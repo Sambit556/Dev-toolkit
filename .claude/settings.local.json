@@ -1,0 +1,18 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm install *)",
+      "Bash(npm run *)",
+      "Bash(node -e \"console.log\\('node ok'\\)\")",
+      "Bash(echo \"started with pid $!\")",
+      "Bash(sleep 8; cat /tmp/web-dev.log)",
+      "Read(//tmp/**)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" http://localhost:3000/)",
+      "Bash(node scratch_verify.js)",
+      "Bash(curl -s http://localhost:3000/)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code} in %{time_total}s\\\\n\" http://localhost:3000/icon.svg)",
+      "Bash(npx tsc *)",
+      "Bash(npx jest *)"
+    ]
+  }
+}

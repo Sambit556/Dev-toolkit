@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm test *)",
+      "Bash(node scratch_verify.js)",
+      "Bash(find /s/personal_proj -maxdepth 4 -iname \"playwright*\" -not -path \"*/node_modules/*/node_modules/*\" 2>/dev/null; echo \"---\"; find / -maxdepth 6 -iname \"playwright-core\" -type d 2>/dev/null | head -5)",
+      "Read(//s//**)"
+    ]
+  }
+}

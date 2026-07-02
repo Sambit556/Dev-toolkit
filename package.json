@@ -1,0 +1,30 @@
+{
+  "name": "devchrono-jsonlab",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Production-grade developer utilities: Epoch Converter & JSON Viewer",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "npm run build --workspace=packages/shared && concurrently \"npm run dev --workspace=apps/api\" \"npm run dev --workspace=apps/web\"",
+    "dev:turbo": "npm run build --workspace=packages/shared && concurrently \"npm run dev --workspace=apps/api\" \"npm run dev:turbo --workspace=apps/web\"",
+    "build": "npm run build --workspace=packages/shared && npm run build --workspace=apps/api && npm run build --workspace=apps/web",
+    "build:api": "npm run build --workspace=apps/api",
+    "build:web": "npm run build --workspace=apps/web",
+    "start": "concurrently \"npm run start --workspace=apps/api\" \"npm run start --workspace=apps/web\"",
+    "test": "npm run test --workspaces --if-present",
+    "lint": "npm run lint --workspaces --if-present",
+    "clean": "rimraf apps/*/node_modules apps/*/.next apps/*/dist packages/*/dist node_modules"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2",
+    "rimraf": "^5.0.5",
+    "typescript": "^5.3.3"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=9.0.0"
+  }
+}

@@ -1,0 +1,106 @@
+version: '3.9'
+
+services:
+  # ─── API Backend ─────────────────────────────────────
+  api:
+    build:
+      context: ..
+      dockerfile: apps/api/Dockerfile
+    container_name: devchrono-api
+    restart: unless-stopped
+    ports:
+      - '3001:3001'
+    environment:
+      NODE_ENV: production
+      PORT: 3001
+      HOST: 0.0.0.0
+      CORS_ORIGIN: http://localhost:3000
+      RATE_LIMIT_WINDOW_MS: 60000
+      RATE_LIMIT_MAX_REQUESTS: 100
+      RATE_LIMIT_JSON_MAX: 30
+      LOG_LEVEL: info
+    healthcheck:
+      test: ['CMD', 'wget', '-qO-', 'http://localhost:3001/health']
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    networks:
+      - devchrono
+
+  # ─── Web Frontend ─────────────────────────────────────
+  web:
+    build:
+      context: ..
+      dockerfile: apps/web/Dockerfile
+    container_name: devchrono-web
+    restart: unless-stopped
+    ports:
+      - '3000:3000'
+    environment:
+      NODE_ENV: production
+      NEXT_PUBLIC_API_URL: http://localhost:3001
+      NEXT_PUBLIC_APP_URL: http://localhost:3000
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test: ['CMD', 'wget', '-qO-', 'http://localhost:3000']
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+    networks:
+      - devchrono
+
+  # ─── Redis (optional: rate limiting) ──────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: devchrono-redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    ports:
+      - '6379:6379'
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - devchrono
+    profiles:
+      - full
+
+  # ─── PostgreSQL (optional: user accounts) ─────────────
+  postgres:
+    image: postgres:16-alpine
+    container_name: devchrono-postgres
+    restart: unless-stopped
+    ports:
+      - '5432:5432'
+    environment:
+      POSTGRES_USER: devchrono
+      POSTGRES_PASSWORD: devchrono_secret
+      POSTGRES_DB: devchrono_db
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ../docker/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U devchrono']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - devchrono
+    profiles:
+      - full
+
+networks:
+  devchrono:
+    driver: bridge
+
+volumes:
+  redis-data:
+  postgres-data:
