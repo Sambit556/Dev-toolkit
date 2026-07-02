@@ -12,7 +12,14 @@
       "Bash(curl -s http://localhost:3000/)",
       "Bash(curl -s -o /dev/null -w \"%{http_code} in %{time_total}s\\\\n\" http://localhost:3000/icon.svg)",
       "Bash(npx tsc *)",
-      "Bash(npx jest *)"
+      "Bash(npx jest *)",
+      "Read(//s/personal_proj/apps/api/**)",
+      "Read(//s/personal_proj/apps/api/src/**)",
+      "Read(//s/s/personal_proj/**)",
+      "Read(//s/personal_proj/docker//**)",
+      "Read(//s/personal_proj/apps/web/src/**)",
+      "Bash(cat /s/personal_proj/DEPLOYMENT.md 2>/dev/null | head -100)",
+      "Read(//s/personal_proj/**)"
     ]
   }
 }
