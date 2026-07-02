@@ -114,8 +114,8 @@ export function TimestampToDate() {
     <div className="space-y-4">
       <div className="space-y-3">
         <div className="grid gap-3 sm:grid-cols-2">
-          <div className="space-y-1.5">
-            <Label htmlFor="ts-input">Unix Timestamp</Label>
+          <div className="space-y-1.5 rounded-md border border-primary/30 bg-primary/5 p-3">
+            <Label htmlFor="ts-input" className="text-primary font-semibold">Unix Timestamp</Label>
             <Input
               id="ts-input"
               placeholder="e.g. 1700000000"

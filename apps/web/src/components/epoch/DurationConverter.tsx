@@ -4,8 +4,7 @@ import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Separator } from '@/components/ui/separator';
-import { Plus, Minus, Trash2, Equal } from 'lucide-react';
+import { Plus, Minus, Trash2, Equal, ArrowLeftRight, Calculator } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
   parseDurationString, formatMsToDuration, autoFormatDurationDigits,
@@ -79,32 +78,39 @@ function DurationBuilder() {
   };
 
   return (
-    <div className="space-y-3">
-      <p className="text-sm text-muted-foreground">
-      </p>
-      <div className="space-y-1">
-        <Label className="text-xs">Duration (HH:MM:SS:mmm)</Label>
-        <Input
-          value={values.duration}
-          onChange={(e) => handleDurationChange(e.target.value)}
-          placeholder="e.g. 02:15:30:500"
-          className="font-mono text-sm"
-        />
+    <div className="rounded-lg border overflow-hidden">
+      <div className="flex items-center gap-2 px-4 py-2.5 bg-muted/30 border-b">
+        <ArrowLeftRight className="h-4 w-4 text-muted-foreground" />
+        <span className="text-sm font-semibold">Convert</span>
       </div>
-      <div className="grid gap-3 grid-cols-2 lg:grid-cols-5">
-        {UNIT_FIELDS.map(({ key, label, placeholder }) => (
-          <div key={key} className="space-y-1">
-            <Label className="text-xs">{label}</Label>
-            <Input
-              value={values[key]}
-              onChange={(e) => handleUnitChange(key, e.target.value)}
-              placeholder={placeholder}
-              className="font-mono text-sm"
-            />
-          </div>
-        ))}
+      <div className="p-4 space-y-3">
+        <p className="text-sm text-muted-foreground">
+          Convert HH:MM:SS:mmm to/from milliseconds, seconds, minutes, hours, or days — edit any field
+        </p>
+        <div className="space-y-1">
+          <Label className="text-xs">Duration (HH:MM:SS:mmm)</Label>
+          <Input
+            value={values.duration}
+            onChange={(e) => handleDurationChange(e.target.value)}
+            placeholder="e.g. 02:15:30:500"
+            className="font-mono text-sm"
+          />
+        </div>
+        <div className="grid gap-3 grid-cols-2 lg:grid-cols-5">
+          {UNIT_FIELDS.map(({ key, label, placeholder }) => (
+            <div key={key} className="space-y-1">
+              <Label className="text-xs">{label}</Label>
+              <Input
+                value={values[key]}
+                onChange={(e) => handleUnitChange(key, e.target.value)}
+                placeholder={placeholder}
+                className="font-mono text-sm"
+              />
+            </div>
+          ))}
+        </div>
+        {error && <p className="text-xs text-destructive">{error}</p>}
       </div>
-      {error && <p className="text-xs text-destructive">{error}</p>}
     </div>
   );
 }
@@ -166,7 +172,12 @@ function DurationArithmetic() {
   };
 
   return (
-    <div className="space-y-3">
+    <div className="rounded-lg border overflow-hidden">
+      <div className="flex items-center gap-2 px-4 py-2.5 bg-muted/30 border-b">
+        <Calculator className="h-4 w-4 text-muted-foreground" />
+        <span className="text-sm font-semibold">Add / Subtract</span>
+      </div>
+      <div className="p-4 space-y-3">
       <p className="text-sm text-muted-foreground">
         Add multiple HH:MM:SS:mmm durations, then subtract others from the total
       </p>
@@ -239,6 +250,7 @@ function DurationArithmetic() {
           <code className="font-mono text-lg font-bold text-primary">{formatMsToDuration(finalResult)}</code>
         </div>
       )}
+      </div>
     </div>
   );
 }
@@ -247,7 +259,6 @@ export function DurationConverter() {
   return (
     <div className="space-y-6">
       <DurationBuilder />
-      <Separator />
       <DurationArithmetic />
     </div>
   );
