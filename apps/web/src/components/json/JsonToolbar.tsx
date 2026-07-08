@@ -3,7 +3,7 @@
 import React, { useRef } from 'react';
 import {
   Code2, Minimize2, CheckCircle, Trash2, Copy, Download,
-  Upload, ChevronDown, ChevronUp, Search, X,
+  Upload, ChevronDown, ChevronUp, Search, X, History,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -22,6 +22,7 @@ interface JsonToolbarProps {
   onUpload: (content: string) => void;
   onExpandAll: () => void;
   onCollapseAll: () => void;
+  onOpenHistory: () => void;
   searchQuery: string;
   onSearchChange: (q: string) => void;
   isValid: boolean | null;
@@ -70,6 +71,7 @@ export function JsonToolbar({
   onUpload,
   onExpandAll,
   onCollapseAll,
+  onOpenHistory,
   searchQuery,
   onSearchChange,
   isValid,
@@ -107,7 +109,7 @@ export function JsonToolbar({
         {/* Format / Minify / Validate */}
         <ToolBtn icon={Code2} label="Format" onClick={onFormat} />
         <ToolBtn icon={Minimize2} label="Minify" onClick={onMinify} />
-        <ToolBtn icon={CheckCircle} label="Validate & Fix" onClick={onValidate} />
+        <ToolBtn icon={CheckCircle} label="Validate" onClick={onValidate} />
 
         <Separator orientation="vertical" className="h-6 mx-0.5" />
 
@@ -123,6 +125,7 @@ export function JsonToolbar({
           onChange={handleFileChange}
         />
         <ToolBtn icon={Upload} label="Load File" onClick={() => fileRef.current?.click()} />
+        <ToolBtn icon={History} label="History" onClick={onOpenHistory} />
 
         <Separator orientation="vertical" className="h-6 mx-0.5" />
 

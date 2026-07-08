@@ -37,6 +37,7 @@ export interface DateTimeResult {
   unixSeconds: number;
   unixMs: number;
   unixNanos: string;
+  unixMicros: string;
   isNegative: boolean;
   formattedDate: string;
 }
@@ -79,6 +80,7 @@ export function timestampToDate(
     unixSeconds: Math.floor(ms / 1000),
     unixMs: ms,
     unixNanos: (BigInt(ms) * BigInt(1_000_000)).toString(),
+    unixMicros: (BigInt(ms) * BigInt(1_000)).toString(),
     isNegative: ms < 0,
     formattedDate: formatDateForDisplay(date, timezone, use24Hour),
   };

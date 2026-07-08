@@ -7,9 +7,11 @@ import { useHistoryStore } from '@/store/history';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { truncate } from '@/lib/utils';
+import { useLocale } from '@/context/LocalizationContext';
 
 export function RecentHistory() {
   const { entries, removeEntry, clearAll } = useHistoryStore();
+  const { t } = useLocale();
   // The store rehydrates from localStorage synchronously on the client, before
   // the server (which always sees an empty store) ever could. Deferring real
   // entries to after mount keeps the first client render matching the server.
@@ -23,12 +25,12 @@ export function RecentHistory() {
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
           <History className="h-4 w-4 text-muted-foreground" />
-          <h2 className="text-base font-semibold">Recent Activity</h2>
+          <h2 className="text-base font-semibold">{t('recentActivity')}</h2>
           <Badge variant="secondary" className="text-xs">{entries.length}</Badge>
         </div>
         <Button variant="ghost" size="sm" onClick={clearAll} className="text-xs text-muted-foreground h-7">
           <Trash2 className="h-3 w-3 mr-1" />
-          Clear all
+          {t('clearAll')}
         </Button>
       </div>
 
@@ -58,10 +60,10 @@ export function RecentHistory() {
               <Button
                 variant="ghost"
                 size="icon-sm"
-                className="h-5 w-5 opacity-0 group-hover:opacity-100 transition-opacity"
+                className="h-5 w-5 opacity-0 group-hover:opacity-100 transition-opacity text-red-500 hover:text-red-600 hover:bg-red-500/10 dark:hover:bg-red-500/20"
                 onClick={() => removeEntry(entry.id)}
               >
-                <Trash2 className="h-3 w-3 text-muted-foreground" />
+                <Trash2 className="h-3 w-3" />
               </Button>
             </div>
           );

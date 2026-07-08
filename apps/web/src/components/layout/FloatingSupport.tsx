@@ -10,8 +10,8 @@ import { cn } from '@/lib/utils';
 // not secrets, just kept out of the component file.
 const WHATSAPP_NUMBER_RAW = process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || '';
 const WHATSAPP_NUMBER = WHATSAPP_NUMBER_RAW.replace(/[^\d]/g, ''); // wa.me needs digits only
-const WHATSAPP_MESSAGE = 'Hi, I need a support/assist with DevChrono JSONLab.';
-const SUPPORT_EMAIL = process.env.NEXT_PUBLIC_SUPPORT_EMAIL || 'support@devchronojsonlab.example';
+const WHATSAPP_MESSAGE = 'Hi, I need assistance with DevToolkit.';
+const SUPPORT_EMAIL = process.env.NEXT_PUBLIC_SUPPORT_EMAIL || 'support@devtoolkit.example';
 
 export function FloatingSupport() {
   const [open, setOpen] = useState(false);
@@ -53,7 +53,7 @@ export function FloatingSupport() {
             </span>
           </a>
           <a
-            href={`mailto:${SUPPORT_EMAIL}?subject=${encodeURIComponent('Support request — DevChrono JSONLab')}`}
+            href={`mailto:${SUPPORT_EMAIL}?subject=${encodeURIComponent('Support request — DevToolkit')}`}
             className="flex items-center gap-2.5 rounded-md px-2 py-2 text-sm hover:bg-accent hover:text-accent-foreground transition-colors"
           >
             <span className="flex h-7 w-7 items-center justify-center rounded-full bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400 shrink-0">

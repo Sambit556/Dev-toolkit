@@ -1,34 +1,70 @@
 {
-  "name": "DevChrono JSONLab",
-  "short_name": "DevChrono",
-  "description": "Fast, private developer tools: Epoch Converter & JSON Viewer",
+  "name": "DevToolkit — Developer Utility Suite",
+  "short_name": "DevToolkit",
+  "description": "Fast, privacy-first developer utilities: JSON viewer, JWT decoder, UUID generator, epoch converter, currency exchanger, internet speed test, and 10 more tools — all offline-ready.",
   "start_url": "/",
+  "scope": "/",
   "display": "standalone",
+  "display_override": ["window-controls-overlay", "standalone", "browser"],
   "background_color": "#ffffff",
   "theme_color": "#3b82f6",
   "orientation": "any",
+  "lang": "en-US",
+  "categories": ["developer", "utilities", "productivity"],
+  "prefer_related_applications": false,
   "icons": [
     {
       "src": "/icon-192.png",
       "sizes": "192x192",
-      "type": "image/png"
+      "type": "image/png",
+      "purpose": "any maskable"
     },
     {
       "src": "/icon-512.png",
       "sizes": "512x512",
-      "type": "image/png"
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
     }
   ],
   "shortcuts": [
     {
       "name": "Epoch Converter",
+      "short_name": "Epoch",
       "url": "/epoch",
-      "description": "Convert Unix timestamps"
+      "description": "Convert Unix timestamps to human-readable dates"
     },
     {
       "name": "JSON Viewer",
+      "short_name": "JSON",
       "url": "/json",
-      "description": "View and format JSON"
+      "description": "Format, validate and explore JSON"
+    },
+    {
+      "name": "JWT Decoder",
+      "short_name": "JWT",
+      "url": "/jwt",
+      "description": "Decode and encode JSON Web Tokens"
+    },
+    {
+      "name": "UUID Generator",
+      "short_name": "UUID",
+      "url": "/uuid",
+      "description": "Generate UUIDs, ULIDs and NanoIDs in bulk"
+    }
+  ],
+  "screenshots": [
+    {
+      "src": "/og-image.png",
+      "sizes": "1200x630",
+      "type": "image/png",
+      "form_factor": "wide",
+      "label": "DevToolkit home page showing all 16 developer tools"
     }
   ]
 }

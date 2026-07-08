@@ -103,10 +103,11 @@ export function TimestampToDate() {
     ? [
         { label: 'Relative', value: formatRelativeTime(result.unixMs), highlight: true },
         { label: `${timezone}`, value: result.local, highlight: isKolkata },
-        { label: 'UTC / GMT', value: result.utc },
         { label: 'Unix (seconds)', value: result.unixSeconds.toString() },
-        { label: 'Unix (ms)', value: result.unixMs.toString() },
-        { label: 'Unix (ns)', value: result.unixNanos },
+        { label: 'Unix (milliseconds)', value: result.unixMs.toString() },
+        { label: 'Unix (microseconds)', value: result.unixMicros },
+        { label: 'Unix (nanoseconds)', value: result.unixNanos },
+        { label: 'UTC / GMT', value: result.utc },
       ]
     : [];
 

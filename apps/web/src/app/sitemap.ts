@@ -1,13 +1,42 @@
 import type { MetadataRoute } from 'next';
 
-export default function sitemap(): MetadataRoute.Sitemap {
-  const base = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
-  const routes = ['', '/epoch', '/json', '/support'];
+const TOOL_ROUTES = [
+  '/epoch',
+  '/json',
+  '/jwt',
+  '/uuid',
+  '/cron',
+  '/unit-converter',
+  '/color-picker',
+  '/encoder-decoder',
+  '/calculator',
+  '/yaml-json',
+  '/image-tool',
+  '/converters',
+  '/currency',
+  '/ip-intel',
+  '/speed-test',
+  '/file-converter',
+  '/blog',
+  '/support',
+];
 
-  return routes.map((route) => ({
+export default function sitemap(): MetadataRoute.Sitemap {
+  const base = process.env.NEXT_PUBLIC_APP_URL || 'https://devtoolkit.app';
+
+  const home = {
+    url: base,
+    lastModified: new Date(),
+    changeFrequency: 'daily' as const,
+    priority: 1.0,
+  };
+
+  const toolPages = TOOL_ROUTES.map((route) => ({
     url: `${base}${route}`,
     lastModified: new Date(),
     changeFrequency: 'weekly' as const,
-    priority: route === '' ? 1 : 0.8,
+    priority: route === '/blog' || route === '/support' ? 0.6 : 0.85,
   }));
+
+  return [home, ...toolPages];
 }

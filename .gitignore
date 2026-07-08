@@ -54,3 +54,4 @@ packages/*/src/**/*.d.ts.map
 # Misc
 .cache/
 tmp/
+.claude/

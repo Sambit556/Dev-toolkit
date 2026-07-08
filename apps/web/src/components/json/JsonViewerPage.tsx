@@ -7,11 +7,13 @@ import { JsonEditor } from './JsonEditor';
 import { JsonTree } from './JsonTree';
 import { JsonToolbar } from './JsonToolbar';
 import { JsonAdvancedTools } from './JsonAdvancedTools';
+import { JsonHistoryPanel } from './JsonHistoryPanel';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { copyToClipboard, downloadFile } from '@/lib/utils';
 import { parseJsonSafe, formatJson, minifyJson, countNodes } from '@/lib/json-utils';
 import { tryRepairJson } from '@/lib/json-repair';
+import { useHistoryStore } from '@/store/history';
 
 export function JsonViewerPage() {
   const [input, setInput] = useState('');
@@ -19,6 +21,9 @@ export function JsonViewerPage() {
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const [rightTab, setRightTab] = useState<'tree' | 'advanced'>('tree');
   const [errorLine, setErrorLine] = useState<number | undefined>();
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const addHistoryEntry = useHistoryStore((s) => s.addEntry);
+  const lastHistoryEntry = useHistoryStore((s) => s.entries.find((e) => e.tool === 'json'));
 
   // Parse result
   const parseResult = useMemo(() => {
@@ -47,25 +52,37 @@ export function JsonViewerPage() {
     }
   }, [parseResult]);
 
+  const saveJsonToHistory = useCallback((value: string) => {
+    if (!value.trim() || value === lastHistoryEntry?.input) return;
+    const parsed = parseJsonSafe(value);
+    if (parsed.error || parsed.value === undefined) return;
+    const count = countNodes(parsed.value);
+    const bytes = new TextEncoder().encode(value).length;
+    const sizeLabel = bytes > 1024 ? `${(bytes / 1024).toFixed(1)} KB` : `${bytes} B`;
+    addHistoryEntry({ tool: 'json', input: value, output: `${count.toLocaleString()} nodes · ${sizeLabel}` });
+  }, [addHistoryEntry, lastHistoryEntry]);
+
   const handleFormat = useCallback(() => {
     try {
       const formatted = formatJson(input);
       setInput(formatted);
+      saveJsonToHistory(formatted);
       toast.success('JSON formatted');
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Invalid JSON');
     }
-  }, [input]);
+  }, [input, saveJsonToHistory]);
 
   const handleMinify = useCallback(() => {
     try {
       const minified = minifyJson(input);
       setInput(minified);
+      saveJsonToHistory(minified);
       toast.success('JSON minified');
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Invalid JSON');
     }
-  }, [input]);
+  }, [input, saveJsonToHistory]);
 
   const handleValidate = useCallback(() => {
     if (!input.trim()) {
@@ -74,6 +91,7 @@ export function JsonViewerPage() {
     }
     const result = parseJsonSafe(input);
     if (!result.error) {
+      saveJsonToHistory(input);
       toast.success(`Valid JSON · ${nodeCount.toLocaleString()} nodes · ${(inputSize / 1024).toFixed(1)} KB`);
       return;
     }
@@ -81,13 +99,14 @@ export function JsonViewerPage() {
     const repaired = tryRepairJson(input);
     if (repaired) {
       setInput(repaired.fixed);
+      saveJsonToHistory(repaired.fixed);
       toast.success('Found issues and fixed them automatically — review the updated JSON');
       return;
     }
 
     const loc = result.error.line ? ` (line ${result.error.line}, col ${result.error.column})` : '';
     toast.error(`Couldn't auto-fix this JSON${loc}: ${result.error.message}`);
-  }, [input, nodeCount, inputSize]);
+  }, [input, nodeCount, inputSize, saveJsonToHistory]);
 
   const handleCopy = useCallback(async () => {
     if (!input) return;
@@ -181,6 +200,7 @@ export function JsonViewerPage() {
         onUpload={setInput}
         onExpandAll={handleExpandAll}
         onCollapseAll={handleCollapseAll}
+        onOpenHistory={() => setHistoryOpen(true)}
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
         isValid={isValid}
@@ -264,6 +284,15 @@ export function JsonViewerPage() {
           </div>
         </div>
       </div>
+
+      <JsonHistoryPanel
+        open={historyOpen}
+        onOpenChange={setHistoryOpen}
+        onLoad={(value) => {
+          setInput(value);
+          toast.success('Loaded from history');
+        }}
+      />
     </div>
   );
 }

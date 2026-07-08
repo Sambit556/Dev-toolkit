@@ -54,10 +54,24 @@
 @layer base {
   * {
     @apply border-border;
+    /* Prevent any element from causing horizontal scroll */
+    box-sizing: border-box;
+  }
+  html {
+    /* Smooth scroll without causing layout shifts */
+    scroll-behavior: smooth;
+    /* Prevent rubberbanding on iOS */
+    overscroll-behavior: none;
   }
   body {
     @apply bg-background text-foreground;
     font-feature-settings: 'rlig' 1, 'calt' 1;
+    /* Prevent body content from ever overflowing horizontally */
+    overflow-x: hidden;
+    /* Prevent content from shifting due to scrollbar appearing/disappearing */
+    scrollbar-gutter: stable;
+    /* Prevent rubberbanding on iOS */
+    overscroll-behavior: none;
   }
 
   /* Scrollbar styling */
@@ -74,6 +88,12 @@
   ::-webkit-scrollbar-thumb:hover {
     @apply bg-muted-foreground/50;
   }
+
+  /* Responsive images */
+  img, video, canvas, svg {
+    max-width: 100%;
+    height: auto;
+  }
 }
 
 @layer utilities {
@@ -85,8 +105,13 @@
     @apply bg-gradient-to-r from-blue-600 via-purple-600 to-blue-600 bg-clip-text text-transparent;
   }
 
+  /* 
+   * Fade-in: opacity ONLY — no translateY.
+   * translateY causes the page to visibly jump/shake on every route change
+   * because each page container re-mounts and re-runs the animation.
+   */
   .animate-fade-in {
-    animation: fade-in 0.3s ease-out;
+    animation: fade-in 0.25s ease-out both;
   }
 
   /* JSON Tree colors */
@@ -95,4 +120,11 @@
   .json-boolean { @apply text-purple-600 dark:text-purple-400; }
   .json-null { @apply text-red-500 dark:text-red-400; }
   .json-key { @apply text-foreground font-medium; }
+
+  /* Responsive container helpers */
+  .safe-area-inset {
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
+    padding-bottom: env(safe-area-inset-bottom);
+  }
 }

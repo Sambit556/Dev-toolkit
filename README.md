@@ -49,6 +49,77 @@ docker/
   postgres/init.sql
 ```
 
+### System Architecture Diagram
+
+```mermaid
+graph TD
+    subgraph Client [Browser Environment / Client-Side]
+        UI[Next.js Frontend Apps]
+        Store[Zustand Persistent Store]
+        
+        subgraph LocalTools [Client-Side Processing Engines]
+            JWT[JWT Decoder / Web Crypto Subtle]
+            UUID[UUID/ULID Generator]
+            Cron[Cron visual scheduler]
+            Color[Color Harmony & WCAG Contrast Checker]
+            Units[Unit Converter Matrix]
+            EncDec[Morse, ROT13, Base64 File drop]
+            Canvas[Image compression/filters canvas]
+            DocConv[CSV, XML, MD parsing & jsPDF exporter]
+        end
+        
+        Monaco[Local Monaco Editor Worker ESM]
+    end
+
+    subgraph Server [Backend Environment]
+        API[Express.js REST API Layer]
+        Helmet[Helmet security headers / CORS policy]
+        RateLimiter[express-rate-limit validation]
+    end
+
+    subgraph Data [Data Persistence Optional]
+        Postgres[(PostgreSQL User Accounts DB)]
+    end
+
+    UI --> Store
+    UI -.-> LocalTools
+    UI --> Monaco
+    UI -- HTTPS Secure Endpoints --> Helmet
+    Helmet --> RateLimiter
+    RateLimiter --> API
+    API --> Postgres
+```
+
+### Architectural Component Descriptions
+- **Monorepo Layout**: The platform uses npm workspaces to isolate dependencies. Shared types, models, schemas, and helper libraries reside in `@devchrono/shared` and are loaded locally by the Next.js client (`@devchrono/web`) and the Express REST service (`@devchrono/api`).
+- **Client-Side Execution Loop**: To guarantee maximum privacy, core formatters, viewer nodes, encoding converters, image canvas manipulation, and PDF document compilers run 100% in-browser. User configuration parameters are persisted locally inside the browser's `localStorage` via Zustand hooks.
+- **REST Backend Service**: The REST backend handles auxiliary server workflows, secured using Helmet header policies, strict CORS origins configurations, and Express rate-limit configurations.
+
+---
+
+## Security Considerations
+
+To ensure the safety of developer inputs, configurations, and secrets, the suite incorporates the following security design patterns:
+
+### 1. Data Privacy & Zero-Transmission Policy
+- **No Remote Operations for Sensitive Inputs**: None of the developer data (such as JWT payloads, private verification keys, configuration parameters, CSV contents, or YAML files) is ever transmitted to a server. All parser calculations are performed in-memory inside the browser tab context.
+- **No Third-Party Analytics / Loggers**: Excludes external trackers, preventing key logs or data capture.
+
+### 2. Sandbox Signature Generation via Web Crypto API
+- Signature parsing for HS256/384/512 and RS256 algorithms is performed using the browser's native `window.crypto.subtle` Web Crypto APIs.
+- Avoids arbitrary JS library compilations for cryptography, isolating keys from side-channel script vulnerabilities.
+
+### 3. Local Monaco Editor ESM Config
+- Monaco Editor contributions, languages, and workers are loaded locally from the project dependencies via ES Modules imports instead of resolving unverified scripts from public CDNs. This aligns with strict **Content Security Policy (CSP)** rules.
+
+### 4. CSV Formula Injection Defense
+- The CSV-to-JSON and JSON-to-CSV converters sanitize cell values containing formula triggers (such as `=`, `+`, `-`, `@`) by escaping them, preventing macro injection attacks when output sheets are opened in Microsoft Excel or Google Sheets.
+
+### 5. API Layer Safeguards (Express Server)
+- **Helmet Middleware**: Configures HTTP headers to protect against cross-site scripting (XSS), clickjacking, sniffing, and MIME-type vulnerabilities.
+- **CORS Protection**: Access to REST endpoints is restricted to configured origins.
+- **Rate-Limiting**: Prevents API abuse and DoS vectors using IP-based request throttles.
+
 ### Tech Stack
 
 | Layer | Technology |
