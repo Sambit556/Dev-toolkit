@@ -721,7 +721,7 @@ export default function BlogPage() {
                   <div className="flex justify-center mt-6 gap-3">
                     <Button size="sm" variant="outline" className="font-bold flex items-center gap-1.5" onClick={initializeGame}>
                       <RotateCcw className="h-3.5 w-3.5" />
-                      Reset Game
+                      Start/Reset Game
                     </Button>
                   </div>
                 </CardContent>

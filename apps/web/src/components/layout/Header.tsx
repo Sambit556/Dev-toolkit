@@ -235,35 +235,71 @@ function HeaderClock() {
   );
 }
 
+type ConnectionStatus = 'online' | 'offline' | 'checking';
+
 function HeaderStatus() {
-  const [isOnline, setIsOnline] = useState(true);
+  const [status, setStatus] = useState<ConnectionStatus>('checking');
 
   const checkConnectivity = useCallback(async () => {
+    // 1. Quick check using navigator.onLine (instant offline detection)
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      setStatus('offline');
+      return;
+    }
+
     try {
       const controller = new AbortController();
-      const tid = setTimeout(() => controller.abort(), 4000);
-      // IMPORTANT: must NOT use mode:'no-cors' — opaque responses always "succeed"
-      // api.ipify.org supports CORS and genuinely throws when offline
-      const res = await fetch(
-        `https://api.ipify.org?format=json&_=${Date.now()}`,
-        { cache: 'no-store', signal: controller.signal }
-      );
+      const tid = setTimeout(() => controller.abort(), 3000);
+
+      // 2. Perform a lightweight no-cors request to a highly reliable public service.
+      // Fetch throws if truly offline or DNS cannot resolve, but avoids CORS blocks.
+      await fetch(`https://www.google.com/favicon.ico?_=${Date.now()}`, {
+        mode: 'no-cors',
+        cache: 'no-store',
+        signal: controller.signal,
+      });
+
       clearTimeout(tid);
-      setIsOnline(res.ok);
+      setStatus('online');
     } catch {
-      // TypeError: Failed to fetch — genuinely offline
-      setIsOnline(false);
+      // 3. Fallback: If public check fails (network restriction/captive portal),
+      // try querying the local backend api to verify if server is reachable.
+      try {
+        const controller = new AbortController();
+        const tid = setTimeout(() => controller.abort(), 2000);
+        const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+        const res = await fetch(`${apiUrl}/health`, {
+          cache: 'no-store',
+          signal: controller.signal,
+        });
+        clearTimeout(tid);
+        if (res.ok) {
+          setStatus('online');
+          return;
+        }
+      } catch {
+        // Fallback failed too
+      }
+      setStatus('offline');
     }
   }, []);
 
   useEffect(() => {
     checkConnectivity();
-    const handleOnline = () => checkConnectivity();
-    const handleOffline = () => setIsOnline(false);
+
+    const handleOnline = () => {
+      setStatus('checking');
+      checkConnectivity();
+    };
+    const handleOffline = () => {
+      setStatus('offline');
+    };
 
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
-    const pingInterval = setInterval(checkConnectivity, 10000);
+    
+    // Check connectivity periodically every 15 seconds
+    const pingInterval = setInterval(checkConnectivity, 15000);
 
     return () => {
       window.removeEventListener('online', handleOnline);
@@ -275,24 +311,35 @@ function HeaderStatus() {
   return (
     <div className={cn(
       "hidden md:flex items-center gap-1.5 font-mono text-[9px] font-black uppercase tracking-widest px-2.5 py-1.5 rounded-lg border shadow-sm transition-all",
-      isOnline 
-        ? "bg-emerald-500/10 text-emerald-600 border-emerald-500/20" 
-        : "bg-red-500/10 text-red-600 border-red-500/20"
+      status === 'online' && "bg-emerald-500/10 text-emerald-600 border-emerald-500/20",
+      status === 'offline' && "bg-red-500/10 text-red-600 border-red-500/20",
+      status === 'checking' && "bg-amber-500/10 text-amber-600 border-amber-500/20"
     )}>
       <span className="relative flex h-1.5 w-1.5 shrink-0">
-        {isOnline ? (
+        {status === 'online' && (
           <>
             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
             <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500"></span>
           </>
-        ) : (
+        )}
+        {status === 'offline' && (
           <>
             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
             <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-red-500"></span>
           </>
         )}
+        {status === 'checking' && (
+          <>
+            <span className="animate-pulse absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+            <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-amber-500"></span>
+          </>
+        )}
       </span>
-      <span>{isOnline ? 'Online' : 'Offline'}</span>
+      <span>
+        {status === 'online' && 'Online'}
+        {status === 'offline' && 'Offline'}
+        {status === 'checking' && 'Checking'}
+      </span>
     </div>
   );
 }

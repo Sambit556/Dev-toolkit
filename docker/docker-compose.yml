@@ -14,7 +14,7 @@ services:
       NODE_ENV: production
       PORT: 3001
       HOST: 0.0.0.0
-      CORS_ORIGIN: http://localhost:3000
+      CORS_ORIGIN: http://localhost:4001
       RATE_LIMIT_WINDOW_MS: 60000
       RATE_LIMIT_MAX_REQUESTS: 100
       RATE_LIMIT_JSON_MAX: 30
@@ -36,16 +36,16 @@ services:
     container_name: devchrono-web
     restart: unless-stopped
     ports:
-      - '3000:3000'
+      - '4001:4001'
     environment:
       NODE_ENV: production
       NEXT_PUBLIC_API_URL: http://localhost:3001
-      NEXT_PUBLIC_APP_URL: http://localhost:3000
+      NEXT_PUBLIC_APP_URL: http://localhost:4001
     depends_on:
       api:
         condition: service_healthy
     healthcheck:
-      test: ['CMD', 'wget', '-qO-', 'http://localhost:3000']
+      test: ['CMD', 'wget', '-qO-', 'http://localhost:4001']
       interval: 30s
       timeout: 10s
       retries: 3

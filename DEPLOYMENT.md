@@ -74,7 +74,7 @@ docker push $AWS_ACCOUNT.dkr.ecr.$AWS_REGION.amazonaws.com/devchrono-web:latest
 ### 3. Application Load Balancer
 
 1. Create ALB with HTTPS listener (port 443)
-2. Create target groups for API (port 3001) and Web (port 3000)
+2. Create target groups for API (port 3001) and Web (port 4001)
 3. Configure routing rules:
    - `api.yourdomain.com/*` → API target group
    - `yourdomain.com/*` → Web target group

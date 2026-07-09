@@ -39,12 +39,12 @@ COPY --from=builder --chown=devchrono:devchrono /app/apps/web/public ./apps/web/
 
 USER devchrono
 
-EXPOSE 3000
+EXPOSE 4001
 
-ENV PORT=3000
+ENV PORT=4001
 ENV HOSTNAME="0.0.0.0"
 
 HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
-  CMD wget -qO- http://localhost:3000/api/health || exit 1
+  CMD wget -qO- http://localhost:4001/api/health || exit 1
 
 CMD ["node", "apps/web/server.js"]

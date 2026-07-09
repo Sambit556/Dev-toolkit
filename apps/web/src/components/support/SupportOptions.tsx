@@ -5,6 +5,7 @@ import { Check, Copy, ExternalLink, Wallet, Smartphone } from 'lucide-react';
 import { toast } from 'sonner';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { copyToClipboard } from '@/lib/utils';
 
 // Public-facing payment details, configured via env (see .env.local.example) so
@@ -33,6 +34,14 @@ function CopyField({ value, label }: { value: string; label: string }) {
 }
 
 export function SupportOptions() {
+  const [showPaypalInput, setShowPaypalInput] = useState(false);
+  const [amount, setAmount] = useState<string>('10');
+
+  const cleanPaypalLink = PAYPAL_LINK.endsWith('/') ? PAYPAL_LINK.slice(0, -1) : PAYPAL_LINK;
+  const numericAmount = Number(amount);
+  const isValidAmount = amount !== '' && !isNaN(numericAmount) && numericAmount > 0;
+  const paypalUrl = `${cleanPaypalLink}/${isValidAmount ? amount : '10'}`;
+
   return (
     <div className="grid gap-4 sm:grid-cols-2">
       <Card className="shadow-sm hover:shadow-md transition-shadow">
@@ -44,12 +53,62 @@ export function SupportOptions() {
           <CardDescription>One-off or recurring, worldwide.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
-          <Button asChild className="w-full gap-2">
-            <a href={PAYPAL_LINK} target="_blank" rel="noopener noreferrer">
+          {!showPaypalInput ? (
+            <Button onClick={() => setShowPaypalInput(true)} className="w-full gap-2">
               Donate via PayPal
               <ExternalLink className="h-3.5 w-3.5" />
-            </a>
-          </Button>
+            </Button>
+          ) : (
+            <div className="space-y-3 animate-in fade-in duration-200">
+              <div className="space-y-1.5">
+                <label htmlFor="paypal-amount" className="text-xs font-semibold text-muted-foreground">
+                  Amount (USD)
+                </label>
+                <div className="flex gap-2">
+                  <div className="relative flex-1">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground select-none">
+                      $
+                    </span>
+                    <Input
+                      id="paypal-amount"
+                      type="number"
+                      min="1"
+                      step="any"
+                      value={amount}
+                      onChange={(e) => setAmount(e.target.value)}
+                      className="pl-7 h-9 text-sm"
+                      placeholder="10"
+                    />
+                  </div>
+                  <Button
+                    onClick={() => {
+                      if (isValidAmount) {
+                        window.open(paypalUrl, '_blank', 'noopener,noreferrer');
+                      }
+                    }}
+                    disabled={!isValidAmount}
+                    className="gap-1.5 h-9 shrink-0"
+                  >
+                    Pay
+                    <ExternalLink className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
+              </div>
+              <div className="flex justify-between items-center">
+                <button
+                  onClick={() => setShowPaypalInput(false)}
+                  className="text-xs text-muted-foreground hover:text-foreground hover:underline transition-colors"
+                >
+                  Cancel
+                </button>
+                {!isValidAmount && amount !== '' && (
+                  <span className="text-[10px] text-destructive font-medium">
+                    Please enter a valid amount
+                  </span>
+                )}
+              </div>
+            </div>
+          )}
           <p className="text-[11px] text-muted-foreground">
             Placeholder link — swap in the real PayPal.me handle before going live.
           </p>

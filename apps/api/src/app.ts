@@ -36,7 +36,7 @@ app.use(
 );
 
 // CORS
-const allowedOrigins = (process.env.CORS_ORIGIN || 'http://localhost:3000')
+const allowedOrigins = (process.env.CORS_ORIGIN || 'http://localhost:4001')
   .split(',')
   .map((o) => o.trim());
 

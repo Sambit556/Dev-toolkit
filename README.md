@@ -164,7 +164,7 @@ cp apps/web/.env.local.example apps/web/.env.local
 npm run dev
 ```
 
-- **Frontend**: http://localhost:3000
+- **Frontend**: http://localhost:4001
 - **Backend API**: http://localhost:3001
 - **API Docs**: http://localhost:3001/docs
 
@@ -258,7 +258,7 @@ Full OpenAPI spec available at `/openapi.json` and `/docs`.
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `PORT` | `3001` | Server port |
-| `CORS_ORIGIN` | `http://localhost:3000` | Allowed CORS origins |
+| `CORS_ORIGIN` | `http://localhost:4001` | Allowed CORS origins |
 | `RATE_LIMIT_MAX_REQUESTS` | `100` | Requests per minute per IP |
 | `RATE_LIMIT_JSON_MAX` | `30` | JSON endpoint rate limit |
 | `BODY_LIMIT_DEFAULT` | `1mb` | Default body size limit |
@@ -272,7 +272,7 @@ Full OpenAPI spec available at `/openapi.json` and `/docs`.
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `NEXT_PUBLIC_API_URL` | `http://localhost:3001` | Backend API URL |
-| `NEXT_PUBLIC_APP_URL` | `http://localhost:3000` | Frontend URL |
+| `NEXT_PUBLIC_APP_URL` | `http://localhost:4001` | Frontend URL |
 
 ---
 
