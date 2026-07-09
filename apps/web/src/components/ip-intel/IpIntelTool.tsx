@@ -203,7 +203,7 @@ export function IpIntelTool() {
       asn: d.connection?.asn ? `AS${d.connection.asn}` : undefined,
     });
 
-    const apiKey = 'sk.22211c1063dc1ee04dc4acfad4c5b14a96342543ca490ca19bf428a9eb07ae1d';
+    const apiKey = process.env.IPWHO_API_KEY;
 
     try {
       // 1. Try ipapi.co (HTTPS, CORS-enabled, keyless)
@@ -292,7 +292,7 @@ export function IpIntelTool() {
       asn: d.connection?.asn ? `AS${d.connection.asn}` : undefined,
     });
 
-    const apiKey = 'sk.22211c1063dc1ee04dc4acfad4c5b14a96342543ca490ca19bf428a9eb07ae1d';
+    const apiKey = process.env.IPWHO_API_KEY;
 
     try {
       // 1. Try ipapi.co (HTTPS, CORS-enabled, keyless)

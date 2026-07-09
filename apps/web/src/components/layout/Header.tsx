@@ -331,13 +331,24 @@ export function Header() {
   const { t } = useLocale();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [desktopOpen, setDesktopOpen] = useState(false);
+  const clickLocked = useRef(false); // true = user clicked to pin the dropdown open
+  const hoverTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   const progressBarRef = useRef<HTMLDivElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
+
+  const closeDropdown = () => {
+    setDesktopOpen(false);
+    clickLocked.current = false;
+    if (hoverTimeout.current) {
+      clearTimeout(hoverTimeout.current);
+      hoverTimeout.current = null;
+    }
+  };
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
-        setDesktopOpen(false);
+        closeDropdown();
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
@@ -395,9 +406,42 @@ export function Header() {
     };
   };
 
+  // Hover handlers for the tools dropdown wrapper
+  const handleMouseEnter = () => {
+    if (hoverTimeout.current) {
+      clearTimeout(hoverTimeout.current);
+      hoverTimeout.current = null;
+    }
+    setDesktopOpen(true);
+  };
+
+  const handleMouseLeave = () => {
+    // Only auto-close if the user hasn't explicitly clicked to lock it open
+    if (!clickLocked.current) {
+      hoverTimeout.current = setTimeout(() => {
+        setDesktopOpen(false);
+      }, 150); // small delay to allow moving to the dropdown panel
+    }
+  };
+
+  // Click handler for the Tools button
+  const handleToolsClick = () => {
+    if (desktopOpen && clickLocked.current) {
+      // Already open and pinned → close it
+      closeDropdown();
+    } else if (desktopOpen && !clickLocked.current) {
+      // Open via hover → pin it
+      clickLocked.current = true;
+    } else {
+      // Closed → open and pin
+      setDesktopOpen(true);
+      clickLocked.current = true;
+    }
+  };
+
   // Close dropdown on navigate
   useEffect(() => {
-    setDesktopOpen(false);
+    closeDropdown();
     setMobileOpen(false);
   }, [pathname]);
 
@@ -430,11 +474,13 @@ export function Header() {
 
           {/* Tools Menu Trigger */}
           <div
-            className="py-1"
+            className="py-1 cursor-pointer"
             ref={dropdownRef}
+            onMouseEnter={handleMouseEnter}
+            onMouseLeave={handleMouseLeave}
           >
             <button
-              onClick={() => setDesktopOpen((prev) => !prev)}
+              onClick={handleToolsClick}
               className={cn(
                 'inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-sm font-medium transition-colors text-muted-foreground hover:bg-accent hover:text-accent-foreground',
                 desktopOpen && 'bg-accent text-accent-foreground'

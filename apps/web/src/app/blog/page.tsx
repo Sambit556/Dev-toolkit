@@ -197,7 +197,7 @@ export default function BlogPage() {
     setWeatherLoading(true);
     setWeatherError(null);
 
-    const apiKey = '6f17dd2d66b202ab4c8c52e73210089c';
+    const apiKey = process.env.OPENWEATHERMAP_API_KEY;
 
     const getOwmIconEmoji = (iconCode: string): string => {
       if (iconCode.startsWith('01')) return '☀️';
