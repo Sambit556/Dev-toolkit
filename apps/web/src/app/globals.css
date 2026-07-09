@@ -142,3 +142,148 @@
     filter: blur(0);
   }
 }
+
+/* True 3D Preservation & Rendering Utility Classes */
+.preserve-3d {
+  transform-style: preserve-3d !important;
+  -webkit-transform-style: preserve-3d !important;
+}
+
+.backface-hidden {
+  backface-visibility: hidden !important;
+  -webkit-backface-visibility: hidden !important;
+}
+
+.perspective-800 {
+  perspective: 800px !important;
+  -webkit-perspective: 800px !important;
+}
+
+.perspective-1000 {
+  perspective: 1000px !important;
+  -webkit-perspective: 1000px !important;
+}
+
+/* 3D Coin Face Position Transforms */
+.coin-face-front { transform: rotateX(0deg); -webkit-transform: rotateX(0deg); }
+.coin-face-back { transform: rotateX(180deg); -webkit-transform: rotateX(180deg); }
+
+/* 3D Dice Face Position Transforms */
+.die-face-1 { transform: rotateY(0deg) translateZ(40px); -webkit-transform: rotateY(0deg) translateZ(40px); }
+.die-face-2 { transform: rotateY(180deg) translateZ(40px); -webkit-transform: rotateY(180deg) translateZ(40px); }
+.die-face-3 { transform: rotateY(-90deg) translateZ(40px); -webkit-transform: rotateY(-90deg) translateZ(40px); }
+.die-face-4 { transform: rotateY(90deg) translateZ(40px); -webkit-transform: rotateY(90deg) translateZ(40px); }
+.die-face-5 { transform: rotateX(90deg) translateZ(40px); -webkit-transform: rotateX(90deg) translateZ(40px); }
+.die-face-6 { transform: rotateX(-90deg) translateZ(40px); -webkit-transform: rotateX(-90deg) translateZ(40px); }
+
+/* Premium 3D Coin Toss Animation (8 complete spins for high speed real look) */
+@keyframes coin-flip-heads {
+  0% {
+    transform: translateY(0) rotateX(0deg) scale(1);
+    filter: blur(0px);
+  }
+  15% {
+    transform: translateY(-30px) rotateX(360deg) scale(1.05);
+    filter: blur(0.5px);
+  }
+  50% {
+    transform: translateY(-130px) rotateX(1440deg) scale(1.15);
+    filter: blur(1.5px);
+  }
+  75% {
+    transform: translateY(-60px) rotateX(2160deg) scale(1.05);
+    filter: blur(0.5px);
+  }
+  100% {
+    transform: translateY(0) rotateX(2880deg) scale(1); /* 8 full spins */
+    filter: blur(0px);
+  }
+}
+
+@keyframes coin-flip-tails {
+  0% {
+    transform: translateY(0) rotateX(0deg) scale(1);
+    filter: blur(0px);
+  }
+  15% {
+    transform: translateY(-30px) rotateX(360deg) scale(1.05);
+    filter: blur(0.5px);
+  }
+  50% {
+    transform: translateY(-130px) rotateX(1440deg) scale(1.15);
+    filter: blur(1.5px);
+  }
+  75% {
+    transform: translateY(-60px) rotateX(2160deg) scale(1.05);
+    filter: blur(0.5px);
+  }
+  100% {
+    transform: translateY(0) rotateX(3060deg) scale(1); /* 8.5 spins */
+    filter: blur(0px);
+  }
+}
+
+.animate-flip-heads {
+  animation: coin-flip-heads 1.2s cubic-bezier(0.15, 0.85, 0.35, 1) both;
+}
+
+.animate-flip-tails {
+  animation: coin-flip-tails 1.2s cubic-bezier(0.15, 0.85, 0.35, 1) both;
+}
+
+/* Premium 3D Coin Toss Shadow Scale */
+@keyframes coin-shadow {
+  0% {
+    transform: scale(1);
+    opacity: 0.6;
+    filter: blur(2px);
+  }
+  30% {
+    transform: scale(0.35);
+    opacity: 0.15;
+    filter: blur(5px);
+  }
+  60% {
+    transform: scale(0.35);
+    opacity: 0.15;
+    filter: blur(5px);
+  }
+  100% {
+    transform: scale(1);
+    opacity: 0.6;
+    filter: blur(2px);
+  }
+}
+
+.animate-coin-shadow {
+  animation: coin-shadow 1.2s cubic-bezier(0.15, 0.85, 0.35, 1) both;
+}
+
+/* Premium 3D Dice Bounce & Wobble */
+@keyframes dice-bounce {
+  0% {
+    transform: scale(1) translateY(0) rotate(0deg);
+  }
+  15% {
+    transform: scale(0.85) translateY(12px) rotate(-8deg);
+  }
+  30% {
+    transform: scale(1.12) translateY(-60px) rotate(15deg);
+  }
+  50% {
+    transform: scale(1.05) translateY(-70px) rotate(-20deg);
+  }
+  70% {
+    transform: scale(0.95) translateY(6px) rotate(12deg);
+  }
+  85% {
+    transform: scale(1.02) translateY(-12px) rotate(-6deg);
+  }
+  100% {
+    transform: scale(1) translateY(0) rotate(0deg);
+  }
+}
+
+.animate-dice-bounce {
+  animation: dice-bounce 1s cubic-bezier(0.25, 0.46, 0.45, 0.94) both;
+}

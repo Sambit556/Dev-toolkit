@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Palette, Copy, RefreshCw, Layers, ShieldCheck, Check, X, ShieldAlert } from 'lucide-react';
+import { Palette, Copy, RefreshCw, Layers, ShieldCheck, Check, X, ShieldAlert, Lock, Unlock } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -24,6 +24,46 @@ export function ColorTool() {
   const [fgColor, setFgColor] = useState<string>('#FFFFFF');
   const [bgColor, setBgColor] = useState<string>('#3B82F6');
   const [contrastRatio, setContrastRatio] = useState<number>(4.5);
+
+  // Palette Generator state
+  const [palette, setPalette] = useState<{ hex: string; locked: boolean }[]>([
+    { hex: '#3B82F6', locked: false },
+    { hex: '#10B981', locked: false },
+    { hex: '#F59E0B', locked: false },
+    { hex: '#EF4444', locked: false },
+    { hex: '#8B5CF6', locked: false },
+  ]);
+
+  const generatePalette = () => {
+    setPalette(prev =>
+      prev.map(c => {
+        if (c.locked) return c;
+        const randomHex = '#' + Math.floor(Math.random() * 16777215).toString(16).padStart(6, '0').toUpperCase();
+        return { hex: randomHex, locked: false };
+      })
+    );
+  };
+
+  const toggleLockColor = (idx: number) => {
+    setPalette(prev =>
+      prev.map((c, i) => (i === idx ? { ...c, locked: !c.locked } : c))
+    );
+  };
+
+  // Listen for spacebar to regenerate colors
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (document.activeElement?.tagName === 'INPUT' || document.activeElement?.tagName === 'TEXTAREA') {
+        return;
+      }
+      if (e.code === 'Space') {
+        e.preventDefault();
+        generatePalette();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
   // Sync conversions from hexColor
   useEffect(() => {
@@ -112,6 +152,10 @@ export function ColorTool() {
         <TabsTrigger value="contrast" className="gap-2">
           <ShieldCheck className="h-4 w-4" />
           Contrast Ratio Checker (WCAG)
+        </TabsTrigger>
+        <TabsTrigger value="palette-gen" className="gap-2">
+          <Palette className="h-4 w-4" />
+          Random Palette Generator
         </TabsTrigger>
       </TabsList>
 
@@ -452,6 +496,80 @@ export function ColorTool() {
             </Card>
           </div>
         </div>
+      </TabsContent>
+
+      {/* --- HARMONIOUS PALETTE GENERATOR --- */}
+      <TabsContent value="palette-gen" className="space-y-6 animate-fade-in">
+        <Card className="border bg-card/65 backdrop-blur-sm shadow-xl p-5 border-primary/20 shadow-[0_0_30px_rgba(59,130,246,0.05)]">
+          <CardContent className="p-0 space-y-4">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 pb-3 border-b border-border/60">
+              <div>
+                <h3 className="font-extrabold text-sm flex items-center gap-2">
+                  <Palette className="h-4.5 w-4.5 text-primary" />
+                  Harmonious Palette Generator
+                </h3>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Lock colors you like and roll the rest. Press <kbd className="px-1.5 py-0.5 rounded bg-muted font-mono text-[10px] font-bold text-foreground">SPACEBAR</kbd> to generate!
+                </p>
+              </div>
+              <Button onClick={generatePalette} size="sm" className="gap-1.5 text-xs font-bold">
+                <RefreshCw className="h-3.5 w-3.5" />
+                Generate Palette
+              </Button>
+            </div>
+
+            {/* Grid display */}
+            <div className="grid grid-cols-1 sm:grid-cols-5 gap-3 pt-2">
+              {palette.map((color, idx) => {
+                // Determine text color based on background luminance
+                const rgbVal = hexToRgb(color.hex);
+                const isDark = rgbVal ? ((rgbVal.r * 299 + rgbVal.g * 587 + rgbVal.b * 114) / 1000) < 128 : false;
+                const textColorClass = isDark ? 'text-white' : 'text-slate-900';
+
+                return (
+                  <div
+                    key={idx}
+                    className="h-36 sm:h-72 rounded-xl flex flex-col justify-between p-4 shadow-sm relative overflow-hidden transition-all duration-300 group hover:shadow-md border border-black/10 dark:border-white/10"
+                    style={{ backgroundColor: color.hex }}
+                  >
+                    {/* Top actions */}
+                    <div className="flex justify-between items-center opacity-90 sm:opacity-0 group-hover:opacity-100 transition-opacity">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className={`h-8 w-8 hover:bg-black/10 dark:hover:bg-white/10 rounded-lg ${textColorClass}`}
+                        onClick={() => toggleLockColor(idx)}
+                      >
+                        {color.locked ? <Lock className="h-4 w-4" /> : <Unlock className="h-4 w-4" />}
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className={`h-8 w-8 hover:bg-black/10 dark:hover:bg-white/10 rounded-lg ${textColorClass}`}
+                        onClick={() => handleCopy(color.hex, `Color ${color.hex}`)}
+                      >
+                        <Copy className="h-4 w-4" />
+                      </Button>
+                    </div>
+
+                    {/* Color hex title at bottom */}
+                    <div className="space-y-1">
+                      <span className={`text-[10px] uppercase font-bold tracking-widest block opacity-70 ${textColorClass}`}>
+                        {color.locked ? 'Locked' : 'Random'}
+                      </span>
+                      <button
+                        onClick={() => handleCopy(color.hex, `Color ${color.hex}`)}
+                        className={`font-mono text-base font-black tracking-wide uppercase focus:outline-none text-left select-all hover:underline decoration-2 ${textColorClass}`}
+                      >
+                        {color.hex}
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </CardContent>
+        </Card>
       </TabsContent>
     </Tabs>
   );

@@ -18,13 +18,17 @@ import {
   Cpu,
   RefreshCw,
   Hash,
-  Fingerprint
+  Fingerprint,
+  Zap,
+  Play,
+  Trash2
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { useLocale } from '@/context/LocalizationContext';
+import { toast } from 'sonner';
 
 interface IpInfo {
   ip: string;
@@ -113,9 +117,47 @@ const COUNTRY_CALLING_CODES: Record<string, { country: string; code: string; fla
   '977': { country: 'Nepal', code: 'NP', flag: '🇳🇵' }
 };
 
+const pingWithImage = (url: string): Promise<number> => {
+  return new Promise((resolve, reject) => {
+    const start = performance.now();
+    const img = new Image();
+    
+    const timeout = setTimeout(() => {
+      img.src = '';
+      reject(new Error('Timeout'));
+    }, 4000);
+    
+    img.onload = () => {
+      clearTimeout(timeout);
+      const end = performance.now();
+      resolve(Math.round(end - start));
+    };
+    
+    img.onerror = () => {
+      clearTimeout(timeout);
+      const end = performance.now();
+      resolve(Math.round(end - start));
+    };
+    
+    let targetUrl = url.trim();
+    if (!/^https?:\/\//i.test(targetUrl)) {
+      targetUrl = 'https://' + targetUrl;
+    }
+    
+    try {
+      const parsed = new URL(targetUrl);
+      const separator = parsed.search ? '&' : '?';
+      img.src = `${parsed.origin}/favicon.ico${separator}cb=${Date.now()}-${Math.random()}`;
+    } catch (e) {
+      clearTimeout(timeout);
+      reject(e);
+    }
+  });
+};
+
 export function IpIntelTool() {
   const { t } = useLocale();
-  const [activeTab, setActiveTab] = useState<'ip' | 'identity'>('ip');
+  const [activeTab, setActiveTab] = useState<'ip' | 'identity' | 'ping'>('ip');
 
   // IP states
   const [userIpInfo, setUserIpInfo] = useState<IpInfo | null>(null);
@@ -132,6 +174,102 @@ export function IpIntelTool() {
   // Identity states
   const [inputVal, setInputVal] = useState('');
   const [validationResult, setValidationResult] = useState<any | null>(null);
+
+  // Ping Test states
+  const [customPingUrl, setCustomPingUrl] = useState('https://google.com');
+  const [pingTargets, setPingTargets] = useState<any[]>([
+    { name: 'Cloudflare DNS', url: 'https://1.1.1.1', desc: 'Anycast DNS Gateway', status: 'idle', min: null, max: null, avg: null, jitter: null, history: [] },
+    { name: 'Google Server', url: 'https://www.google.com', desc: 'Google search platform gateway', status: 'idle', min: null, max: null, avg: null, jitter: null, history: [] },
+  ]);
+  const [isPingingAll, setIsPingingAll] = useState(false);
+
+  const runPingTest = async (targetIdx: number) => {
+    const nextTargets = [...pingTargets];
+    const target = nextTargets[targetIdx];
+    
+    target.status = 'running';
+    target.history = [];
+    target.min = null;
+    target.max = null;
+    target.avg = null;
+    target.jitter = null;
+    setPingTargets([...nextTargets]);
+
+    const numTests = 4;
+    const history: number[] = [];
+
+    for (let i = 0; i < numTests; i++) {
+      try {
+        const rtt = await pingWithImage(target.url);
+        history.push(rtt);
+      } catch (err) {
+        console.warn(`Ping attempt ${i} failed for ${target.url}`, err);
+      }
+      await new Promise(r => setTimeout(r, 120));
+    }
+
+    if (history.length > 0) {
+      const min = Math.min(...history);
+      const max = Math.max(...history);
+      const avg = Math.round(history.reduce((a, b) => a + b, 0) / history.length);
+      
+      let diffSum = 0;
+      for (let i = 1; i < history.length; i++) {
+        diffSum += Math.abs(history[i] - history[i - 1]);
+      }
+      const jitter = history.length > 1 ? Math.round(diffSum / (history.length - 1)) : 0;
+
+      target.status = 'done';
+      target.history = history;
+      target.min = min;
+      target.max = max;
+      target.avg = avg;
+      target.jitter = jitter;
+    } else {
+      target.status = 'failed';
+    }
+
+    setPingTargets([...nextTargets]);
+  };
+
+  const handlePingAll = async () => {
+    setIsPingingAll(true);
+    for (let i = 0; i < pingTargets.length; i++) {
+      await runPingTest(i);
+    }
+    setIsPingingAll(false);
+  };
+
+  const handleAddCustomPing = () => {
+    let url = customPingUrl.trim();
+    if (!url) return;
+    if (!/^https?:\/\//i.test(url)) {
+      url = 'https://' + url;
+    }
+    try {
+      const parsed = new URL(url);
+      const newTarget = {
+        name: `Custom (${parsed.hostname})`,
+        url: parsed.origin,
+        desc: `User specified URL: ${parsed.hostname}`,
+        status: 'idle',
+        min: null,
+        max: null,
+        avg: null,
+        jitter: null,
+        history: [],
+      };
+      setPingTargets([...pingTargets, newTarget]);
+      setCustomPingUrl('');
+      toast.success('Custom target endpoint added!');
+    } catch {
+      toast.error('Invalid URL format');
+    }
+  };
+
+  const handleRemovePingTarget = (idx: number) => {
+    setPingTargets(pingTargets.filter((_, i) => i !== idx));
+  };
 
   useEffect(() => {
     // Fetch current user IP and both protocols on mount
@@ -486,7 +624,7 @@ export function IpIntelTool() {
           className={`px-4 py-2 text-sm font-bold transition-all border-b-2 -mb-[2px] flex items-center gap-2 ${
             activeTab === 'ip' 
               ? 'border-primary text-primary' 
-              : 'border-transparent text-muted-foreground hover:text-foreground'
+               : 'border-transparent text-muted-foreground hover:text-foreground'
           }`}
         >
           <Globe className="h-4 w-4" />
@@ -503,9 +641,20 @@ export function IpIntelTool() {
           <Fingerprint className="h-4 w-4" />
           Identity Validator
         </button>
+        <button
+          onClick={() => setActiveTab('ping')}
+          className={`px-4 py-2 text-sm font-bold transition-all border-b-2 -mb-[2px] flex items-center gap-2 ${
+            activeTab === 'ping' 
+              ? 'border-primary text-primary' 
+              : 'border-transparent text-muted-foreground hover:text-foreground'
+          }`}
+        >
+          <Zap className="h-4 w-4" />
+          Ping Latency Test
+        </button>
       </div>
 
-      {activeTab === 'ip' ? (
+      {activeTab === 'ip' && (
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
           {/* Lookup Input */}
           <div className="lg:col-span-12">
@@ -729,7 +878,7 @@ export function IpIntelTool() {
                         <iframe
                           title="Geographic Position Map"
                           width="100%"
-                          height="100%"
+                  height="100%"
                           frameBorder="0"
                           scrolling="no"
                           marginHeight={0}
@@ -777,7 +926,10 @@ export function IpIntelTool() {
             </Card>
           </div>
         </div>
-      ) : (
+      )}
+
+
+      {activeTab === 'identity' && (
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
           {/* Identity Validator Input */}
           <div className="lg:col-span-5 space-y-6">
@@ -887,6 +1039,123 @@ export function IpIntelTool() {
                     <p className="text-sm">Type an email address or mobile phone above to see structural analysis reports.</p>
                   </div>
                 )}
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      )}
+
+      {activeTab === 'ping' && (
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 animate-fade-in">
+          {/* Target List */}
+          <div className="lg:col-span-7 space-y-4">
+            <Card className="bg-card/45 border-border/80 shadow-sm">
+              <CardHeader className="pb-2">
+                <div className="flex justify-between items-center flex-wrap gap-2">
+                  <div>
+                    <CardTitle className="text-base font-bold">Latency Telemetry</CardTitle>
+                    <CardDescription>Measure HTTP Round-Trip Time (RTT) to global targets.</CardDescription>
+                  </div>
+                  <Button size="sm" onClick={handlePingAll} disabled={isPingingAll} className="gap-1.5 h-8.5 font-bold">
+                    <RefreshCw className={`h-3.5 w-3.5 ${isPingingAll ? 'animate-spin' : ''}`} />
+                    Test All Links
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent className="p-4">
+                <div className="space-y-3 max-h-[380px] overflow-y-auto pr-1.5 scrollbar-thin">
+                  {pingTargets.map((target, idx) => (
+                  <div key={idx} className="flex flex-col sm:flex-row items-start sm:items-center justify-between border rounded-xl p-3 bg-muted/15 text-xs gap-3">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold text-foreground">{target.name}</span>
+                        <Badge variant="secondary" className="font-mono text-[9px] h-4.5">{target.url}</Badge>
+                      </div>
+                      <p className="text-[10px] text-muted-foreground mt-0.5">{target.desc}</p>
+                    </div>
+
+                    <div className="flex items-center gap-3 shrink-0 self-end sm:self-auto">
+                      {target.status === 'running' && (
+                        <span className="flex items-center gap-1 text-primary font-semibold font-mono animate-pulse">
+                          <RefreshCw className="h-3 w-3 animate-spin" /> Timing...
+                        </span>
+                      )}
+                      {target.status === 'failed' && (
+                        <span className="text-red-500 font-bold font-mono">Offline / Blocked</span>
+                      )}
+                      {target.status === 'done' && (
+                        <div className="flex items-center gap-3 font-mono text-[11px] text-foreground">
+                          <div className="text-right">
+                            <p className="font-extrabold text-primary">{target.avg} ms <span className="font-normal text-muted-foreground text-[9px]">avg</span></p>
+                            <p className="text-[9px] text-muted-foreground">min: {target.min}ms • max: {target.max}ms</p>
+                          </div>
+                          <div className="text-right border-l pl-3">
+                            <p className="font-semibold text-foreground">{target.jitter} ms</p>
+                            <p className="text-[9px] text-muted-foreground">jitter</p>
+                          </div>
+                        </div>
+                      )}
+                      {target.status === 'idle' && (
+                        <span className="text-muted-foreground/60 italic font-mono">Not tested</span>
+                      )}
+
+                      <div className="flex gap-1 items-center">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7 text-primary"
+                          onClick={() => runPingTest(idx)}
+                          disabled={target.status === 'running'}
+                        >
+                          <Play className="h-3.5 w-3.5 fill-current" />
+                        </Button>
+                        {target.name.startsWith('Custom') && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7 text-red-500 hover:text-red-600"
+                            onClick={() => handleRemovePingTarget(idx)}
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Add Custom URL Panel */}
+          <div className="lg:col-span-5 space-y-6">
+            <Card className="bg-card/45 border-border/80 shadow-sm h-fit">
+              <CardHeader>
+                <CardTitle className="text-base font-bold">Add Custom Target</CardTitle>
+                <CardDescription>Configure a custom web URL endpoint to benchmark latency.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex gap-2">
+                  <Input
+                    placeholder="https://example.com or hostname"
+                    value={customPingUrl}
+                    onChange={(e) => setCustomPingUrl(e.target.value)}
+                    className="h-9.5 text-xs bg-background/50 font-mono"
+                  />
+                  <Button onClick={handleAddCustomPing} size="sm" className="h-9.5 font-bold">
+                    Add Target
+                  </Button>
+                </div>
+
+                <div className="bg-muted/30 p-3 rounded-lg border border-border/50 text-[10px] text-muted-foreground leading-normal space-y-1.5">
+                  <h5 className="font-bold uppercase tracking-wider text-primary text-[9px] flex items-center gap-1">
+                    <ShieldAlert className="h-3.5 w-3.5" /> Browser Sandbox Notes
+                  </h5>
+                  <p>
+                    All requests are sent securely from your browser via <code>fetch</code> using <code>no-cors</code>. This timing method bypasses CORS block restrictions, though local firewall filters or proxy tools may affect latency reports.
+                  </p>
+                </div>
               </CardContent>
             </Card>
           </div>

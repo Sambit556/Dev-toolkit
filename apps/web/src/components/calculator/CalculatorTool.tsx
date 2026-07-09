@@ -8,7 +8,18 @@ import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Switch } from '@/components/ui/switch';
+import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
+
+// Factorial helper
+const factorial = (n: number): number => {
+  if (n < 0) return NaN;
+  if (n === 0 || n === 1) return 1;
+  let res = 1;
+  for (let i = 2; i <= n; i++) res *= i;
+  return res;
+};
 
 const CURRENCIES = [
   { value: 'USD', symbol: '$', label: 'USD ($)' },
@@ -58,6 +69,27 @@ export function CalculatorTool() {
   const [expression, setExpression] = useState<string>('');
   const [result, setResult] = useState<string>('');
   const [calcHistory, setCalcHistory] = useState<string[]>([]);
+  const [isScientific, setIsScientific] = useState<boolean>(false);
+
+  // --- GST CALCULATOR STATES ---
+  const [gstAmount, setGstAmount] = useState<number>(1000);
+  const [gstRate, setGstRate] = useState<number>(18);
+  const [gstType, setGstType] = useState<'add' | 'remove'>('add');
+  const [gstResult, setGstResult] = useState({ net: 0, tax: 0, gross: 0 });
+
+  // --- SIP CALCULATOR STATES ---
+  const [sipMonthly, setSipMonthly] = useState<number>(5000);
+  const [sipReturn, setSipReturn] = useState<number>(12);
+  const [sipYears, setSipYears] = useState<number>(10);
+  const [sipResult, setSipResult] = useState({ invested: 0, returns: 0, total: 0 });
+
+  // --- BMI CALCULATOR STATES ---
+  const [bmiSystem, setBmiSystem] = useState<'metric' | 'imperial'>('metric');
+  const [bmiWeight, setBmiWeight] = useState<number>(70);
+  const [bmiHeight, setBmiHeight] = useState<number>(175);
+  const [bmiScore, setBmiScore] = useState<number>(0);
+  const [bmiCategory, setBmiCategory] = useState<string>('');
+  const [bmiColor, setBmiColor] = useState<string>('');
 
   const handleInput = (val: string) => {
     setExpression((prev) => prev + val);
@@ -79,20 +111,28 @@ export function CalculatorTool() {
         .replace(/×/g, '*')
         .replace(/÷/g, '/')
         .replace(/π/g, 'Math.PI')
+        .replace(/e/g, 'Math.E')
         .replace(/√\(/g, 'Math.sqrt(')
         .replace(/sin\(/g, 'Math.sin(')
         .replace(/cos\(/g, 'Math.cos(')
         .replace(/tan\(/g, 'Math.tan(')
+        .replace(/sinh\(/g, 'Math.sinh(')
+        .replace(/cosh\(/g, 'Math.cosh(')
+        .replace(/tanh\(/g, 'Math.tanh(')
+        .replace(/ln\(/g, 'Math.log(')
+        .replace(/log\(/g, 'Math.log10(')
+        .replace(/abs\(/g, 'Math.abs(')
+        .replace(/fact\(/g, 'factorial(')
         .replace(/\^/g, '**')
         .replace(/²/g, '**2');
 
-      const matchRegex = /^[0-9+\-*\/%().Math.sinostanPIsqrtpow\s]+$/;
+      const matchRegex = /^[0-9+\-*\/%().Math.sinostanPIsqrtpoweabsfactorial\s]+$/;
       if (!matchRegex.test(sanitized)) {
         throw new Error('Invalid tokens');
       }
 
-      const evalFn = new Function(`return (${sanitized})`);
-      const val = evalFn();
+      const evalFn = new Function('factorial', `return (${sanitized})`);
+      const val = evalFn(factorial);
 
       if (val === undefined || isNaN(val)) {
         setResult('Error');
@@ -107,6 +147,92 @@ export function CalculatorTool() {
       setResult('Invalid expression');
     }
   };
+
+  // --- GST CALCULATION ---
+  useEffect(() => {
+    const amt = gstAmount;
+    const rate = gstRate;
+    if (amt <= 0) return;
+    
+    let net = 0;
+    let tax = 0;
+    let gross = 0;
+    
+    if (gstType === 'add') {
+      net = amt;
+      tax = (amt * rate) / 100;
+      gross = amt + tax;
+    } else {
+      gross = amt;
+      net = amt / (1 + rate / 100);
+      tax = gross - net;
+    }
+    
+    setGstResult({ net, tax, gross });
+  }, [gstAmount, gstRate, gstType]);
+
+  // --- SIP CALCULATION ---
+  useEffect(() => {
+    const P = sipMonthly;
+    const annualRate = sipReturn;
+    const years = sipYears;
+    
+    if (P <= 0 || annualRate <= 0 || years <= 0) {
+      setSipResult({ invested: 0, returns: 0, total: 0 });
+      return;
+    }
+    
+    const i = annualRate / 12 / 100;
+    const n = years * 12;
+    
+    const total = P * ((Math.pow(1 + i, n) - 1) / i) * (1 + i);
+    const invested = P * n;
+    const returns = total - invested;
+    
+    setSipResult({
+      invested: Math.round(invested),
+      returns: Math.round(returns),
+      total: Math.round(total)
+    });
+  }, [sipMonthly, sipReturn, sipYears]);
+
+  // --- BMI CALCULATION ---
+  useEffect(() => {
+    const w = bmiWeight;
+    const h = bmiHeight;
+    if (w <= 0 || h <= 0) {
+      setBmiScore(0);
+      setBmiCategory('');
+      setBmiColor('');
+      return;
+    }
+    
+    let score = 0;
+    if (bmiSystem === 'metric') {
+      const heightInMeters = h / 100;
+      score = w / (heightInMeters * heightInMeters);
+    } else {
+      score = (w * 703) / (h * h);
+    }
+    
+    score = Number(score.toFixed(1));
+    setBmiScore(score);
+    
+    let cat = 'Normal weight';
+    let color = 'text-emerald-500 border-emerald-500/30 bg-emerald-500/10';
+    if (score < 18.5) {
+      cat = 'Underweight';
+      color = 'text-blue-500 border-blue-500/30 bg-blue-500/10';
+    } else if (score >= 30) {
+      cat = 'Obese';
+      color = 'text-red-500 border-red-500/30 bg-red-500/10';
+    } else if (score >= 25) {
+      cat = 'Overweight';
+      color = 'text-orange-500 border-orange-500/30 bg-orange-500/10';
+    }
+    setBmiCategory(cat);
+    setBmiColor(color);
+  }, [bmiWeight, bmiHeight, bmiSystem]);
 
   // 1. Calculate EMI
   useEffect(() => {
@@ -296,31 +422,52 @@ export function CalculatorTool() {
   return (
     <Tabs defaultValue="standard-calc" className="space-y-6">
       <div className="flex justify-center">
-        <TabsList className="grid grid-cols-2 md:grid-cols-4 w-full max-w-3xl h-auto p-1 gap-1">
-          <TabsTrigger value="standard-calc" className="gap-2 py-2">
+        <TabsList className="grid grid-cols-3 md:grid-cols-7 w-full max-w-5xl h-auto p-1 gap-1">
+          <TabsTrigger value="standard-calc" className="gap-2 py-2 text-xs">
             <Calculator className="h-4 w-4" />
-            Standard Calculator
+            Standard
           </TabsTrigger>
-          <TabsTrigger value="loan-emi" className="gap-2 py-2">
+          <TabsTrigger value="loan-emi" className="gap-2 py-2 text-xs">
             <Landmark className="h-4 w-4" />
-            Loan EMI Calculator
+            EMI
           </TabsTrigger>
-          <TabsTrigger value="salary" className="gap-2 py-2">
+          <TabsTrigger value="salary" className="gap-2 py-2 text-xs">
             <Coins className="h-4 w-4" />
-            Salary Converter
+            Salary
           </TabsTrigger>
-          <TabsTrigger value="date-math" className="gap-2 py-2">
+          <TabsTrigger value="date-math" className="gap-2 py-2 text-xs">
             <Calendar className="h-4 w-4" />
-            Age & Date Calculator
+            Age/Date
+          </TabsTrigger>
+          <TabsTrigger value="gst-calc" className="gap-2 py-2 text-xs">
+            <Coins className="h-4 w-4" />
+            GST
+          </TabsTrigger>
+          <TabsTrigger value="sip-calc" className="gap-2 py-2 text-xs">
+            <Landmark className="h-4 w-4" />
+            SIP
+          </TabsTrigger>
+          <TabsTrigger value="bmi-calc" className="gap-2 py-2 text-xs">
+            <Calculator className="h-4 w-4" />
+            BMI
           </TabsTrigger>
         </TabsList>
       </div>
 
       {/* --- STANDARD/SCIENTIFIC CALCULATOR --- */}
-      <TabsContent value="standard-calc" className="space-y-6">
+      <TabsContent value="standard-calc" className="space-y-6 animate-fade-in">
         <div className="max-w-md mx-auto space-y-4">
           <Card className="border bg-card/65 backdrop-blur-sm shadow-xl p-5 border-primary/20 shadow-[0_0_30px_rgba(59,130,246,0.05)]">
             <CardContent className="p-0 space-y-4">
+              {/* Scientific Toggle header */}
+              <div className="flex justify-between items-center pb-2 border-b border-border/60">
+                <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wide">Keypad Layout</span>
+                <div className="flex items-center gap-1.5 text-xs">
+                  <Label htmlFor="sci-toggle" className="cursor-pointer text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Scientific Keys</Label>
+                  <Switch id="sci-toggle" checked={isScientific} onCheckedChange={setIsScientific} className="h-4.5 scale-75" />
+                </div>
+              </div>
+
               {/* Screen Display */}
               <div className="bg-black/25 dark:bg-black/45 rounded-xl p-4 font-mono text-right border border-border/80 shadow-inner space-y-1.5">
                 {/* Past Calculation logs */}
@@ -340,6 +487,22 @@ export function CalculatorTool() {
                   {result || '0'}
                 </div>
               </div>
+
+              {/* Extra Scientific Row if toggled */}
+              {isScientific && (
+                <div className="grid grid-cols-5 gap-1.5 font-mono text-[10px] border-b pb-2">
+                  <Button variant="outline" className="h-8 px-0 font-semibold" onClick={() => handleInput('ln(')}>ln</Button>
+                  <Button variant="outline" className="h-8 px-0 font-semibold" onClick={() => handleInput('log(')}>log</Button>
+                  <Button variant="outline" className="h-8 px-0 font-semibold" onClick={() => handleInput('abs(')}>abs</Button>
+                  <Button variant="outline" className="h-8 px-0 font-semibold" onClick={() => handleInput('fact(')}>n!</Button>
+                  <Button variant="outline" className="h-8 px-0 font-semibold" onClick={() => handleInput('e')}>e</Button>
+                  <Button variant="outline" className="h-8 px-0 font-semibold" onClick={() => handleInput('sinh(')}>sinh</Button>
+                  <Button variant="outline" className="h-8 px-0 font-semibold" onClick={() => handleInput('cosh(')}>cosh</Button>
+                  <Button variant="outline" className="h-8 px-0 font-semibold" onClick={() => handleInput('tanh(')}>tanh</Button>
+                  <Button variant="outline" className="h-8 px-0 font-semibold" onClick={() => handleInput('(')}>(</Button>
+                  <Button variant="outline" className="h-8 px-0 font-semibold" onClick={() => handleInput(')')}>)</Button>
+                </div>
+              )}
 
               {/* Grid of keys */}
               <div className="grid grid-cols-5 gap-2 font-mono text-xs">
@@ -826,6 +989,296 @@ export function CalculatorTool() {
         </div>
       </TabsContent>
 
+      {/* --- GST CALCULATOR --- */}
+      <TabsContent value="gst-calc" className="space-y-6 animate-fade-in">
+        <div className="grid gap-6 md:grid-cols-3">
+          {/* Controls */}
+          <Card className="md:col-span-1">
+            <CardContent className="p-4 space-y-4">
+              <div className="space-y-1.5">
+                <Label htmlFor="gst-amount">Initial Amount</Label>
+                <Input
+                  id="gst-amount"
+                  type="number"
+                  value={gstAmount}
+                  onChange={(e) => setGstAmount(Math.max(0, Number(e.target.value)))}
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="gst-rate">Tax Rate (%)</Label>
+                <Select value={String(gstRate)} onValueChange={(v) => setGstRate(Number(v))}>
+                  <SelectTrigger id="gst-rate">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="5">5% (Utility/Grains)</SelectItem>
+                    <SelectItem value="12">12% (Standard)</SelectItem>
+                    <SelectItem value="18">18% (Services/IT)</SelectItem>
+                    <SelectItem value="28">28% (Luxury)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label>Tax Calculation Type</Label>
+                <Select value={gstType} onValueChange={(v: any) => setGstType(v)}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="add">Add GST (+)</SelectItem>
+                    <SelectItem value="remove">Remove GST (-)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Results Summary */}
+          <Card className="md:col-span-2">
+            <CardContent className="p-6 space-y-6">
+              <div className="flex justify-between items-center pb-2 border-b">
+                <h3 className="font-bold text-sm">Tax Summary (GST)</h3>
+                <Badge variant="secondary">Calculated</Badge>
+              </div>
+
+              <div className="grid gap-4 sm:grid-cols-3">
+                <div className="bg-muted/30 p-3 rounded-lg border text-center space-y-0.5">
+                  <span className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">Net Amount</span>
+                  <p className="text-base font-black text-foreground">{currencySymbol}{gstResult.net.toFixed(2)}</p>
+                </div>
+                <div className="bg-muted/30 p-3 rounded-lg border text-center space-y-0.5">
+                  <span className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">Tax (CGST + SGST)</span>
+                  <p className="text-base font-black text-primary">{currencySymbol}{gstResult.tax.toFixed(2)}</p>
+                </div>
+                <div className="bg-primary/5 p-3 rounded-lg border border-primary/20 text-center space-y-0.5">
+                  <span className="text-[10px] text-primary uppercase font-bold tracking-wider">Gross Total</span>
+                  <p className="text-base font-black text-primary">{currencySymbol}{gstResult.gross.toFixed(2)}</p>
+                </div>
+              </div>
+
+              <div className="bg-muted/20 p-4 rounded-xl border space-y-2 text-xs">
+                <h4 className="font-bold uppercase tracking-wider text-muted-foreground text-[10px]">CGST / SGST Tax Split (50% each)</h4>
+                <div className="flex justify-between border-b pb-1.5 border-dashed">
+                  <span className="text-muted-foreground">Central GST (CGST):</span>
+                  <span className="font-bold font-mono">{currencySymbol}{(gstResult.tax / 2).toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">State GST (SGST):</span>
+                  <span className="font-bold font-mono">{currencySymbol}{(gstResult.tax / 2).toFixed(2)}</span>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </TabsContent>
+
+      {/* --- SIP CALCULATOR --- */}
+      <TabsContent value="sip-calc" className="space-y-6 animate-fade-in">
+        <div className="grid gap-6 md:grid-cols-3">
+          {/* Controls */}
+          <Card className="md:col-span-1">
+            <CardContent className="p-4 space-y-4">
+              <div className="space-y-1.5">
+                <Label htmlFor="sip-monthly">Monthly Investment</Label>
+                <Input
+                  id="sip-monthly"
+                  type="number"
+                  step="500"
+                  value={sipMonthly}
+                  onChange={(e) => setSipMonthly(Math.max(0, Number(e.target.value)))}
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="sip-return">Expected Return Rate (%)</Label>
+                <Input
+                  id="sip-return"
+                  type="number"
+                  step="0.5"
+                  value={sipReturn}
+                  onChange={(e) => setSipReturn(Math.max(0, Number(e.target.value)))}
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="sip-years">Time Period (Years)</Label>
+                <Input
+                  id="sip-years"
+                  type="number"
+                  value={sipYears}
+                  onChange={(e) => setSipYears(Math.max(0, Number(e.target.value)))}
+                />
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Results Summary */}
+          <Card className="md:col-span-2">
+            <CardContent className="p-6 grid md:grid-cols-5 gap-6">
+              <div className="md:col-span-3 space-y-4">
+                <h3 className="font-bold text-sm border-b pb-2">SIP Wealth Estimate</h3>
+                
+                <div className="space-y-3.5 text-xs">
+                  <div className="flex justify-between border-b pb-2">
+                    <span className="text-muted-foreground">Invested Amount:</span>
+                    <span className="font-bold font-mono">{currencySymbol}{sipResult.invested.toLocaleString()}</span>
+                  </div>
+                  <div className="flex justify-between border-b pb-2">
+                    <span className="text-muted-foreground">Est. Return Wealth Gained:</span>
+                    <span className="font-bold font-mono text-emerald-500">+{currencySymbol}{sipResult.returns.toLocaleString()}</span>
+                  </div>
+                  <div className="flex justify-between text-sm font-black pt-1">
+                    <span className="text-foreground">Total Future Value:</span>
+                    <span className="font-mono text-primary">{currencySymbol}{sipResult.total.toLocaleString()}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Donut Chart Display */}
+              <div className="md:col-span-2 flex flex-col justify-center items-center text-center">
+                <div className="relative w-36 h-36">
+                  <svg className="w-full h-full -rotate-90">
+                    <circle cx="72" cy="72" r="35" className="stroke-slate-100 dark:stroke-slate-800 fill-none" strokeWidth="12" />
+                    {sipResult.total > 0 && (
+                      <>
+                        {/* Invested progress */}
+                        <circle
+                          cx="72"
+                          cy="72"
+                          r="35"
+                          className="stroke-blue-500 fill-none"
+                          strokeWidth="12"
+                          strokeDasharray={2 * Math.PI * 35}
+                          strokeDashoffset={2 * Math.PI * 35 - (sipResult.invested / sipResult.total) * (2 * Math.PI * 35)}
+                        />
+                        {/* Returns progress */}
+                        <circle
+                          cx="72"
+                          cy="72"
+                          r="35"
+                          className="stroke-emerald-500 fill-none"
+                          strokeWidth="12"
+                          strokeDasharray={2 * Math.PI * 35}
+                          strokeDashoffset={2 * Math.PI * 35 - (sipResult.returns / sipResult.total) * (2 * Math.PI * 35)}
+                          style={{
+                            transform: `rotate(${(sipResult.invested / sipResult.total) * 360}deg)`,
+                            transformOrigin: '72px 72px'
+                          }}
+                        />
+                      </>
+                    )}
+                  </svg>
+                  <div className="absolute inset-0 flex flex-col justify-center items-center">
+                    <span className="text-[10px] font-bold text-muted-foreground uppercase">Returns</span>
+                    <span className="text-xs font-black text-emerald-500">
+                      {sipResult.total > 0 ? Math.round((sipResult.returns / sipResult.total) * 100) : 0}%
+                    </span>
+                  </div>
+                </div>
+
+                <div className="flex gap-4 text-[10px] font-bold mt-4">
+                  <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded bg-blue-500" />Invested</span>
+                  <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded bg-emerald-500" />Gains</span>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </TabsContent>
+
+      {/* --- BMI CALCULATOR --- */}
+      <TabsContent value="bmi-calc" className="space-y-6 animate-fade-in">
+        <div className="grid gap-6 md:grid-cols-3">
+          {/* Controls */}
+          <Card className="md:col-span-1">
+            <CardContent className="p-4 space-y-4">
+              <div className="space-y-1.5">
+                <Label>Measurement System</Label>
+                <Select value={bmiSystem} onValueChange={(v: any) => setBmiSystem(v)}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="metric">Metric (kg / cm)</SelectItem>
+                    <SelectItem value="imperial">Imperial (lbs / inches)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="bmi-weight">Weight ({bmiSystem === 'metric' ? 'kg' : 'lbs'})</Label>
+                <Input
+                  id="bmi-weight"
+                  type="number"
+                  value={bmiWeight}
+                  onChange={(e) => setBmiWeight(Math.max(0, Number(e.target.value)))}
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="bmi-height">Height ({bmiSystem === 'metric' ? 'cm' : 'inches'})</Label>
+                <Input
+                  id="bmi-height"
+                  type="number"
+                  value={bmiHeight}
+                  onChange={(e) => setBmiHeight(Math.max(0, Number(e.target.value)))}
+                />
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Results Summary */}
+          <Card className="md:col-span-2 flex flex-col justify-center">
+            <CardContent className="p-6 space-y-6">
+              <div className="flex justify-between items-center pb-2 border-b">
+                <h3 className="font-bold text-sm">Body Mass Index (BMI) Report</h3>
+                <Badge variant="secondary">Calculated</Badge>
+              </div>
+
+              {bmiScore > 0 ? (
+                <div className="space-y-6">
+                  <div className="flex items-center justify-between gap-6">
+                    <div className="space-y-0.5">
+                      <span className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">BMI Score</span>
+                      <p className="text-3xl font-black text-foreground font-mono">{bmiScore}</p>
+                    </div>
+                    <div className={`px-4 py-2 border rounded-xl font-bold text-xs uppercase tracking-wider ${bmiColor}`}>
+                      {bmiCategory}
+                    </div>
+                  </div>
+
+                  {/* Horizontal gauge bar */}
+                  <div className="space-y-1.5">
+                    <div className="flex justify-between text-[9px] font-bold text-muted-foreground uppercase tracking-wider">
+                      <span>15 (Under)</span>
+                      <span>18.5</span>
+                      <span>25</span>
+                      <span>30</span>
+                      <span>35 (Obese)</span>
+                    </div>
+                    <div className="relative w-full h-3 bg-gradient-to-r from-blue-400 via-emerald-400 via-orange-400 to-red-400 rounded-full">
+                      {/* Needle indicator pin */}
+                      <div
+                        className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 h-5 w-5 rounded-full border-2 border-white bg-slate-950 shadow-md transition-all duration-300"
+                        style={{
+                          left: `${Math.min(100, Math.max(0, ((bmiScore - 15) / (35 - 15)) * 100))}%`
+                        }}
+                      />
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="text-center py-12 border border-dashed rounded-lg bg-muted/20">
+                  <Calculator className="h-6 w-6 text-muted-foreground/30 mx-auto mb-2" />
+                  <p className="text-xs text-muted-foreground italic">Provide correct weight/height metrics.</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      </TabsContent>
     </Tabs>
   );
 }

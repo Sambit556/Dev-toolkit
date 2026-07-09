@@ -19,8 +19,15 @@ import {
   Zap,
   Globe,
   ArrowRight,
+  ArrowRightLeft,
   Search,
   SlidersHorizontal,
+  Gamepad2,
+  Code2,
+  FileCode,
+  QrCode,
+  FileText,
+  Lock,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -63,17 +70,7 @@ const TOOLS = [
     badge: 'JWT',
     color: 'red',
   },
-  {
-    href: '/uuid',
-    icon: Fingerprint,
-    title: 'UUID & ULID Generator',
-    description:
-      'Generate secure v4/v1/v5 UUIDs, lexicographically sortable ULIDs, and lightweight NanoIDs in bulk batches.',
-    features: ['Bulk generation (1000)', 'V1 details decoder', 'NanoID custom charset', 'Standard formatting'],
-    category: 'generators',
-    badge: 'Security',
-    color: 'purple',
-  },
+
   {
     href: '/cron',
     icon: CalendarRange,
@@ -129,17 +126,7 @@ const TOOLS = [
     badge: 'Finance',
     color: 'sky',
   },
-  {
-    href: '/yaml-json',
-    icon: Layers,
-    title: 'YAML ↔ JSON Converter',
-    description:
-      'Translate structured YAML config parameters to JSON schemas and back using side-by-side Monaco Editors.',
-    features: ['Monaco syntax highlights', 'Indentation sizes', 'Sort keys alphabetically', 'Local js-yaml conversion'],
-    category: 'converters',
-    badge: 'YAML',
-    color: 'violet',
-  },
+
   {
     href: '/image-tool',
     icon: Sparkles,
@@ -154,12 +141,12 @@ const TOOLS = [
   {
     href: '/converters',
     icon: RefreshCw,
-    title: 'Data & PDF Converters',
+    title: 'Structured Data Format Converter',
     description:
-      'Convert CSV spreadsheets, XML configurations, Markdown documents, and export text directly to formatted PDF files.',
-    features: ['CSV interactive table grid', 'XML nested parsed tags', 'MD HTML prose preview', 'Client-side jsPDF generator'],
+      'Translate between CSV spreadsheets, XML configs, YAML schemas, and Markdown documents client-side in real time.',
+    features: ['CSV ↔ JSON dynamic grid', 'XML ↔ JSON nested trees', 'YAML ↔ JSON configurations', 'Markdown ↔ HTML previews'],
     category: 'converters',
-    badge: 'Document',
+    badge: 'Converter',
     color: 'teal',
   },
   {
@@ -205,6 +192,116 @@ const TOOLS = [
     category: 'converters',
     badge: 'Converter',
     color: 'teal',
+  },
+  {
+    href: '/text-utils',
+    icon: FileText,
+    title: 'Text Case Converter & Counters',
+    description:
+      'Modify case styles (camel, Pascal, snake, kebab), calculate text reading/speaking times, and count words, sentences, and lines.',
+    features: ['10+ case transforms', 'Speaking/reading time estimators', 'Frequency distribution logs', 'Word/Char/Sentence counters'],
+    category: 'converters',
+    badge: 'Text',
+    color: 'pink',
+  },
+  {
+    href: '/diff-checker',
+    icon: ArrowRightLeft,
+    title: 'Code Diff Checker',
+    description:
+      'Compare files, code blocks, or standard text strings side-by-side or in inline unified views using Monaco DiffEditor.',
+    features: ['Monaco Diff editor', 'Side-by-side & unified layout', 'Local files upload dropzone', 'Format checking'],
+    category: 'formatters',
+    badge: 'Format',
+    color: 'emerald',
+  },
+  {
+    href: '/countdown',
+    icon: Clock,
+    title: 'Countdown Timer & Lap Stopwatch',
+    description:
+      'Visual circular countdown timer, custom alarms, tab title duration trackers, and stopwatch lap recorder.',
+    features: ['Circular countdown SVG', 'Offline audio chime synths', 'Lap list stopwatch', 'Tab title progress indicator'],
+    category: 'utilities',
+    badge: 'Clock',
+    color: 'sky',
+  },
+  {
+    href: '/lorem-ipsum',
+    icon: FileText,
+    title: 'Lorem Ipsum Generator',
+    description:
+      'Create placeholder dummy text paragraphs, sentences, words, and list structures for design mockups.',
+    features: ['Custom paragraphs & lists', 'HTML wrapper wraps', 'Random generator seeds', 'Clipboard copies'],
+    category: 'generators',
+    badge: 'Text',
+    color: 'violet',
+  },
+  {
+    href: '/security-tools',
+    icon: Lock,
+    title: 'Security & Key Generator Suite',
+    description:
+      'Generate secure passwords, cryptographically random UUIDs (v4/v1/v5), sortable ULIDs, NanoIDs, sign HMAC hashes, and verify BCrypt strings.',
+    features: ['UUID, ULID & NanoID generator', 'BCrypt hasher & verifier', 'HMAC signature signing', 'Entropy strength checks'],
+    category: 'generators',
+    badge: 'Security',
+    color: 'amber',
+  },
+  {
+    href: '/qr-barcode',
+    icon: QrCode,
+    title: 'QR & Barcode Creator',
+    description:
+      'Generate customizeable SVG/PNG QR Codes with size scaling and barcodes matching multiple international standards.',
+    features: ['QR SVG/PNG options', 'CODE128/CODE39/EAN barcodes', 'Live validation checkers', 'Batch file saving'],
+    category: 'generators',
+    badge: 'Marketing',
+    color: 'blue',
+  },
+  {
+    href: '/pdf-tools',
+    icon: FileCode,
+    title: 'PDF Merger, Splitter & Protector',
+    description:
+      'Merge multiple PDF documents client-side, extract specific pages, or password-protect files with User & Owner encryption.',
+    features: ['Drag-and-drop file reordering', 'Client-side pdf-lib processor', 'Password locking', 'Page range selectors'],
+    category: 'utilities',
+    badge: 'PDF',
+    color: 'purple',
+  },
+  {
+    href: '/html-preview',
+    icon: Code2,
+    title: 'HTML/CSS/JS Sandbox Preview',
+    description:
+      'Code playground split-view sandbox. Run client-side scripts, styles, and view intercepted console outputs directly.',
+    features: ['Interactive sandbox preview', 'Split-screen layout', 'Captured console logs tray', 'Live hot-reloading'],
+    category: 'formatters',
+    badge: 'Sandbox',
+    color: 'indigo',
+  },
+  {
+    href: '/fake-address',
+    icon: Globe,
+    title: 'Fake Address & Persona Generator',
+    description:
+      'Generate realistic mock personas containing names, phones, credit cards, physical addresses, and occupations for testing.',
+    features: ['US/UK/IN/CA regions', 'Valid Luhn credit cards', 'Bulk profiles export', 'Offline mock DBs'],
+    category: 'generators',
+    badge: 'Testing',
+    color: 'orange',
+  },
+  {
+    href: '/fun-tools',
+    icon: Gamepad2,
+    title: 'Fun Utilities Playground',
+    description:
+      'Simulate 3D coin flips, 3D dice rollers, split participants into random teams, or spin interactive name fortune wheels.',
+    features: ['3D CSS flip animations', '3D CSS dice cubes', 'HTML5 canvas name wheel', 'Random team builders'],
+    category: 'utilities',
+    badge: 'Play',
+    color: 'red',
   },
 ];
 

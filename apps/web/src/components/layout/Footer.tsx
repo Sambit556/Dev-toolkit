@@ -6,11 +6,9 @@ import {
   Clock,
   Braces,
   Shield,
-  Layers,
   ShieldCheck,
   RefreshCw,
   ArrowRightLeft,
-  Fingerprint,
   CalendarRange,
   Calculator,
   Coins,
@@ -20,7 +18,14 @@ import {
   Globe,
   Zap,
   Github,
-  HeartHandshake
+  HeartHandshake,
+  FileText,
+  Lock,
+  QrCode,
+  Gamepad2,
+  FileCode,
+  Scissors,
+  Combine
 } from 'lucide-react';
 import { useLocale } from '@/context/LocalizationContext';
 
@@ -44,165 +49,214 @@ export function Footer() {
             </p>
           </div>
 
-          {/* Converters & Formatters */}
+          {/* Formatters & Viewers */}
           <div>
             <h4 className="text-xs font-bold uppercase tracking-wider text-foreground mb-4">
-              Converters
+              Formatters & Viewers
             </h4>
             <ul className="space-y-2.5">
               <li>
-                <Link href="/epoch" className="flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground transition-colors">
-                  <Clock className="h-3.5 w-3.5 text-primary/70" />
-                  {t('epochTitle')}
-                </Link>
-              </li>
-              <li>
                 <Link href="/json" className="flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground transition-colors">
                   <Braces className="h-3.5 w-3.5 text-primary/70" />
-                  {t('jsonTitle')}
+                  JSON Viewer
                 </Link>
               </li>
               <li>
                 <Link href="/jwt" className="flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground transition-colors">
                   <Shield className="h-3.5 w-3.5 text-primary/70" />
-                  {t('jwtTitle')}
+                  JWT Decoder
                 </Link>
               </li>
               <li>
-                <Link href="/yaml-json" className="flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground transition-colors">
-                  <Layers className="h-3.5 w-3.5 text-primary/70" />
-                  {t('yamlTitle')}
+                <Link href="/diff-checker" className="flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground transition-colors">
+                  <ArrowRightLeft className="h-3.5 w-3.5 text-primary/70" />
+                  Code Diff Checker
                 </Link>
               </li>
               <li>
-                <Link href="/encoder-decoder" className="flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground transition-colors">
-                  <ShieldCheck className="h-3.5 w-3.5 text-primary/70" />
-                  {t('encoderDecoderTitle')}
+                <Link href="/html-preview" className="flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground transition-colors">
+                  <Sparkles className="h-3.5 w-3.5 text-primary/70" />
+                  HTML Sandbox
+                </Link>
+              </li>
+            </ul>
+          </div>
+
+          {/* Converters & Generators */}
+          <div>
+            <h4 className="text-xs font-bold uppercase tracking-wider text-foreground mb-4">
+              Converters & Generators
+            </h4>
+            <ul className="space-y-2.5">
+              <li>
+                <Link href="/epoch" className="flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground transition-colors">
+                  <Clock className="h-3.5 w-3.5 text-primary/70" />
+                  Epoch Converter
                 </Link>
               </li>
               <li>
                 <Link href="/converters" className="flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground transition-colors">
                   <RefreshCw className="h-3.5 w-3.5 text-primary/70" />
-                  {t('convertersTitle')}
+                  Structured Data Converter
+                </Link>
+              </li>
+              <li>
+                <Link href="/encoder-decoder" className="flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground transition-colors">
+                  <ShieldCheck className="h-3.5 w-3.5 text-primary/70" />
+                  Text Encoder / Decoder
+                </Link>
+              </li>
+              <li>
+                <Link href="/text-utils" className="flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground transition-colors">
+                  <FileText className="h-3.5 w-3.5 text-primary/70" />
+                  Text & Case Utility
                 </Link>
               </li>
               <li>
                 <Link href="/file-converter" className="flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground transition-colors">
                   <ArrowRightLeft className="h-3.5 w-3.5 text-primary/70" />
-                  {t('fileConverterTitle')}
-                </Link>
-              </li>
-            </ul>
-          </div>
-
-          {/* Generators & Utilities */}
-          <div>
-            <h4 className="text-xs font-bold uppercase tracking-wider text-foreground mb-4">
-              Tools & Utilities
-            </h4>
-            <ul className="space-y-2.5">
-              <li>
-                <Link href="/uuid" className="flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground transition-colors">
-                  <Fingerprint className="h-3.5 w-3.5 text-primary/70" />
-                  {t('uuidTitle')}
+                  Universal File Converter
                 </Link>
               </li>
               <li>
                 <Link href="/cron" className="flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground transition-colors">
                   <CalendarRange className="h-3.5 w-3.5 text-primary/70" />
-                  {t('cronTitle')}
+                  Cron Generator
                 </Link>
               </li>
               <li>
-                <Link href="/unit-converter" className="flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground transition-colors">
-                  <Ruler className="h-3.5 w-3.5 text-primary/70" />
-                  {t('unitTitle')}
+                <Link href="/security-tools" className="flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground transition-colors">
+                  <Lock className="h-3.5 w-3.5 text-primary/70" />
+                  Security & Key Suite
                 </Link>
               </li>
               <li>
-                <Link href="/color-picker" className="flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground transition-colors">
-                  <Palette className="h-3.5 w-3.5 text-primary/70" />
-                  {t('colorTitle')}
+                <Link href="/qr-barcode" className="flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground transition-colors">
+                  <QrCode className="h-3.5 w-3.5 text-primary/70" />
+                  QR & Barcode Creator
                 </Link>
               </li>
+              <li>
+                <Link href="/lorem-ipsum" className="flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground transition-colors">
+                  <FileText className="h-3.5 w-3.5 text-primary/70" />
+                  Lorem Ipsum
+                </Link>
+              </li>
+              <li>
+                <Link href="/fake-address" className="flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground transition-colors">
+                  <Globe className="h-3.5 w-3.5 text-primary/70" />
+                  Fake Person & Address
+                </Link>
+              </li>
+            </ul>
+          </div>
+
+          {/* Calculators & Utilities */}
+          <div>
+            <h4 className="text-xs font-bold uppercase tracking-wider text-foreground mb-4">
+              Calculators & Utilities
+            </h4>
+            <ul className="space-y-2.5">
               <li>
                 <Link href="/calculator" className="flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground transition-colors">
                   <Calculator className="h-3.5 w-3.5 text-primary/70" />
-                  {t('calculatorTitle')}
-                </Link>
-              </li>
-              <li>
-                <Link href="/image-tool" className="flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground transition-colors">
-                  <Sparkles className="h-3.5 w-3.5 text-primary/70" />
-                  {t('imageTitle')}
+                  Calculators Suite
                 </Link>
               </li>
               <li>
                 <Link href="/currency" className="flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground transition-colors">
                   <Coins className="h-3.5 w-3.5 text-primary/70" />
-                  {t('currencyTitle')}
+                  Currency Exchange
+                </Link>
+              </li>
+              <li>
+                <Link href="/unit-converter" className="flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground transition-colors">
+                  <Ruler className="h-3.5 w-3.5 text-primary/70" />
+                  Unit Converter
+                </Link>
+              </li>
+              <li>
+                <Link href="/color-picker" className="flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground transition-colors">
+                  <Palette className="h-3.5 w-3.5 text-primary/70" />
+                  Color Tool Suite
+                </Link>
+              </li>
+              <li>
+                <Link href="/image-tool" className="flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground transition-colors">
+                  <Sparkles className="h-3.5 w-3.5 text-primary/70" />
+                  Image Optimizer
                 </Link>
               </li>
               <li>
                 <Link href="/ip-intel" className="flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground transition-colors">
                   <Globe className="h-3.5 w-3.5 text-primary/70" />
-                  {t('ipIntelTitle')}
+                  IP & Identity
                 </Link>
               </li>
               <li>
                 <Link href="/speed-test" className="flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground transition-colors">
                   <Zap className="h-3.5 w-3.5 text-primary/70" />
-                  {t('speedTestTitle')}
+                  Speed Test
+                </Link>
+              </li>
+              <li>
+                <Link href="/pdf-tools" className="flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground transition-colors">
+                  <FileCode className="h-3.5 w-3.5 text-primary/70" />
+                  PDF Suite
+                </Link>
+              </li>
+              <li>
+                <Link href="/fun-tools" className="flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground transition-colors">
+                  <Gamepad2 className="h-3.5 w-3.5 text-primary/70" />
+                  Fun Utilities
                 </Link>
               </li>
             </ul>
           </div>
 
-          {/* Privacy Checklist */}
-          <div>
-            <h4 className="text-xs font-bold uppercase tracking-wider text-foreground mb-4">
-              Privacy
-            </h4>
-            <ul className="space-y-2 text-xs text-muted-foreground">
-              <li className="flex items-center gap-1.5">
-                <span className="text-primary font-bold">✓</span> {t('privacyFeature1')}
-              </li>
-              <li className="flex items-center gap-1.5">
-                <span className="text-primary font-bold">✓</span> {t('privacyFeature2')}
-              </li>
-              <li className="flex items-center gap-1.5">
-                <span className="text-primary font-bold">✓</span> {t('privacyFeature3')}
-              </li>
-              <li className="flex items-center gap-1.5">
-                <span className="text-primary font-bold">✓</span> {t('privacyFeature4')}
-              </li>
-            </ul>
-          </div>
-
-          {/* Support & Links */}
-          <div>
-            <h4 className="text-xs font-bold uppercase tracking-wider text-foreground mb-4">
-              Resources
-            </h4>
-            <ul className="space-y-2.5">
-              <li>
-                <Link href="/support" className="flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground transition-colors">
-                  <HeartHandshake className="h-3.5 w-3.5 text-primary/70" />
-                  {t('support')}
-                </Link>
-              </li>
-              <li>
-                <a
-                  href="https://github.com/Sambit556/Dev-toolkit"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground transition-colors"
-                >
-                  <Github className="h-3.5 w-3.5 text-primary/70" />
-                  {t('openSource')}
-                </a>
-              </li>
-            </ul>
+          {/* Resources & Privacy */}
+          <div className="space-y-6">
+            <div>
+              <h4 className="text-xs font-bold uppercase tracking-wider text-foreground mb-4">
+                Resources
+              </h4>
+              <ul className="space-y-2.5">
+                <li>
+                  <Link href="/support" className="flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground transition-colors">
+                    <HeartHandshake className="h-3.5 w-3.5 text-primary/70" />
+                    Support
+                  </Link>
+                </li>
+                <li>
+                  <a
+                    href="https://github.com/Sambit556/Dev-toolkit"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    <Github className="h-3.5 w-3.5 text-primary/70" />
+                    Open Source
+                  </a>
+                </li>
+              </ul>
+            </div>
+            
+            <div>
+              <h4 className="text-xs font-bold uppercase tracking-wider text-foreground mb-3">
+                Security Sandbox
+              </h4>
+              <ul className="space-y-2 text-[10px] text-muted-foreground leading-normal">
+                <li className="flex items-start gap-1.5">
+                  <span className="text-primary font-bold">✓</span> Local sandboxed execution
+                </li>
+                <li className="flex items-start gap-1.5">
+                  <span className="text-primary font-bold">✓</span> No server logs or storage
+                </li>
+                <li className="flex items-start gap-1.5">
+                  <span className="text-primary font-bold">✓</span> Fully offline compatible
+                </li>
+              </ul>
+            </div>
           </div>
         </div>
 

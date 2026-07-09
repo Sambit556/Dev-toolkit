@@ -28,7 +28,12 @@ import {
   Globe,
   Gamepad2,
   ArrowRightLeft,
-  Zap
+  Zap,
+  Code2,
+  FileCode,
+  QrCode,
+  FileText,
+  Lock
 } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import { cn } from '@/lib/utils';
@@ -50,35 +55,47 @@ const toolCategories = [
     items: [
       { href: '/json', label: 'JSON Viewer', icon: Braces, desc: 'Format and explore JSON text' },
       { href: '/jwt', label: 'JWT Decoder', icon: Shield, desc: 'Decode & encode tokens' },
+      { href: '/diff-checker', label: 'Diff Checker', icon: ArrowRightLeft, desc: 'Compare text and code side-by-side' },
+      { href: '/html-preview', label: 'HTML Sandbox', icon: Code2, desc: 'Live preview HTML/CSS/JS playground' },
     ],
   },
   {
     name: 'Converters & Parsers',
     items: [
       { href: '/epoch', label: 'Epoch Converter', icon: Clock, desc: 'Unix timestamp converter' },
-      { href: '/yaml-json', label: 'YAML ↔ JSON', icon: Layers, desc: 'Map YAML configs to JSON' },
-      { href: '/encoder-decoder', label: 'Encoder/Decoder', icon: ShieldCheck, desc: 'Base64, URL, Hex, HTML' },
-      { href: '/converters', label: 'Data & PDF', icon: RefreshCw, desc: 'CSV, XML, MD, PDF Writer' },
-      { href: '/file-converter', label: 'File Converter', icon: ArrowRightLeft, desc: 'CSV, JSON, Markdown, Images' },
+      { href: '/encoder-decoder', label: 'Text Encoder / Decoder', icon: ShieldCheck, desc: 'Base64, URL, Hex, HTML' },
+      { href: '/converters', label: 'Data Format Converter', icon: RefreshCw, desc: 'CSV, XML, YAML, Markdown parser' },
+      { href: '/text-utils', label: 'Text & Case Utility', icon: FileText, desc: 'Case conversion & analytics' },
+      { href: '/file-converter', label: 'Universal File Converter', icon: ArrowRightLeft, desc: 'Convert files client-side' },
     ],
   },
   {
     name: 'Generators',
     items: [
-      { href: '/uuid', label: 'UUID Generator', icon: Fingerprint, desc: 'Batch UUID/ULID/NanoID' },
       { href: '/cron', label: 'Cron Generator', icon: CalendarRange, desc: 'Visual cron scheduler' },
+      { href: '/security-tools', label: 'Security & Key Suite', icon: Lock, desc: 'Passwords, Keys, HMAC, BCrypt, UUIDs' },
+      { href: '/qr-barcode', label: 'QR & Barcode Creator', icon: QrCode, desc: 'Generate QR codes and barcodes' },
+      { href: '/lorem-ipsum', label: 'Lorem Ipsum', icon: FileText, desc: 'Generate dummy placeholder text' },
+      { href: '/fake-address', label: 'Fake Person & Address', icon: Globe, desc: 'Mock test profile datasets' },
     ],
   },
   {
-    name: 'Calculators & Utilities',
+    name: 'Calculators & Design',
     items: [
-      { href: '/calculator', label: 'Calculators', icon: Calculator, desc: 'EMI, Salary, Age, Date' },
-      { href: '/currency', label: 'Currency Exchanger', icon: Coins, desc: 'Exchange rates & offline values' },
-      { href: '/unit-converter', label: 'Unit Converter', icon: Ruler, desc: 'Length, weight, area' },
-      { href: '/color-picker', label: 'Color Picker', icon: Palette, desc: 'Picker, harmonies, WCAG' },
+      { href: '/calculator', label: 'Calculators Suite', icon: Calculator, desc: 'EMI, Salary, GST, SIP, BMI' },
+      { href: '/currency', label: 'Currency Exchange', icon: Coins, desc: 'Exchange rates & offline values' },
+      { href: '/unit-converter', label: 'Unit Converter', icon: Ruler, desc: 'Length, weight, area conversions' },
+      { href: '/color-picker', label: 'Color Tool Suite', icon: Palette, desc: 'Picker, contrast, random palettes' },
       { href: '/image-tool', label: 'Image Optimizer', icon: Sparkles, desc: 'Compress, scale, filter' },
-      { href: '/ip-intel', label: 'IP Intelligence', icon: Globe, desc: 'Geo details & credentials check' },
+    ],
+  },
+  {
+    name: 'System & Network',
+    items: [
+      { href: '/ip-intel', label: 'IP & Identity', icon: Globe, desc: 'Geo-IP & validation + HTTP Ping' },
       { href: '/speed-test', label: 'Speed Test', icon: Zap, desc: 'Ping, jitter, download, upload' },
+      { href: '/pdf-tools', label: 'PDF Suite', icon: FileCode, desc: 'Merge, split, and password protect' },
+      { href: '/fun-tools', label: 'Fun Utilities', icon: Gamepad2, desc: 'Coin flip, dice roll, name wheel' },
     ],
   },
 ];
@@ -372,10 +389,9 @@ export function Header() {
   }, []);
 
   const getCategoryTitle = (name: string) => {
-    if (name.includes('Formatter')) return t('formatters');
-    if (name.includes('Converter')) return t('converters');
-    if (name.includes('Generator')) return t('generators');
-    if (name.includes('Calculator')) return t('utilities');
+    if (name === 'Formatters & Viewers') return t('formatters') || name;
+    if (name === 'Converters & Parsers') return t('converters') || name;
+    if (name === 'Generators') return t('generators') || name;
     return name;
   };
 
@@ -489,103 +505,65 @@ export function Header() {
               {t('tools')}
               <ChevronDown className="h-3.5 w-3.5" />
             </button>
-
-            {/* Premium Multi-column Dropdown Popover */}
             {desktopOpen && (
-              <div className="absolute top-12 left-1/2 -translate-x-1/2 w-[760px] bg-card/95 backdrop-blur-md border border-primary/20 dark:border-primary/30 shadow-[0_20px_50px_rgba(59,130,246,0.15)] dark:shadow-[0_20px_50px_rgba(99,102,241,0.25)] rounded-2xl p-5 grid grid-cols-12 gap-5 animate-fade-in z-50 before:content-[''] before:absolute before:top-[-20px] before:left-0 before:right-0 before:h-5">
-                {/* Column 1 (Left): Formatters & Generators */}
-                <div className="col-span-4 space-y-4">
-                  {toolCategories.filter(c => ['Formatters & Viewers', 'Generators'].includes(c.name)).map((cat) => (
-                    <div key={cat.name} className="space-y-2">
-                      <h4 className="text-[10px] uppercase font-black tracking-widest text-primary/80 px-1">
-                        {getCategoryTitle(cat.name)}
-                      </h4>
-                      <div className="grid gap-1">
-                        {cat.items.map((item) => {
-                          const Icon = item.icon;
-                          const isSelected = pathname === item.href;
-                          const trans = getToolTranslation(item.href, item.label, item.desc);
-                          return (
-                            <Link
-                              key={item.href}
-                              href={item.href}
-                              className={cn(
-                                "flex items-start gap-2.5 rounded-lg p-2 transition-all hover:translate-x-0.5 hover:bg-muted text-left",
-                                isSelected && "bg-primary/5 border border-primary/20"
-                              )}
-                            >
-                              <div className="h-7 w-7 rounded-md bg-primary/10 text-primary flex items-center justify-center shrink-0">
-                                <Icon className="h-3.5 w-3.5" />
-                              </div>
-                              <div>
-                                <p className="text-xs font-bold leading-none">{trans.label}</p>
-                                <p className="text-[9px] text-muted-foreground mt-0.5 leading-snug line-clamp-1">
-                                  {trans.desc}
-                                </p>
-                              </div>
-                            </Link>
-                          );
-                        })}
-                      </div>
+              <div className="absolute top-12 left-1/2 -translate-x-1/2 w-[1180px] bg-card/95 backdrop-blur-md border border-primary/20 dark:border-primary/30 shadow-[0_20px_50px_rgba(59,130,246,0.15)] dark:shadow-[0_20px_50px_rgba(99,102,241,0.25)] rounded-2xl p-6 grid grid-cols-12 gap-6 animate-fade-in z-50 before:content-[''] before:absolute before:top-[-20px] before:left-0 before:right-0 before:h-5">
+                {toolCategories.map((cat) => (
+                  <div key={cat.name} className="col-span-2 space-y-3">
+                    <h4 className="text-[10px] uppercase font-black tracking-widest text-primary/85 border-b pb-2 border-primary/10 px-1 truncate">
+                      {getCategoryTitle(cat.name)}
+                    </h4>
+                    <div className="grid gap-1">
+                      {cat.items.map((item) => {
+                        const Icon = item.icon;
+                        const isSelected = pathname === item.href;
+                        const trans = getToolTranslation(item.href, item.label, item.desc);
+                        return (
+                          <Link
+                            key={item.href}
+                            href={item.href}
+                            className={cn(
+                              "flex items-center gap-2.5 rounded-lg p-2 transition-all hover:translate-x-0.5 hover:bg-muted text-left border border-transparent",
+                              isSelected && "bg-primary/5 border border-primary/20 text-primary"
+                            )}
+                          >
+                            <div className="h-7 w-7 rounded-md bg-primary/10 text-primary flex items-center justify-center shrink-0">
+                              <Icon className="h-3.5 w-3.5" />
+                            </div>
+                            <span className="text-xs font-bold leading-snug truncate">
+                              {trans.label}
+                            </span>
+                          </Link>
+                        );
+                      })}
                     </div>
-                  ))}
-                </div>
+                  </div>
+                ))}
 
-                {/* Column 2 (Middle): Converters & Calculators */}
-                <div className="col-span-4 space-y-4">
-                  {toolCategories.filter(c => ['Converters & Parsers', 'Calculators & Utilities'].includes(c.name)).map((cat) => (
-                    <div key={cat.name} className="space-y-2">
-                      <h4 className="text-[10px] uppercase font-black tracking-widest text-primary/80 px-1">
-                        {getCategoryTitle(cat.name)}
-                      </h4>
-                      <div className="grid gap-1">
-                        {cat.items.map((item) => {
-                          const Icon = item.icon;
-                          const isSelected = pathname === item.href;
-                          const trans = getToolTranslation(item.href, item.label, item.desc);
-                          return (
-                            <Link
-                              key={item.href}
-                              href={item.href}
-                              className={cn(
-                                "flex items-start gap-2.5 rounded-lg p-2 transition-all hover:translate-x-0.5 hover:bg-muted text-left",
-                                isSelected && "bg-primary/5 border border-primary/20"
-                              )}
-                            >
-                              <div className="h-7 w-7 rounded-md bg-primary/10 text-primary flex items-center justify-center shrink-0">
-                                <Icon className="h-3.5 w-3.5" />
-                              </div>
-                              <div>
-                                <p className="text-xs font-bold leading-none">{trans.label}</p>
-                                <p className="text-[9px] text-muted-foreground mt-0.5 leading-snug line-clamp-1">
-                                  {trans.desc}
-                                </p>
-                              </div>
-                            </Link>
-                          );
-                        })}
+                {/* Column 6: Featured Privacy Sidebar (col-span-2) */}
+                <div className="col-span-2 border-l border-border/60 pl-6 flex flex-col justify-between">
+                  <div className="space-y-4 text-left">
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2 text-primary">
+                        <Shield className="h-4.5 w-4.5 shrink-0" />
+                        <h5 className="text-xs font-black uppercase tracking-wider truncate">Private & Local</h5>
                       </div>
-                    </div>
-                  ))}
-                </div>
-
-                {/* Column 3 (Right): Featured Platform Sidebar */}
-                <div className="col-span-4 border-l border-border/60 pl-5">
-                  <div className="space-y-3 text-left">
-                    <div className="space-y-1.5">
-                      <h5 className="text-xs font-black">{t('allToolsPrivate')}</h5>
                       <p className="text-[10px] text-muted-foreground leading-relaxed">
-                        {t('privacyEngineDesc')}
+                        Data never leaves your device. Uses Wasm and client scripts.
                       </p>
                     </div>
-                    <div className="bg-muted/40 rounded-xl p-3 border border-border/50 text-[10px] space-y-1">
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">{t('toolboxCount')}:</span>
-                        <span className="font-bold font-mono text-primary">{totalTools} {t('utilitiesLabel')}</span>
+
+                    <div className="bg-muted/40 rounded-xl p-3.5 border border-border/50 text-[10px] space-y-2.5">
+                      <div className="flex flex-col gap-1">
+                        <span className="text-muted-foreground font-medium">Toolbox Count:</span>
+                        <span className="font-bold font-mono text-primary bg-primary/10 px-2 py-0.5 rounded-md w-fit mt-0.5">
+                          {toolCategories.reduce((acc, cat) => acc + cat.items.length, 0)} Utilities
+                        </span>
                       </div>
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">{t('storageState')}:</span>
-                        <span className="font-bold text-primary font-mono">{t('prodSandbox')}</span>
+                      <div className="flex flex-col gap-1 border-t pt-2 border-border/40">
+                        <span className="text-muted-foreground font-medium">Storage State:</span>
+                        <span className="font-bold text-emerald-600 dark:text-emerald-450 font-mono">
+                          Production Sandbox
+                        </span>
                       </div>
                     </div>
                   </div>

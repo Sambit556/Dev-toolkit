@@ -9,7 +9,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import { CodeEditor } from '@/components/ui/CodeEditor';
 import { Input } from '@/components/ui/input';
-import { jsPDF } from 'jspdf';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Switch } from '@/components/ui/switch';
+import jsyaml from 'js-yaml';
 import { marked } from 'marked';
 import { toast } from 'sonner';
 
@@ -42,12 +44,28 @@ export function ConvertersTool() {
   const [mdOutput, setMdOutput] = useState<string>('');
   const [htmlPreview, setHtmlPreview] = useState<string>('');
 
-  // --- PDF EXPORTER STATES ---
-  const [pdfText, setPdfText] = useState<string>(
-    'Developer Tool PDF Export\n==========================\n\nThis document was generated fully client-side using JavaScript!\n\nAll computations occurred in the browser. No server calls were made.'
+  // --- YAML / JSON STATES ---
+  const [yamlDirection, setYamlDirection] = useState<'json2yaml' | 'yaml2json'>('json2yaml');
+  const [yamlInput, setYamlInput] = useState<string>(
+    JSON.stringify(
+      {
+        name: 'DevToolkit',
+        version: '1.0.0',
+        active: true,
+        features: ['JWT', 'UUID', 'Cron', 'YAML/JSON', 'Unit Converter'],
+        author: {
+          name: 'Antigravity',
+          role: 'AI Companion',
+        },
+      },
+      null,
+      2
+    )
   );
-  const [pdfFontSize, setPdfFontSize] = useState<number>(12);
-  const [pdfTitle, setPdfTitle] = useState<string>('Developer Export');
+  const [yamlOutput, setYamlOutput] = useState<string>('');
+  const [yamlError, setYamlError] = useState<string | null>(null);
+  const [yamlIndentSize, setYamlIndentSize] = useState<string>('2');
+  const [yamlSortKeys, setYamlSortKeys] = useState<boolean>(false);
 
   // 1. Process CSV ↔ JSON
   const handleCsvConversion = () => {
@@ -301,27 +319,42 @@ export function ConvertersTool() {
     handleMdConversion();
   }, [mdInput, mdDirection]);
 
-  // 4. Generate PDF
-  const handleGeneratePdf = () => {
+  // 4. Process YAML ↔ JSON
+  const handleYamlConversion = () => {
+    if (!yamlInput.trim()) {
+      setYamlOutput('');
+      setYamlError(null);
+      return;
+    }
+
     try {
-      const doc = new jsPDF({
-        orientation: 'portrait',
-        unit: 'pt',
-        format: 'a4',
-      });
-
-      doc.setFontSize(pdfFontSize);
-      const splitText = doc.splitTextToSize(pdfText, 500);
-      
-      // Page styling / margins
-      doc.text(splitText, 45, 60);
-
-      doc.save(`${pdfTitle.toLowerCase().replace(/\s+/g, '-')}.pdf`);
-      toast.success('PDF generated and downloaded!');
+      if (yamlDirection === 'json2yaml') {
+        const parsed = JSON.parse(yamlInput);
+        const yaml = jsyaml.dump(parsed, {
+          indent: Number(yamlIndentSize),
+          sortKeys: yamlSortKeys,
+          noRefs: true,
+        });
+        setYamlOutput(yaml);
+        setYamlError(null);
+      } else {
+        const parsed = jsyaml.load(yamlInput);
+        if (typeof parsed !== 'object' && parsed !== null) {
+          throw new Error('YAML did not parse into an object');
+        }
+        const json = JSON.stringify(parsed, null, Number(yamlIndentSize));
+        setYamlOutput(json);
+        setYamlError(null);
+      }
     } catch (e: any) {
-      toast.error(`PDF generate failed: ${e.message}`);
+      setYamlError(e.message || 'Error occurred during parsing');
+      setYamlOutput('');
     }
   };
+
+  useEffect(() => {
+    handleYamlConversion();
+  }, [yamlInput, yamlDirection, yamlIndentSize, yamlSortKeys]);
 
   const handleCopyText = (text: string, label: string) => {
     navigator.clipboard.writeText(text);
@@ -339,8 +372,18 @@ export function ConvertersTool() {
     toast.success('Downloaded successfully!');
   };
 
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const tabParam = params.get('tab');
+      if (tabParam && ['csv-json', 'xml-json', 'yaml-json', 'md-html'].includes(tabParam)) {
+        setActiveTab(tabParam);
+      }
+    }
+  }, []);
+
   return (
-    <Tabs defaultValue="csv-json" onValueChange={setActiveTab} className="space-y-6">
+    <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
       <TabsList className="grid grid-cols-4 text-xs h-auto py-1">
         <TabsTrigger value="csv-json" className="gap-2">
           <FileSpreadsheet className="h-4 w-4" />
@@ -350,13 +393,13 @@ export function ConvertersTool() {
           <Code2 className="h-4 w-4" />
           XML ↔ JSON
         </TabsTrigger>
+        <TabsTrigger value="yaml-json" className="gap-2">
+          <ArrowLeftRight className="h-4 w-4" />
+          YAML ↔ JSON
+        </TabsTrigger>
         <TabsTrigger value="md-html" className="gap-2">
           <Eye className="h-4 w-4" />
           Markdown ↔ HTML
-        </TabsTrigger>
-        <TabsTrigger value="pdf-writer" className="gap-2">
-          <FileText className="h-4 w-4" />
-          PDF Writer
         </TabsTrigger>
       </TabsList>
 
@@ -607,55 +650,107 @@ export function ConvertersTool() {
         )}
       </TabsContent>
 
-      {/* --- PDF WRITER TAB --- */}
-      <TabsContent value="pdf-writer" className="space-y-6">
-        <div className="grid gap-6 md:grid-cols-3">
-          {/* Controls */}
-          <Card className="md:col-span-1">
+      {/* --- YAML ↔ JSON TAB --- */}
+      <TabsContent value="yaml-json" className="space-y-6">
+        <div className="grid gap-6 md:grid-cols-2">
+          {/* Input Panel */}
+          <Card>
             <CardContent className="p-4 space-y-4">
-              <h3 className="font-semibold text-sm border-b pb-2">PDF Document Setup</h3>
-
-              <div className="space-y-1.5">
-                <Label htmlFor="pdf-doc-title">Document Title</Label>
-                <Input
-                  id="pdf-doc-title"
-                  value={pdfTitle}
-                  onChange={(e) => setPdfTitle(e.target.value)}
-                />
+              <div className="flex items-center justify-between border-b pb-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setYamlDirection(yamlDirection === 'json2yaml' ? 'yaml2json' : 'json2yaml')}
+                  className="h-8 text-xs gap-1"
+                >
+                  <ArrowLeftRight className="h-3 w-3" />
+                  {yamlDirection === 'json2yaml' ? 'JSON ➔ YAML' : 'YAML ➔ JSON'}
+                </Button>
               </div>
 
-              <div className="space-y-1.5">
-                <Label htmlFor="pdf-font-slider">Font Size ({pdfFontSize}pt)</Label>
-                <input
-                  type="range"
-                  id="pdf-font-slider"
-                  min={8}
-                  max={24}
-                  value={pdfFontSize}
-                  onChange={(e) => setPdfFontSize(Number(e.target.value))}
-                  className="w-full accent-primary h-1.5 rounded bg-muted cursor-pointer"
-                />
-              </div>
+              <div className="space-y-3">
+                <div className="space-y-1.5">
+                  <Label htmlFor="yaml-input-box">Input Text</Label>
+                  <CodeEditor
+                    language={yamlDirection === 'json2yaml' ? 'json' : 'yaml'}
+                    value={yamlInput}
+                    onChange={setYamlInput}
+                    height="320px"
+                    className="border"
+                  />
+                </div>
 
-              <Button onClick={handleGeneratePdf} className="w-full text-xs">
-                <Download className="h-3.5 w-3.5 mr-1.5" />
-                Download PDF
-              </Button>
+                <div className="grid grid-cols-2 gap-3 text-xs pt-1 border-t">
+                  <div className="space-y-1">
+                    <Label htmlFor="yaml-indent">Indent size</Label>
+                    <Select value={yamlIndentSize} onValueChange={setYamlIndentSize}>
+                      <SelectTrigger id="yaml-indent" className="h-8 text-xs bg-background">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="2">2 spaces</SelectItem>
+                        <SelectItem value="4">4 spaces</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  {yamlDirection === 'json2yaml' && (
+                    <div className="flex items-center justify-between text-xs pt-5">
+                      <Label htmlFor="yaml-sort-keys" className="cursor-pointer">Sort object keys</Label>
+                      <Switch
+                        id="yaml-sort-keys"
+                        checked={yamlSortKeys}
+                        onCheckedChange={setYamlSortKeys}
+                      />
+                    </div>
+                  )}
+                </div>
+              </div>
             </CardContent>
           </Card>
 
-          {/* Textarea */}
-          <Card className="md:col-span-2">
-            <CardContent className="p-4 space-y-4">
-              <div className="flex items-center justify-between border-b pb-2">
-                <span className="text-sm font-bold">Write Text Content</span>
-                <span className="text-xs text-muted-foreground">Standard text will wrap automatically</span>
+          {/* Output Panel */}
+          <Card className="flex flex-col h-full min-h-[350px]">
+            <CardContent className="p-4 flex-1 flex flex-col space-y-4 justify-between">
+              <div className="space-y-2 flex-1 flex flex-col">
+                <div className="flex items-center justify-between pb-2 border-b">
+                  <span className="text-sm font-bold">Converted Code Output</span>
+                  <div className="flex items-center gap-1.5">
+                    <Button variant="outline" size="sm" onClick={() => handleCopyText(yamlOutput, 'Output')} className="h-7 text-xs">
+                      <Copy className="h-3 w-3 mr-1" />
+                      Copy
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleDownloadFile(
+                        yamlOutput, 
+                        yamlDirection === 'json2yaml' ? 'converted.yaml' : 'converted.json', 
+                        yamlDirection === 'json2yaml' ? 'text/yaml' : 'application/json'
+                      )}
+                      className="h-7 text-xs"
+                      disabled={!yamlOutput}
+                    >
+                      <Download className="h-3 w-3 mr-1" />
+                      Download
+                    </Button>
+                  </div>
+                </div>
+
+                <div className="flex-1">
+                  <CodeEditor
+                    language={yamlDirection === 'json2yaml' ? 'yaml' : 'json'}
+                    value={yamlOutput}
+                    readOnly
+                    height="320px"
+                  />
+                </div>
+
+                {yamlError && (
+                  <div className="p-3 bg-red-50/15 border border-red-500/30 text-red-500 rounded-lg text-[10px] font-mono leading-normal mt-2">
+                    {yamlError}
+                  </div>
+                )}
               </div>
-              <Textarea
-                value={pdfText}
-                onChange={(e) => setPdfText(e.target.value)}
-                className="font-mono text-xs h-80 resize-y"
-              />
             </CardContent>
           </Card>
         </div>
