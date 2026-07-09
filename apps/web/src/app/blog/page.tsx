@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Globe, 
   TrendingUp, 
@@ -8,7 +8,6 @@ import {
   Clock, 
   Search, 
   RefreshCw, 
-  CloudSun, 
   Coins, 
   LineChart, 
   Rss, 
@@ -63,6 +62,7 @@ interface WeatherData {
   condition: string;
   icon: string;
   location: string;
+  updatedAt: string;
 }
 
 interface GameCard {
@@ -104,35 +104,14 @@ export default function BlogPage() {
   const [bestScore, setBestScore] = useState<number>(0);
   const [gameStarted, setGameStarted] = useState<boolean>(false);
 
-  // Actual connectivity check via HTTP ping — navigator.onLine is unreliable
-  const checkConnectivity = useCallback(async () => {
-    try {
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 4000);
-      // IMPORTANT: must NOT use mode:'no-cors' — opaque responses always "succeed"
-      // api.ipify.org supports CORS and genuinely throws when offline
-      const res = await fetch(
-        `https://api.ipify.org?format=json&_=${Date.now()}`,
-        { cache: 'no-store', signal: controller.signal }
-      );
-      clearTimeout(timeout);
-      setIsOnline(res.ok);
-    } catch {
-      // TypeError: Failed to fetch — genuinely offline
-      setIsOnline(false);
-    }
-  }, []);
-
+  // Connectivity detection using native browser APIs
   useEffect(() => {
-    // Initial connectivity check
-    checkConnectivity();
+    setIsOnline(navigator.onLine);
 
     const handleOnline = () => {
-      // Don't blindly trust the event — verify with a real ping
-      checkConnectivity().then(() => {
-        toast.success('Connection restored! Synchronizing dashboard feeds...');
-        refreshAllData();
-      });
+      setIsOnline(true);
+      toast.success('Connection restored! Synchronizing dashboard feeds...');
+      refreshAllData();
     };
     const handleOffline = () => {
       setIsOnline(false);
@@ -143,15 +122,12 @@ export default function BlogPage() {
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
 
-    // Poll every 10s to catch silent disconnects
-    const pingInterval = setInterval(checkConnectivity, 10000);
-
     return () => {
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
-      clearInterval(pingInterval);
     };
-  }, [checkConnectivity]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     // Initial fetch sequences
@@ -188,7 +164,7 @@ export default function BlogPage() {
     setWeatherLoading(true);
     setWeatherError(null);
 
-    const defaultCoords = { lat: 40.7128, lon: -74.0060, name: 'New York, US' };
+    const defaultCoords = { lat: 28.6139, lon: 77.2090, name: 'New Delhi, India' };
 
     const loadWeather = async (lat: number, lon: number, name: string) => {
       try {
@@ -198,7 +174,7 @@ export default function BlogPage() {
         url.searchParams.set('current_weather', 'true');
         url.searchParams.set('hourly', 'relativehumidity_2m');
         url.searchParams.set('forecast_days', '1');
-        url.searchParams.set('timezone', 'auto'); // return local time
+        url.searchParams.set('timezone', 'auto');
 
         const response = await fetch(url.toString());
         if (!response.ok) throw new Error(`Open-Meteo HTTP ${response.status}`);
@@ -209,18 +185,15 @@ export default function BlogPage() {
         const windSpeed: number = cw.windspeed;
         const weathercode: number = cw.weathercode;
 
-        // Find the hourly index that matches the current weather observation time
-        const currentTime: string = cw.time; // e.g. "2026-07-08T21:00"
+        const currentTime: string = cw.time;
         const hourlyTimes: string[] = data.hourly?.time ?? [];
         let humidityIdx = hourlyTimes.findIndex((t: string) => t === currentTime);
         if (humidityIdx < 0) {
-          // Fallback: use the hour portion of the current time
           const currentHour = new Date().getHours();
           humidityIdx = Math.min(currentHour, hourlyTimes.length - 1);
         }
         const humidity: number = data.hourly?.relativehumidity_2m?.[humidityIdx] ?? 60;
 
-        // Complete WMO weather interpretation codes (https://open-meteo.com/en/docs#weathervariables)
         const getCondition = (code: number): { condition: string; icon: string } => {
           if (code === 0)                          return { condition: 'Clear Sky',         icon: '☀️' };
           if (code === 1)                          return { condition: 'Mainly Clear',      icon: '🌤️' };
@@ -244,7 +217,9 @@ export default function BlogPage() {
         };
 
         const { condition, icon } = getCondition(weathercode);
-        setWeatherData({ temp, humidity, windSpeed, condition, icon, location: name });
+        const now = new Date();
+        const updatedAt = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        setWeatherData({ temp, humidity, windSpeed, condition, icon, location: name, updatedAt });
       } catch (err: any) {
         console.warn('Open-Meteo fetch failed:', err.message);
         setWeatherError('Weather data unavailable.');
@@ -255,25 +230,39 @@ export default function BlogPage() {
           condition: 'Data Unavailable',
           icon: '⛅',
           location: name || 'Unknown',
+          updatedAt: '--:--',
         });
       } finally {
         setWeatherLoading(false);
       }
     };
 
+    // Resolve user location: Geolocation API → IP-based fallback → default coords
     if (typeof window !== 'undefined' && 'geolocation' in navigator) {
       navigator.geolocation.getCurrentPosition(
         async (pos) => {
-          await loadWeather(pos.coords.latitude, pos.coords.longitude, 'Your Location');
+          // Try to reverse-geocode coordinates to get city name
+          let locationName = 'Your Location';
+          // Use ipapi.co for city name based on IP (more reliable than reverse geocoding)
+          try {
+            const ipRes = await fetch('https://ipapi.co/json/');
+            if (ipRes.ok) {
+              const ipData = await ipRes.json();
+              if (ipData.city && ipData.country_name) {
+                locationName = `${ipData.city}, ${ipData.country_name}`;
+              }
+            }
+          } catch { /* use default name */ }
+          await loadWeather(pos.coords.latitude, pos.coords.longitude, locationName);
         },
         async () => {
-          // Permission denied or timed out — fall back to IP-based city from ip-api.com
+          // Permission denied or timed out — fall back to IP-based geolocation
           try {
-            const res = await fetch('https://ip-api.com/json/?fields=status,city,country,lat,lon');
+            const res = await fetch('https://ipapi.co/json/');
             if (res.ok) {
               const d = await res.json();
-              if (d.status === 'success' && d.lat && d.lon) {
-                await loadWeather(d.lat, d.lon, `${d.city}, ${d.country}`);
+              if (d.latitude && d.longitude) {
+                await loadWeather(d.latitude, d.longitude, `${d.city || 'Unknown'}, ${d.country_name || d.country || ''}`);
                 return;
               }
             }
@@ -370,34 +359,22 @@ export default function BlogPage() {
         setNews(mappedNews);
 
       } else if (feedType === 'google') {
-        const targetUrl = 'https://news.google.com/rss/search?q=technology&hl=en-US&gl=US&ceid=US:en';
-        const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(targetUrl)}`;
+        const rssUrl = 'https://news.google.com/rss/search?q=technology&hl=en-US&gl=US&ceid=US:en';
+        const apiUrl = `https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(rssUrl)}`;
         
-        const response = await fetch(proxyUrl);
+        const response = await fetch(apiUrl);
         if (!response.ok) throw new Error('Failed to resolve Google News RSS data.');
-        const xmlText = await response.text();
+        const data = await response.json();
 
-        const parser = new DOMParser();
-        const xmlDoc = parser.parseFromString(xmlText, 'text/xml');
-        const items = xmlDoc.getElementsByTagName('item');
-        
-        const parsedItems: NewsItem[] = [];
-        for (let i = 0; i < Math.min(items.length, 12); i++) {
-          const item = items[i];
-          const title = item.getElementsByTagName('title')[0]?.textContent || 'Untitled';
-          const link = item.getElementsByTagName('link')[0]?.textContent || '#';
-          const description = item.getElementsByTagName('description')[0]?.textContent || 'No description preview available.';
-          const pubDate = item.getElementsByTagName('pubDate')[0]?.textContent || 'N/A';
-          const source = item.getElementsByTagName('source')[0]?.textContent || 'Google News';
-          
-          parsedItems.push({
-            title,
-            link,
-            description: description.replace(/<[^>]*>/g, ''),
-            pubDate: new Date(pubDate).toLocaleDateString(),
-            source
-          });
-        }
+        if (data.status !== 'ok' || !data.items) throw new Error('RSS2JSON returned error status.');
+
+        const parsedItems: NewsItem[] = data.items.slice(0, 12).map((item: any) => ({
+          title: item.title || 'Untitled',
+          link: item.link || '#',
+          description: (item.description || 'No description preview available.').replace(/<[^>]*>/g, ''),
+          pubDate: item.pubDate ? new Date(item.pubDate).toLocaleDateString() : 'N/A',
+          source: item.author || 'Google News'
+        }));
         setNews(parsedItems);
 
       }
@@ -542,10 +519,22 @@ export default function BlogPage() {
                   <CardDescription className="text-[10px] font-bold mt-1 flex items-center gap-1">
                     <MapPin className="h-3 w-3 text-primary" />
                     {weather.location}
+                    {weather.updatedAt && (
+                      <span className="text-muted-foreground/60 font-mono ml-1">• {weather.updatedAt}</span>
+                    )}
                   </CardDescription>
                 )}
               </div>
-              <CloudSun className="h-4 w-4 text-primary" />
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                className="h-7 w-7 shrink-0"
+                onClick={() => fetchWeatherForecast()}
+                disabled={weatherLoading}
+                aria-label="Refresh weather"
+              >
+                <RefreshCw className={cn("h-3.5 w-3.5 text-primary", weatherLoading && "animate-spin")} />
+              </Button>
             </CardHeader>
             <CardContent className="pt-0">
               {weatherLoading ? (
