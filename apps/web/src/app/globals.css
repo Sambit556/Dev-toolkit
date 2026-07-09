@@ -128,3 +128,17 @@
     padding-bottom: env(safe-area-inset-bottom);
   }
 }
+
+/* Clock digit slide-up animation (bottom → top flip on every tick) */
+@keyframes clockSlideUp {
+  from {
+    opacity: 0;
+    transform: translateY(40%) scaleY(0.7);
+    filter: blur(1px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scaleY(1);
+    filter: blur(0);
+  }
+}

@@ -173,65 +173,98 @@ function KeyboardShortcuts() {
   );
 }
 
+function ClockSegment({ value, className }: { value: string; className?: string }) {
+  return (
+    <span
+      className={className ?? 'text-primary font-semibold tracking-wider'}
+      style={{
+        display: 'inline-block',
+        animation: 'clockSlideUp 0.26s cubic-bezier(0.22,1,0.36,1) both',
+      }}
+    >
+      {value}
+    </span>
+  );
+}
+
 function HeaderClock() {
+  const [mounted, setMounted] = useState(false);
   const [datePart, setDatePart] = useState('');
-  const [hours, setHours] = useState('');
-  const [minutes, setMinutes] = useState('');
-  const [seconds, setSeconds] = useState('');
+  const [hh, setHh] = useState('--');
+  const [mm, setMm] = useState('--');
+  const [ss, setSs] = useState('--');
+  const [ampm, setAmpm] = useState('');
+  const [use12Hour, setUse12Hour] = useState(false);
 
   useEffect(() => {
+    setMounted(true);
     const updateClock = () => {
       const now = new Date();
       const day = String(now.getDate()).padStart(2, '0');
       const month = String(now.getMonth() + 1).padStart(2, '0');
       const year = now.getFullYear();
+      const newMm = String(now.getMinutes()).padStart(2, '0');
+      const newSs = String(now.getSeconds()).padStart(2, '0');
+      const rawHours = now.getHours();
 
-      const hh = String(now.getHours()).padStart(2, '0');
-      const mm = String(now.getMinutes()).padStart(2, '0');
-      const ss = String(now.getSeconds()).padStart(2, '0');
+      const period = rawHours >= 12 ? 'PM' : 'AM';
+      const h12 = rawHours % 12 || 12;
+      const newHh = use12Hour ? String(h12).padStart(2, '0') : String(rawHours).padStart(2, '0');
 
       setDatePart(`${day}/${month}/${year}`);
-      setHours(hh);
-      setMinutes(mm);
-      setSeconds(ss);
+      setHh(newHh);
+      setMm(newMm);
+      setSs(newSs);
+      setAmpm(period);
     };
 
     updateClock();
     const intervalId = setInterval(updateClock, 1000);
     return () => clearInterval(intervalId);
-  }, []);
+  }, [use12Hour]);
+
+  if (!mounted) {
+    return (
+      <div className="hidden md:flex items-center gap-2 font-mono text-xs font-bold text-primary bg-primary/5 border border-primary/20 px-3 py-1.5 rounded-lg shadow-sm">
+        <Clock className="h-3.5 w-3.5 text-primary shrink-0" />
+        <span className="text-muted-foreground/40">--/--/---- | --:--:--</span>
+      </div>
+    );
+  }
 
   return (
-    <div className="hidden md:flex items-center gap-2 font-mono text-xs font-bold text-primary bg-primary/5 hover:bg-primary/10 border border-primary/20 hover:border-primary/30 transition-all px-3 py-1.5 rounded-lg shadow-sm">
-      <style>{`
-        @keyframes clockSlideUp {
-          from {
-            transform: translateY(3px);
-            opacity: 0.2;
-          }
-          to {
-            transform: translateY(0);
-            opacity: 1;
-          }
-        }
-        .clock-tick-animation {
-          display: inline-block;
-          animation: clockSlideUp 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-        }
-      `}</style>
-      <Clock className="h-3.5 w-3.5 text-primary shrink-0" />
-      <div className="flex items-center gap-1.5 select-none">
+    <button
+      onClick={() => setUse12Hour(v => !v)}
+      className="hidden md:flex items-center gap-2 font-mono text-xs font-bold text-primary bg-primary/5 hover:bg-primary/10 border border-primary/20 hover:border-primary/30 transition-all px-3 py-1.5 rounded-lg shadow-sm cursor-pointer select-none group"
+    >
+      <Clock className="h-3.5 w-3.5 text-primary shrink-0 animate-pulse" />
+      <div className="flex items-center gap-1">
         <span className="text-muted-foreground/80">{datePart}</span>
         <span className="text-muted-foreground/30 font-light mx-0.5">|</span>
-        <div className="flex items-center text-primary font-semibold tracking-wider">
-          <span key={hours} className="clock-tick-animation">{hours}</span>
-          <span className="text-muted-foreground/40 mx-[1px]">:</span>
-          <span key={minutes} className="clock-tick-animation">{minutes}</span>
-          <span className="text-muted-foreground/40 mx-[1px]">:</span>
-          <span key={seconds} className="clock-tick-animation text-primary/90">{seconds}</span>
-        </div>
+        {/* Tight wrapper — zero gap so colons sit flush against digits */}
+        <span className="inline-flex items-center">
+          <ClockSegment key={`h:${hh}`} value={hh} />
+          <span className="text-primary/50 font-light">:</span>
+          <ClockSegment key={`m:${mm}`} value={mm} />
+          <span className="text-primary/50 font-light">:</span>
+          <ClockSegment key={`s:${ss}`} value={ss} className="text-primary font-semibold tracking-wider" />
+        </span>
+        {use12Hour && (
+          <span className="text-[10px] font-black text-primary/70 ml-1">{ampm}</span>
+        )}
       </div>
-    </div>
+      {/* Format badge */}
+      <span
+        className={cn(
+          "text-[9px] font-black tracking-widest px-1.5 py-0.5 rounded-md border transition-all duration-200",
+          use12Hour
+            ? "bg-primary/15 text-primary border-primary/30"
+            : "bg-muted/60 text-muted-foreground/60 border-border/50 group-hover:bg-primary/10 group-hover:text-primary/60 group-hover:border-primary/20"
+        )}
+      >
+        {use12Hour ? '12H' : '24H'}
+      </span>
+    </button>
   );
 }
 
@@ -299,6 +332,17 @@ export function Header() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [desktopOpen, setDesktopOpen] = useState(false);
   const progressBarRef = useRef<HTMLDivElement>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setDesktopOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   const totalTools = toolCategories.reduce((acc, cat) => acc + cat.items.length, 0);
 
@@ -387,10 +431,10 @@ export function Header() {
           {/* Tools Menu Trigger */}
           <div
             className="py-1"
-            onMouseEnter={() => setDesktopOpen(true)}
-            onMouseLeave={() => setDesktopOpen(false)}
+            ref={dropdownRef}
           >
             <button
+              onClick={() => setDesktopOpen((prev) => !prev)}
               className={cn(
                 'inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-sm font-medium transition-colors text-muted-foreground hover:bg-accent hover:text-accent-foreground',
                 desktopOpen && 'bg-accent text-accent-foreground'
@@ -619,7 +663,7 @@ export function Header() {
       {/* Scroll progress bar */}
       <div
         ref={progressBarRef}
-        className="absolute bottom-0 left-0 h-[2px] bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-500 transition-all duration-75 ease-out shadow-[0_0_8px_rgba(59,130,246,0.5)]"
+        className="absolute bottom-0 left-0 h-[2px] bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-500 transition-all duration-75 ease-out"
         style={{ width: '0%' }}
       />
     </header>

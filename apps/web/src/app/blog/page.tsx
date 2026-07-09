@@ -17,11 +17,15 @@ import {
   Droplets,
   ExternalLink,
   ChevronRight,
+  ChevronUp,
+  ChevronDown,
+  ChevronLeft,
   ShieldCheck,
   AlertCircle,
   Gamepad2,
   RotateCcw,
-  Play
+  Play,
+  Check
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -77,6 +81,20 @@ interface GameCard {
 
 const MEMORY_SYMBOLS = ['JWT', 'JSON', 'UUID', 'CRON', 'PDF', 'API', 'SSL', 'PWA'];
 
+const getCardSymbolStyle = (symbol: string) => {
+  switch (symbol) {
+    case 'JWT': return 'bg-purple-500/10 dark:bg-purple-500/15 border-purple-500/30 dark:border-purple-500/40 text-purple-700 dark:text-purple-400 shadow-[0_4px_12px_rgba(168,85,247,0.12)] dark:shadow-[0_0_15px_rgba(168,85,247,0.25)]';
+    case 'JSON': return 'bg-amber-500/10 dark:bg-amber-500/15 border-amber-500/30 dark:border-amber-500/40 text-amber-700 dark:text-amber-400 shadow-[0_4px_12px_rgba(245,158,11,0.12)] dark:shadow-[0_0_15px_rgba(245,158,11,0.25)]';
+    case 'UUID': return 'bg-blue-500/10 dark:bg-blue-500/15 border-blue-500/30 dark:border-blue-500/40 text-blue-700 dark:text-blue-400 shadow-[0_4px_12px_rgba(59,130,246,0.12)] dark:shadow-[0_0_15px_rgba(59,130,246,0.25)]';
+    case 'CRON': return 'bg-emerald-500/10 dark:bg-emerald-500/15 border-emerald-500/30 dark:border-emerald-500/40 text-emerald-700 dark:text-emerald-400 shadow-[0_4px_12px_rgba(16,185,129,0.12)] dark:shadow-[0_0_15px_rgba(16,185,129,0.25)]';
+    case 'PDF': return 'bg-rose-500/10 dark:bg-rose-500/15 border-rose-500/30 dark:border-rose-500/40 text-rose-700 dark:text-rose-400 shadow-[0_4px_12px_rgba(244,63,94,0.12)] dark:shadow-[0_0_15px_rgba(244,63,94,0.25)]';
+    case 'API': return 'bg-cyan-500/10 dark:bg-cyan-500/15 border-cyan-500/30 dark:border-cyan-500/40 text-cyan-700 dark:text-cyan-400 shadow-[0_4px_12px_rgba(6,182,212,0.12)] dark:shadow-[0_0_15px_rgba(6,182,212,0.25)]';
+    case 'SSL': return 'bg-teal-500/10 dark:bg-teal-500/15 border-teal-500/30 dark:border-teal-500/40 text-teal-700 dark:text-teal-400 shadow-[0_4px_12px_rgba(20,184,166,0.12)] dark:shadow-[0_0_15px_rgba(20,184,166,0.25)]';
+    case 'PWA': return 'bg-pink-500/10 dark:bg-pink-500/15 border-pink-500/30 dark:border-pink-500/40 text-pink-700 dark:text-pink-400 shadow-[0_4px_12px_rgba(236,72,153,0.12)] dark:shadow-[0_0_15px_rgba(236,72,153,0.25)]';
+    default: return 'bg-primary/10 dark:bg-primary/20 border-primary/30 dark:border-primary/45 text-primary shadow-[0_4px_12px_rgba(59,130,246,0.12)] dark:shadow-[0_0_15px_rgba(59,130,246,0.25)]';
+  }
+};
+
 export default function BlogPage() {
   const { t } = useLocale();
   const [isOnline, setIsOnline] = useState<boolean>(true);
@@ -87,6 +105,7 @@ export default function BlogPage() {
   const [newsSearch, setNewsSearch] = useState('');
   const [newsLoading, setNewsLoading] = useState(false);
   const [activeFeed, setActiveFeed] = useState<'hn' | 'google'>('hn');
+  const [brokenImages, setBrokenImages] = useState<Record<string, boolean>>({});
 
   // Market states
   const [stocks, setStocks] = useState<StockItem[]>([]);
@@ -108,6 +127,15 @@ export default function BlogPage() {
   const [bestScore, setBestScore] = useState<number>(0);
   const [gameStarted, setGameStarted] = useState<boolean>(false);
   const [forceArcadeMode, setForceArcadeMode] = useState<boolean>(false);
+  const [arcadeTab, setArcadeTab] = useState<'memory' | 'snake'>('memory');
+
+  // Code Snake game states
+  const [snake, setSnake] = useState<{ x: number; y: number }[]>([]);
+  const [snakeDir, setSnakeDir] = useState<'UP' | 'DOWN' | 'LEFT' | 'RIGHT'>('UP');
+  const [snakeFood, setSnakeFood] = useState<{ x: number; y: number }>({ x: 5, y: 5 });
+  const [snakeScore, setSnakeScore] = useState<number>(0);
+  const [snakeHighScore, setSnakeHighScore] = useState<number>(0);
+  const [snakeStatus, setSnakeStatus] = useState<'IDLE' | 'PLAYING' | 'GAME_OVER'>('IDLE');
 
   // Connectivity detection using native browser APIs
   useEffect(() => {
@@ -120,7 +148,7 @@ export default function BlogPage() {
     };
     const handleOffline = () => {
       setIsOnline(false);
-      toast.error('Network connection offline. Information Pulse Hub Arcade loaded.');
+      toast.error('Network connection offline. Information Pulse Arcade loaded.');
       initializeGame();
     };
 
@@ -439,6 +467,179 @@ export default function BlogPage() {
     setGameStarted(true);
   };
 
+  // Code Snake Game Logic
+  const initializeSnakeGame = () => {
+    const initialSnake = [
+      { x: 7, y: 7 },
+      { x: 7, y: 8 },
+      { x: 7, y: 9 }
+    ];
+    setSnake(initialSnake);
+    setSnakeDir('UP');
+    setSnakeScore(0);
+    setSnakeStatus('IDLE');
+    generateSnakeFood(initialSnake);
+  };
+
+  const generateSnakeFood = (currentSnake: { x: number; y: number }[]) => {
+    const activeSnake = currentSnake.length > 0 ? currentSnake : snake;
+    let newFood;
+    let isOccupied = true;
+    
+    while (isOccupied) {
+      const rx = Math.floor(Math.random() * 15);
+      const ry = Math.floor(Math.random() * 15);
+      newFood = { x: rx, y: ry };
+      isOccupied = activeSnake.some(cell => cell.x === rx && cell.y === ry);
+    }
+    
+    if (newFood) setSnakeFood(newFood);
+  };
+
+  // Keyboard controls listener for Code Snake
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (arcadeTab !== 'snake' || snakeStatus === 'GAME_OVER') return;
+      
+      let nextDir = snakeDir;
+      let keyProcessed = false;
+      
+      switch (e.key) {
+        case 'ArrowUp':
+        case 'w':
+        case 'W':
+          if (snakeDir !== 'DOWN') {
+            nextDir = 'UP';
+            keyProcessed = true;
+            e.preventDefault();
+          }
+          break;
+        case 'ArrowDown':
+        case 's':
+        case 'S':
+          if (snakeDir !== 'UP') {
+            nextDir = 'DOWN';
+            keyProcessed = true;
+            e.preventDefault();
+          }
+          break;
+        case 'ArrowLeft':
+        case 'a':
+        case 'A':
+          if (snakeDir !== 'RIGHT') {
+            nextDir = 'LEFT';
+            keyProcessed = true;
+            e.preventDefault();
+          }
+          break;
+        case 'ArrowRight':
+        case 'd':
+        case 'D':
+          if (snakeDir !== 'LEFT') {
+            nextDir = 'RIGHT';
+            keyProcessed = true;
+            e.preventDefault();
+          }
+          break;
+      }
+      
+      if (keyProcessed) {
+        setSnakeDir(nextDir);
+        if (snakeStatus === 'IDLE') {
+          setSnakeStatus('PLAYING');
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [snakeDir, snakeStatus, arcadeTab]);
+
+  const handleDpadClick = (dir: 'UP' | 'DOWN' | 'LEFT' | 'RIGHT') => {
+    if (snakeStatus === 'GAME_OVER' || arcadeTab !== 'snake') return;
+    
+    let nextDir = snakeDir;
+    switch (dir) {
+      case 'UP': if (snakeDir !== 'DOWN') nextDir = 'UP'; break;
+      case 'DOWN': if (snakeDir !== 'UP') nextDir = 'DOWN'; break;
+      case 'LEFT': if (snakeDir !== 'RIGHT') nextDir = 'LEFT'; break;
+      case 'RIGHT': if (snakeDir !== 'LEFT') nextDir = 'RIGHT'; break;
+    }
+    
+    setSnakeDir(nextDir);
+    if (snakeStatus === 'IDLE') {
+      setSnakeStatus('PLAYING');
+    }
+  };
+
+  // Game loop interval ticker for Code Snake
+  useEffect(() => {
+    if (snakeStatus !== 'PLAYING' || arcadeTab !== 'snake') return;
+
+    const gameTick = () => {
+      setSnake(prevSnake => {
+        if (prevSnake.length === 0) return prevSnake;
+        
+        const head = { ...prevSnake[0] };
+        
+        // Calculate new head position
+        switch (snakeDir) {
+          case 'UP': head.y -= 1; break;
+          case 'DOWN': head.y += 1; break;
+          case 'LEFT': head.x -= 1; break;
+          case 'RIGHT': head.x += 1; break;
+        }
+
+        // Collision Check: wall boundaries
+        if (head.x < 0 || head.x >= 15 || head.y < 0 || head.y >= 15) {
+          setSnakeStatus('GAME_OVER');
+          toast.error(`Game Over! Crash detected at cell coordinates.`);
+          return prevSnake;
+        }
+
+        // Collision Check: self body segment
+        const selfCollision = prevSnake.some((cell, idx) => idx > 0 && cell.x === head.x && cell.y === head.y);
+        if (selfCollision) {
+          setSnakeStatus('GAME_OVER');
+          toast.error('Game Over! Self loop collision.');
+          return prevSnake;
+        }
+
+        // Food eating check
+        const eaten = head.x === snakeFood.x && head.y === snakeFood.y;
+        const newSnake = [head, ...prevSnake];
+        
+        if (eaten) {
+          setSnakeScore(s => {
+            const nextScore = s + 1;
+            if (nextScore > snakeHighScore) {
+              setSnakeHighScore(nextScore);
+              localStorage.setItem('devpulse_snake_highscore', String(nextScore));
+            }
+            return nextScore;
+          });
+          generateSnakeFood(newSnake);
+        } else {
+          newSnake.pop(); // Remove tail segment
+        }
+
+        return newSnake;
+      });
+    };
+
+    const intervalId = setInterval(gameTick, 160);
+    return () => clearInterval(intervalId);
+  }, [snakeDir, snakeFood, snakeStatus, arcadeTab, snakeHighScore]);
+
+  // Load high scores on mount
+  useEffect(() => {
+    const savedBestScore = localStorage.getItem('devpulse_best_score');
+    if (savedBestScore) setBestScore(Number(savedBestScore));
+    
+    const savedSnakeHighScore = localStorage.getItem('devpulse_snake_highscore');
+    if (savedSnakeHighScore) setSnakeHighScore(Number(savedSnakeHighScore));
+  }, []);
+
   const handleCardClick = (id: number) => {
     if (selectedCards.length === 2) return;
     
@@ -506,7 +707,7 @@ export default function BlogPage() {
           <div className="flex items-center gap-2 mb-1">
             <Rss className="h-5 w-5 text-primary animate-pulse" />
             <h1 className="text-2xl font-bold tracking-tight bg-gradient-to-r from-foreground to-primary bg-clip-text text-transparent">
-              Information Pulse Hub
+              Information Pulse
             </h1>
             {!isOnline && (
               <Badge variant="destructive" className="ml-2 font-mono text-[9px] uppercase tracking-widest animate-pulse">
@@ -525,15 +726,20 @@ export default function BlogPage() {
             </span>
             <Button
               size="sm"
-              variant={forceArcadeMode ? "default" : "outline"}
-              className="text-[10px] font-bold h-7 px-3.5 transition-all rounded-lg"
+              variant="outline"
+              className={cn(
+                "text-[10px] font-bold h-7 px-3.5 transition-all rounded-lg flex items-center justify-center shadow-sm font-sans tracking-wide",
+                forceArcadeMode 
+                  ? "bg-rose-500/10 hover:bg-rose-500/20 text-rose-500 border-rose-500/25 hover:border-rose-500/40 shadow-[0_0_10px_rgba(244,63,94,0.08)]" 
+                  : "bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-500 border-emerald-500/25 hover:border-emerald-500/40 shadow-[0_0_10px_rgba(16,185,129,0.08)]"
+              )}
               onClick={() => {
                 const next = !forceArcadeMode;
                 setForceArcadeMode(next);
                 if (next) initializeGame();
               }}
             >
-              {forceArcadeMode ? "Active" : "Launch"}
+              {forceArcadeMode ? "Deactivate" : "Activate"}
             </Button>
           </div>
 
@@ -735,53 +941,299 @@ export default function BlogPage() {
             {!isOnline || forceArcadeMode ? (
               /* Offline Memory Match Game Board */
               <div key="arcade-board" className="animate-in fade-in zoom-in-95 duration-500 flex-1 flex flex-col">
-                <CardHeader className="pb-3 border-b border-border/50">
+                <CardHeader className="pb-3 border-b border-border/50 min-h-[80px]">
                   <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
-                    <div>
-                      <CardTitle className="text-base font-bold flex items-center gap-2 text-amber-500">
-                        <Gamepad2 className="h-5 w-5 animate-bounce" />
-                        Arcade Recovery Mode
-                      </CardTitle>
-                      <CardDescription className="text-xs">
-                        Flip and match DevToolkit technology tags to clear the board!
-                      </CardDescription>
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2 mb-1">
+                        <Gamepad2 className="h-5 w-5 text-amber-500 animate-bounce" />
+                        <CardTitle className="text-base font-black tracking-wide text-amber-500">
+                          Arcade Recovery Mode
+                        </CardTitle>
+                      </div>
+                      {/* Fixed-height description so tab switch doesn't shift layout */}
+                      <div className="h-4 overflow-hidden">
+                        <CardDescription className="text-xs leading-4 truncate">
+                          {arcadeTab === 'memory' 
+                            ? 'Flip and match DevToolkit technology tags to clear the board!'
+                            : 'Navigate the snake to squash developer bugs and commit lines of code!'}
+                        </CardDescription>
+                      </div>
                     </div>
-                    
-                    <div className="flex items-center gap-3 text-xs font-bold text-muted-foreground">
-                      <span>Moves: <strong className="text-foreground font-mono">{moves}</strong></span>
-                      <span>•</span>
-                      <span>Best Score: <strong className="text-foreground font-mono">{bestScore > 0 ? `${bestScore} moves` : '--'}</strong></span>
+
+                    <div className="flex items-center gap-2 shrink-0">
+                      {/* Tabs with visible active indicator */}
+                      <div className="flex gap-1 bg-muted/50 p-0.5 rounded-xl border border-border/70 shadow-inner">
+                        <button
+                          className={cn(
+                            "flex items-center gap-1.5 text-[10px] font-black h-7 px-3 rounded-lg transition-all duration-200",
+                            arcadeTab === 'memory'
+                              ? "bg-primary text-primary-foreground shadow-sm shadow-primary/20"
+                              : "text-muted-foreground hover:text-foreground hover:bg-muted/60"
+                          )}
+                          onClick={() => setArcadeTab('memory')}
+                        >
+                          <Play className="h-3 w-3" />
+                          Memory Match
+                        </button>
+                        <button
+                          className={cn(
+                            "flex items-center gap-1.5 text-[10px] font-black h-7 px-3 rounded-lg transition-all duration-200",
+                            arcadeTab === 'snake'
+                              ? "bg-emerald-600 text-white shadow-sm shadow-emerald-500/25"
+                              : "text-muted-foreground hover:text-foreground hover:bg-muted/60"
+                          )}
+                          onClick={() => {
+                            setArcadeTab('snake');
+                            if (snakeStatus === 'IDLE' && snake.length === 0) initializeSnakeGame();
+                          }}
+                        >
+                          <Gamepad2 className="h-3 w-3" />
+                          Code Snake
+                        </button>
+                      </div>
+
+                      {/* Score metrics — fixed min-width so content changes don't resize */}
+                      <div className="flex items-center gap-2 text-[10px] font-bold text-muted-foreground font-mono bg-muted/30 px-2 py-1 rounded-md border border-border/50 min-w-[160px] h-7 shrink-0">
+                        {arcadeTab === 'memory' ? (
+                          <>
+                            <span>Moves: <strong className="text-foreground">{moves}</strong></span>
+                            <span>•</span>
+                            <span>Best: <strong className="text-foreground">{bestScore > 0 ? `${bestScore}m` : '--'}</strong></span>
+                          </>
+                        ) : (
+                          <>
+                            <span>LOC: <strong className="text-emerald-500 font-black">{snakeScore}</strong></span>
+                            <span>•</span>
+                            <span>Best: <strong className="text-foreground">{snakeHighScore}</strong></span>
+                          </>
+                        )}
+                      </div>
                     </div>
                   </div>
                 </CardHeader>
                 
-                <CardContent className="p-6 flex flex-col justify-between flex-1">
-                  <div className="grid grid-cols-4 gap-3 max-w-md mx-auto w-full my-auto">
-                    {cards.map((card) => {
-                      const flipped = card.isFlipped || card.isMatched;
-                      return (
-                        <button
-                          key={card.id}
-                          onClick={() => handleCardClick(card.id)}
-                          className={cn(
-                            "h-20 rounded-xl font-bold font-mono text-xs flex items-center justify-center transition-all duration-300 transform select-none border relative overflow-hidden",
-                            flipped 
-                              ? "bg-primary/20 border-primary/40 text-primary shadow-[0_0_12px_rgba(59,130,246,0.15)] scale-[0.98]" 
-                              : "bg-muted/40 border-border/60 text-muted-foreground/30 hover:border-primary/30 hover:bg-muted/65 hover:scale-[1.02]"
-                          )}
+                <CardContent className="p-6 flex flex-col justify-between flex-1 relative overflow-hidden min-h-[420px]">
+
+                  {arcadeTab === 'memory' ? (
+                    matches === MEMORY_SYMBOLS.length ? (
+                      /* High-Fidelity Cyber Match Victory Screen */
+                      <div className="flex-1 flex flex-col items-center justify-center text-center space-y-6 py-6 animate-in fade-in zoom-in-95 duration-500">
+                        <div className="relative">
+                          <div className="absolute inset-0 rounded-full bg-emerald-500/20 dark:bg-emerald-500/10 blur-xl animate-pulse" />
+                          <div className="relative h-16 w-16 rounded-full border-2 border-emerald-500 bg-emerald-500/10 flex items-center justify-center text-emerald-600 dark:text-emerald-400 shadow-[0_0_20px_rgba(16,185,129,0.3)]">
+                            <Check className="h-8 w-8 stroke-[3]" />
+                          </div>
+                        </div>
+                        <div className="space-y-2">
+                          <h3 className="text-lg font-black uppercase tracking-wider text-emerald-600 dark:text-emerald-400">System Restored</h3>
+                          <p className="text-xs text-muted-foreground max-w-xs font-semibold leading-relaxed">
+                            All technology indexes have been fully calibrated and mapped successfully.
+                          </p>
+                        </div>
+                        <div className="bg-muted/40 border border-border/80 rounded-2xl p-4 w-full max-w-[280px] grid grid-cols-2 gap-2 text-center text-xs font-bold font-mono">
+                          <div>
+                            <p className="text-muted-foreground/60 text-[10px] uppercase font-black leading-none mb-1">Final Score</p>
+                            <p className="text-foreground text-sm font-black">{moves} moves</p>
+                          </div>
+                          <div className="border-l border-border/70">
+                            <p className="text-muted-foreground/60 text-[10px] uppercase font-black leading-none mb-1">Best Score</p>
+                            <p className="text-foreground text-sm font-black">{bestScore > 0 ? `${bestScore} moves` : `${moves} moves`}</p>
+                          </div>
+                        </div>
+                        <Button 
+                          size="sm" 
+                          className="bg-gradient-to-r from-emerald-500 via-emerald-600 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white font-bold flex items-center gap-1.5 px-5 py-2 rounded-xl transition-all hover:scale-105 active:scale-95 shadow-md shadow-emerald-500/15" 
+                          onClick={initializeGame}
                         >
-                          {flipped ? card.symbol : 'DT'}
-                        </button>
-                      );
-                    })}
-                  </div>
-                  
-                  <div className="flex justify-center mt-6 gap-3">
-                    <Button size="sm" variant="outline" className="font-bold flex items-center gap-1.5" onClick={initializeGame}>
-                      <RotateCcw className="h-3.5 w-3.5" />
-                      Start/Reset Game
-                    </Button>
-                  </div>
+                          <RotateCcw className="h-3.5 w-3.5" />
+                          Run Diagnosis Again
+                        </Button>
+                      </div>
+                    ) : (
+                      /* Grid and controls */
+                      <>
+                        <div className="grid grid-cols-4 gap-3 max-w-md mx-auto w-full my-auto">
+                          {cards.map((card) => {
+                            const flipped = card.isFlipped || card.isMatched;
+                            return (
+                              <div
+                                key={card.id}
+                                className="h-20 w-full [perspective:1000px] group cursor-pointer"
+                                onClick={() => handleCardClick(card.id)}
+                              >
+                                <div
+                                  className={cn(
+                                    "relative w-full h-full duration-500 [transform-style:preserve-3d] rounded-xl border border-transparent select-none transition-all",
+                                    flipped ? "[transform:rotateY(180deg)]" : ""
+                                  )}
+                                >
+                                  {/* Card Back Face (visible when NOT flipped) */}
+                                  <div className="absolute inset-0 w-full h-full rounded-xl bg-gradient-to-br from-slate-50 to-indigo-50/70 dark:from-slate-900 dark:via-slate-950 dark:to-indigo-950/65 border-border/80 dark:border-primary/25 flex flex-col items-center justify-center hover:border-cyan-500/50 hover:shadow-md dark:hover:shadow-[0_0_15px_rgba(34,211,238,0.2)] hover:scale-[1.03] transition-all [backface-visibility:hidden]">
+                                    <div className="absolute inset-0 bg-grid-white/[0.04] opacity-40 pointer-events-none" />
+                                    <span className="text-[13px] font-black tracking-widest bg-gradient-to-r from-cyan-500 via-primary to-purple-500 bg-clip-text text-transparent drop-shadow-[0_2px_8px_rgba(6,182,212,0.3)]">DT</span>
+                                  </div>
+
+                                  {/* Card Front Face (visible when flipped) */}
+                                  <div className={cn(
+                                    "absolute inset-0 w-full h-full rounded-xl flex items-center justify-center font-sans font-black tracking-wider text-sm [backface-visibility:hidden] [transform:rotateY(180deg)]",
+                                    getCardSymbolStyle(card.symbol)
+                                  )}>
+                                    {card.symbol}
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                        
+                        <div className="flex justify-center mt-6 gap-3">
+                          <Button 
+                            size="sm" 
+                            variant="outline" 
+                            className="bg-gradient-to-r from-cyan-500/10 via-primary/10 to-purple-500/10 hover:from-cyan-500/20 hover:to-purple-500/20 border-primary/30 dark:border-primary/40 hover:border-primary/50 text-foreground font-black flex items-center gap-1.5 px-5 py-2 rounded-xl transition-all hover:scale-105 active:scale-95 duration-200 shadow-sm"
+                            onClick={initializeGame}
+                          >
+                            <RotateCcw className="h-3.5 w-3.5 text-primary" />
+                            Start / Reset Game
+                          </Button>
+                        </div>
+                      </>
+                    )
+                  ) : (
+                    /* Code Snake retro game layout */
+                    snakeStatus === 'GAME_OVER' ? (
+                      /* Snake Game Over Screen */
+                      <div className="flex-1 flex flex-col items-center justify-center text-center space-y-6 py-6 animate-in fade-in zoom-in-95 duration-500">
+                        <div className="relative">
+                          <div className="absolute inset-0 rounded-full bg-rose-500/20 dark:bg-rose-500/10 blur-xl animate-pulse" />
+                          <div className="relative h-16 w-16 rounded-full border-2 border-rose-500 bg-rose-500/10 flex items-center justify-center text-rose-600 dark:text-rose-400 shadow-[0_0_20px_rgba(244,63,94,0.3)]">
+                            <AlertCircle className="h-8 w-8 stroke-[3]" />
+                          </div>
+                        </div>
+                        <div className="space-y-2">
+                          <h3 className="text-lg font-black uppercase tracking-wider text-rose-600 dark:text-rose-400">Compiler Fault</h3>
+                          <p className="text-xs text-muted-foreground max-w-xs font-semibold leading-relaxed">
+                            Code execution crashed. Snake collided with a system wall or self-loop pointer segment.
+                          </p>
+                        </div>
+                        <div className="bg-muted/40 border border-border/80 rounded-2xl p-4 w-full max-w-[280px] grid grid-cols-2 gap-2 text-center text-xs font-bold font-mono">
+                          <div>
+                            <p className="text-muted-foreground/60 text-[10px] uppercase font-black leading-none mb-1">Score</p>
+                            <p className="text-foreground text-sm font-black">{snakeScore} LOC</p>
+                          </div>
+                          <div className="border-l border-border/70">
+                            <p className="text-muted-foreground/60 text-[10px] uppercase font-black leading-none mb-1">Record</p>
+                            <p className="text-foreground text-sm font-black">{snakeHighScore} LOC</p>
+                          </div>
+                        </div>
+                        <Button 
+                          size="sm" 
+                          className="bg-gradient-to-r from-rose-500 via-rose-600 to-purple-600 hover:from-rose-600 hover:to-purple-700 text-white font-bold flex items-center gap-1.5 px-5 py-2 rounded-xl transition-all hover:scale-105 active:scale-95 shadow-md shadow-rose-500/15" 
+                          onClick={initializeSnakeGame}
+                        >
+                          <RotateCcw className="h-3.5 w-3.5 animate-spin-slow" />
+                          Recompile Program
+                        </Button>
+                      </div>
+                    ) : (
+                      /* Active Snake board grid & D-pad controllers */
+                      <div className="flex-1 flex flex-col md:flex-row gap-6 items-center justify-center py-2 animate-in fade-in duration-300">
+                        {/* Grid Board with IDLE overlay */}
+                        <div className="relative border border-border/80 dark:border-primary/20 bg-muted/20 dark:bg-black/35 rounded-2xl p-1.5 shadow-inner">
+                          {snakeStatus === 'IDLE' && (
+                            <div className="absolute inset-0 z-10 rounded-2xl flex flex-col items-center justify-center bg-background/60 dark:bg-black/50 backdrop-blur-[2px]">
+                              <Gamepad2 className="h-8 w-8 text-emerald-500 mb-2 animate-bounce" />
+                              <p className="text-xs font-black text-foreground">Press ↑ ↓ ← → to Start</p>
+                              <p className="text-[10px] text-muted-foreground mt-1">or use WASD keys</p>
+                            </div>
+                          )}
+                          <div className="grid grid-cols-[repeat(15,minmax(0,1fr))] gap-[1px] w-[220px] h-[220px] bg-muted/45 dark:bg-muted/10 rounded-xl overflow-hidden p-[1.5px]">
+                            {Array.from({ length: 15 * 15 }).map((_, idx) => {
+                              const x = idx % 15;
+                              const y = Math.floor(idx / 15);
+                              const isSnake = snake.some(c => c.x === x && c.y === y);
+                              const isHead = snake.length > 0 && snake[0].x === x && snake[0].y === y;
+                              const isFood = snakeFood.x === x && snakeFood.y === y;
+                              return (
+                                <div
+                                  key={idx}
+                                  className={cn(
+                                    "aspect-square w-full rounded-[2.5px] transition-all duration-100",
+                                    isHead 
+                                      ? "bg-emerald-600 dark:bg-emerald-500 border-[0.5px] border-emerald-400/50 shadow-[0_0_6px_#10b981]" 
+                                      : isSnake 
+                                        ? "bg-emerald-500/80 dark:bg-emerald-500/90 shadow-[0_0_3px_rgba(16,185,129,0.3)]" 
+                                        : isFood 
+                                          ? "bg-rose-500 animate-pulse shadow-[0_0_8px_#f43f5e] rounded-full scale-90" 
+                                          : "bg-background/40 dark:bg-slate-900/10"
+                                  )}
+                                />
+                              );
+                            })}
+                          </div>
+                        </div>
+
+                        {/* On-screen tactile D-Pad controllers */}
+                        <div className="flex flex-col items-center">
+                          <div className="mb-2 text-center select-none">
+                            <p className="text-[10px] uppercase font-black tracking-widest text-muted-foreground">Directional Input</p>
+                            <p className="text-[9px] text-muted-foreground/60 font-semibold font-mono leading-none mt-0.5">Click keys or use WASD/Arrows</p>
+                          </div>
+                          
+                          <div className="flex flex-col items-center gap-1">
+                            <Button 
+                              size="icon-sm" 
+                              variant="outline" 
+                              className="h-8 w-8 rounded-lg shadow-sm border border-border/70 hover:bg-muted active:scale-90 transition-all" 
+                              onClick={() => handleDpadClick('UP')}
+                              disabled={false}
+                            >
+                              <ChevronUp className="h-4 w-4 text-muted-foreground group-hover:text-foreground" />
+                            </Button>
+                            <div className="flex gap-1.5">
+                              <Button 
+                                size="icon-sm" 
+                                variant="outline" 
+                                className="h-8 w-8 rounded-lg shadow-sm border border-border/70 hover:bg-muted active:scale-90 transition-all" 
+                                onClick={() => handleDpadClick('LEFT')}
+                                disabled={false}
+                              >
+                                <ChevronLeft className="h-4 w-4 text-muted-foreground" />
+                              </Button>
+                              <Button 
+                                size="icon-sm" 
+                                variant="outline" 
+                                className="h-8 w-8 rounded-lg shadow-sm border border-border/70 hover:bg-muted active:scale-90 transition-all" 
+                                onClick={() => handleDpadClick('DOWN')}
+                                disabled={false}
+                              >
+                                <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                              </Button>
+                              <Button 
+                                size="icon-sm" 
+                                variant="outline" 
+                                className="h-8 w-8 rounded-lg shadow-sm border border-border/70 hover:bg-muted active:scale-90 transition-all" 
+                                onClick={() => handleDpadClick('RIGHT')}
+                                disabled={false}
+                              >
+                                <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                              </Button>
+                            </div>
+                          </div>
+
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="mt-4 font-bold text-[10px] h-7 px-4 rounded-lg flex items-center gap-1.5 hover:bg-muted"
+                            onClick={initializeSnakeGame}
+                          >
+                            <RotateCcw className="h-3 w-3" />
+                            Restart Board
+                          </Button>
+                        </div>
+                      </div>
+                    )
+                  )}
                 </CardContent>
               </div>
             ) : (
@@ -826,7 +1278,7 @@ export default function BlogPage() {
                     />
                   </div>
 
-                  <div className="flex-1 overflow-y-auto max-h-[500px] p-4 divide-y divide-border/60">
+                  <div className="flex-1 overflow-y-auto p-4 divide-y divide-border/60 h-0">
                     {newsLoading ? (
                       <div className="py-20 text-center space-y-3 select-none">
                         <RefreshCw className="h-8 w-8 animate-spin text-primary mx-auto" />
@@ -842,11 +1294,14 @@ export default function BlogPage() {
                         <div key={idx} className="py-4 first:pt-0 last:pb-0 group">
                           <div className="flex flex-col sm:flex-row gap-4 items-start">
                             {/* Thumbnail image if available */}
-                            {item.thumbnail && (
+                            {item.thumbnail && !brokenImages[item.thumbnail] && (
                               <div className="relative w-full sm:w-24 h-24 sm:h-16 shrink-0 rounded-lg overflow-hidden border border-border/60 shadow-sm bg-muted/30">
                                 <img 
                                   src={item.thumbnail} 
-                                  alt={item.title} 
+                                  alt="" 
+                                  onError={() => {
+                                    setBrokenImages((prev) => ({ ...prev, [item.thumbnail!]: true }));
+                                  }}
                                   className="w-full h-full object-cover transition-transform duration-350 group-hover:scale-105"
                                 />
                                 {item.videoUrl && (

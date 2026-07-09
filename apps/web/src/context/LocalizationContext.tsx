@@ -90,7 +90,7 @@ const TRANSLATION_BUNDLES: Record<string, Record<string, string>> = {
     recentActivity: 'Recent Activity',
     clearAll: 'Clear All',
     openTool: 'Open Tool',
-    blog: 'Information Pulse Hub',
+    blog: 'Information Pulse',
     support: 'Support',
     privacyFeature1: 'Client-side processing',
     privacyFeature2: 'No data collection',

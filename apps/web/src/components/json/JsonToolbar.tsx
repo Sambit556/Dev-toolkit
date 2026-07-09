@@ -83,16 +83,34 @@ export function JsonToolbar({
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (file.size > 10 * 1024 * 1024) {
-      alert('File too large. Maximum 10MB.');
+    const MAX_BYTES = 200 * 1024 * 1024; // 200 MB
+    if (file.size > MAX_BYTES) {
+      alert(`File too large (${(file.size / 1024 / 1024).toFixed(0)} MB). Maximum supported size is 200 MB.`);
       return;
     }
 
-    const reader = new FileReader();
-    reader.onload = (ev) => {
-      onUpload(ev.target?.result as string);
+    // Use streaming chunks for large files to avoid UI freeze
+    const CHUNK = 8 * 1024 * 1024; // 8 MB per chunk
+    let offset = 0;
+    const chunks: string[] = [];
+
+    const readNextChunk = () => {
+      const blob = file.slice(offset, offset + CHUNK);
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        chunks.push(ev.target?.result as string);
+        offset += CHUNK;
+        if (offset < file.size) {
+          readNextChunk();
+        } else {
+          onUpload(chunks.join(''));
+        }
+      };
+      reader.onerror = () => alert('Failed to read file.');
+      reader.readAsText(blob);
     };
-    reader.readAsText(file);
+
+    readNextChunk();
     e.target.value = '';
   };
 
