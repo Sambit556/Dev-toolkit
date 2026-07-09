@@ -176,7 +176,7 @@ export function IpIntelTool() {
   const [validationResult, setValidationResult] = useState<any | null>(null);
 
   // Ping Test states
-  const [customPingUrl, setCustomPingUrl] = useState('https://google.com');
+  const [customPingUrl, setCustomPingUrl] = useState('');
   const [pingTargets, setPingTargets] = useState<any[]>([
     { name: 'Cloudflare DNS', url: 'https://1.1.1.1', desc: 'Anycast DNS Gateway', status: 'idle', min: null, max: null, avg: null, jitter: null, history: [] },
     { name: 'Google Server', url: 'https://www.google.com', desc: 'Google search platform gateway', status: 'idle', min: null, max: null, avg: null, jitter: null, history: [] },
@@ -1067,11 +1067,11 @@ export function IpIntelTool() {
                   {pingTargets.map((target, idx) => (
                   <div key={idx} className="flex flex-col sm:flex-row items-start sm:items-center justify-between border rounded-xl p-3 bg-muted/15 text-xs gap-3">
                     <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2">
-                        <span className="font-bold text-foreground">{target.name}</span>
-                        <Badge variant="secondary" className="font-mono text-[9px] h-4.5">{target.url}</Badge>
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className="font-bold text-foreground truncate min-w-0" title={target.name}>{target.name}</span>
+                        <Badge variant="secondary" className="font-mono text-[9px] h-4.5 shrink-0 max-w-[160px] truncate" title={target.url}>{target.url}</Badge>
                       </div>
-                      <p className="text-[10px] text-muted-foreground mt-0.5">{target.desc}</p>
+                      <p className="text-[10px] text-muted-foreground mt-0.5 truncate" title={target.desc}>{target.desc}</p>
                     </div>
 
                     <div className="flex items-center gap-3 shrink-0 self-end sm:self-auto">

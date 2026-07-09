@@ -506,57 +506,47 @@ export function Header() {
               <ChevronDown className="h-3.5 w-3.5" />
             </button>
             {desktopOpen && (
-              <div className="absolute top-12 left-1/2 -translate-x-1/2 w-[1180px] bg-card/95 backdrop-blur-md border border-primary/20 dark:border-primary/30 shadow-[0_20px_50px_rgba(59,130,246,0.15)] dark:shadow-[0_20px_50px_rgba(99,102,241,0.25)] rounded-2xl p-6 grid grid-cols-12 gap-6 animate-fade-in z-50 before:content-[''] before:absolute before:top-[-20px] before:left-0 before:right-0 before:h-5">
-                {toolCategories.map((cat) => (
-                  <div key={cat.name} className="col-span-2 space-y-3">
-                    <h4 className="text-[10px] uppercase font-black tracking-widest text-primary/85 border-b pb-2 border-primary/10 px-1 truncate">
-                      {getCategoryTitle(cat.name)}
-                    </h4>
-                    <div className="grid gap-1">
-                      {cat.items.map((item) => {
-                        const Icon = item.icon;
-                        const isSelected = pathname === item.href;
-                        const trans = getToolTranslation(item.href, item.label, item.desc);
-                        return (
-                          <Link
-                            key={item.href}
-                            href={item.href}
-                            className={cn(
-                              "flex items-center gap-2.5 rounded-lg p-2 transition-all hover:translate-x-0.5 hover:bg-muted text-left border border-transparent",
-                              isSelected && "bg-primary/5 border border-primary/20 text-primary"
-                            )}
-                          >
-                            <div className="h-7 w-7 rounded-md bg-primary/10 text-primary flex items-center justify-center shrink-0">
-                              <Icon className="h-3.5 w-3.5" />
-                            </div>
-                            <span className="text-xs font-bold leading-snug truncate">
-                              {trans.label}
-                            </span>
-                          </Link>
-                        );
-                      })}
-                    </div>
-                  </div>
-                ))}
-
-                {/* Column 6: Featured Privacy Sidebar (col-span-2) */}
-                <div className="col-span-2 border-l border-border/60 pl-6 flex flex-col justify-between">
-                  <div className="space-y-4 text-left">
-                    <div className="space-y-2">
-                      <div className="flex items-center gap-2 text-primary">
-                        <Shield className="h-4.5 w-4.5 shrink-0" />
-                        <h5 className="text-xs font-black uppercase tracking-wider truncate">Private & Local</h5>
+              <div className="fixed left-1/2 top-14 z-50 w-[calc(100vw-2rem)] max-w-[1100px] -translate-x-1/2 animate-fade-in rounded-2xl border border-primary/20 bg-card/95 p-5 shadow-[0_20px_50px_rgba(59,130,246,0.15)] backdrop-blur-md dark:border-primary/30 dark:shadow-[0_20px_50px_rgba(99,102,241,0.25)] sm:p-6">
+                <div className="grid grid-cols-3 gap-5 sm:gap-6 xl:grid-cols-6">
+                  {toolCategories.map((cat) => (
+                    <div key={cat.name} className="min-w-0 space-y-3">
+                      <h4 className="text-[10px] uppercase font-black tracking-widest text-primary/85 border-b pb-2 border-primary/10 px-1 leading-snug">
+                        {getCategoryTitle(cat.name)}
+                      </h4>
+                      <div className="grid gap-1">
+                        {cat.items.map((item) => {
+                          const Icon = item.icon;
+                          const isSelected = pathname === item.href;
+                          const trans = getToolTranslation(item.href, item.label, item.desc);
+                          return (
+                            <Link
+                              key={item.href}
+                              href={item.href}
+                              className={cn(
+                                "flex items-center gap-2.5 rounded-lg p-2 transition-all hover:translate-x-0.5 hover:bg-muted text-left border border-transparent min-w-0",
+                                isSelected && "bg-primary/5 border border-primary/20 text-primary"
+                              )}
+                            >
+                              <div className="h-7 w-7 rounded-md bg-primary/10 text-primary flex items-center justify-center shrink-0">
+                                <Icon className="h-3.5 w-3.5" />
+                              </div>
+                              <span className="text-xs font-bold leading-snug min-w-0">
+                                {trans.label}
+                              </span>
+                            </Link>
+                          );
+                        })}
                       </div>
-                      <p className="text-[10px] text-muted-foreground leading-relaxed">
-                        Data never leaves your device. Uses Wasm and client scripts.
-                      </p>
                     </div>
+                  ))}
 
+                  {/* Toolbox stats sidebar */}
+                  <div className="min-w-0 flex flex-col justify-end border-t border-border/60 pt-4 sm:border-l sm:border-t-0 sm:pl-6 sm:pt-0">
                     <div className="bg-muted/40 rounded-xl p-3.5 border border-border/50 text-[10px] space-y-2.5">
                       <div className="flex flex-col gap-1">
                         <span className="text-muted-foreground font-medium">Toolbox Count:</span>
                         <span className="font-bold font-mono text-primary bg-primary/10 px-2 py-0.5 rounded-md w-fit mt-0.5">
-                          {toolCategories.reduce((acc, cat) => acc + cat.items.length, 0)} Utilities
+                          {totalTools} Utilities
                         </span>
                       </div>
                       <div className="flex flex-col gap-1 border-t pt-2 border-border/40">
