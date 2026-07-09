@@ -197,8 +197,6 @@ export default function BlogPage() {
     setWeatherLoading(true);
     setWeatherError(null);
 
-    const apiKey = process.env.OPENWEATHERMAP_API_KEY;
-
     const getOwmIconEmoji = (iconCode: string): string => {
       if (iconCode.startsWith('01')) return '☀️';
       if (iconCode.startsWith('02')) return '🌤️';
@@ -215,7 +213,7 @@ export default function BlogPage() {
     try {
       let url = '';
       if (searchCity && searchCity.trim() !== '') {
-        url = `https://api.openweathermap.org/data/2.5/weather?q=${encodeURIComponent(searchCity.trim())}&appid=${apiKey}&units=metric`;
+        url = `/api/weather?q=${encodeURIComponent(searchCity.trim())}`;
       } else {
         // Resolve user location: Geolocation API → IP-based fallback → default coords
         let lat = 28.6139;
@@ -242,7 +240,7 @@ export default function BlogPage() {
             } catch { /* ignore */ }
           }
         }
-        url = `https://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${lon}&appid=${apiKey}&units=metric`;
+        url = `/api/weather?lat=${lat}&lon=${lon}`;
       }
 
       const response = await fetch(url);

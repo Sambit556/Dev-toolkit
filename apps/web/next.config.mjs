@@ -32,10 +32,9 @@ const nextConfig = {
               "style-src 'self' 'unsafe-inline'",
               "img-src 'self' data: blob: https://images.unsplash.com",
               "font-src 'self'",
-              "connect-src 'self' " + (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001') + 
-              " https://api.openweathermap.org" +
+              "connect-src 'self' " + (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001') +
               " https://ipapi.co" +
-              " https://api.ipwho.org" +
+              " https://ipwho.is" +
               " https://api.ipify.org" +
               " https://api.coingecko.com" +
               " https://speed.cloudflare.com" +

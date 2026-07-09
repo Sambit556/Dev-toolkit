@@ -203,8 +203,6 @@ export function IpIntelTool() {
       asn: d.connection?.asn ? `AS${d.connection.asn}` : undefined,
     });
 
-    const apiKey = process.env.IPWHO_API_KEY;
-
     try {
       // 1. Try ipapi.co (HTTPS, CORS-enabled, keyless)
       const res = await fetch('https://ipapi.co/json/');
@@ -215,13 +213,13 @@ export function IpIntelTool() {
       setUserIpInfo(info);
       setSearchResult(info);
     } catch (err: any) {
-      console.warn('Primary IP API failed, trying api.ipwho.org with key...', err);
+      console.warn('Primary IP API failed, trying ipwho.is...', err);
       try {
-        // 2. Try api.ipwho.org (HTTPS, CORS-enabled, using user API key)
-        const res = await fetch(`https://api.ipwho.org/ip?apiKey=${apiKey}`);
-        if (!res.ok) throw new Error('api.ipwho.org failed');
+        // 2. Try ipwho.is (HTTPS, CORS-enabled, keyless)
+        const res = await fetch('https://ipwho.is/');
+        if (!res.ok) throw new Error('ipwho.is failed');
         const data = await res.json();
-        if (data.success === false) throw new Error(data.message || 'api.ipwho.org failed');
+        if (data.success === false) throw new Error(data.message || 'ipwho.is failed');
         const info = mapIpWhoIs(data);
         setUserIpInfo(info);
         setSearchResult(info);
@@ -292,8 +290,6 @@ export function IpIntelTool() {
       asn: d.connection?.asn ? `AS${d.connection.asn}` : undefined,
     });
 
-    const apiKey = process.env.IPWHO_API_KEY;
-
     try {
       // 1. Try ipapi.co (HTTPS, CORS-enabled, keyless)
       const res = await fetch(`https://ipapi.co/${trimmedIp}/json/`);
@@ -303,11 +299,11 @@ export function IpIntelTool() {
       const info = mapIpApiCo(data);
       setSearchResult(info);
     } catch (err: any) {
-      console.warn('Primary lookup failed, trying api.ipwho.org with key...', err);
+      console.warn('Primary lookup failed, trying ipwho.is...', err);
       try {
-        // 2. Try api.ipwho.org (HTTPS, CORS-enabled, using user API key)
-        const res = await fetch(`https://api.ipwho.org/ip/${trimmedIp}?apiKey=${apiKey}`);
-        if (!res.ok) throw new Error('api.ipwho.org failed');
+        // 2. Try ipwho.is (HTTPS, CORS-enabled, keyless)
+        const res = await fetch(`https://ipwho.is/${encodeURIComponent(trimmedIp)}`);
+        if (!res.ok) throw new Error('ipwho.is failed');
         const data = await res.json();
         if (data.success === false) throw new Error(data.message || 'Invalid IP address.');
         const info = mapIpWhoIs(data);
