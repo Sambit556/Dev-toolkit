@@ -136,7 +136,7 @@ export default function BlogPage() {
     };
     const handleOffline = () => {
       setIsOnline(false);
-      toast.error('Network connection offline. DevPulse Hub Arcade loaded.');
+      toast.error('Network connection offline. Information Pulse Hub Arcade loaded.');
       initializeGame();
     };
 
@@ -500,7 +500,7 @@ export default function BlogPage() {
           <div className="flex items-center gap-2 mb-1">
             <Rss className="h-5 w-5 text-primary animate-pulse" />
             <h1 className="text-2xl font-bold tracking-tight bg-gradient-to-r from-foreground to-primary bg-clip-text text-transparent">
-              DevPulse Hub
+              Information Pulse Hub
             </h1>
             {!isOnline && (
               <Badge variant="destructive" className="ml-2 font-mono text-[9px] uppercase tracking-widest animate-pulse">

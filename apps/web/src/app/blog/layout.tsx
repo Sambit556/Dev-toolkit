@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
-  title: 'DevPulse Hub — Tech News, Markets & Live Dashboard',
+  title: 'Information Pulse Hub — Tech News, Markets & Live Dashboard',
   description:
     'Your real-time developer terminal: Hacker News top stories, Google News tech feed, live crypto prices (BTC/ETH/SOL), stock market data, and local weather — all in one offline-ready dashboard.',
   keywords: [
@@ -14,11 +14,11 @@ export const metadata: Metadata = {
     'stock market',
     'developer dashboard',
     'tech feed',
-    'devpulse',
+    'information pulse hub',
   ],
   alternates: { canonical: '/blog' },
   openGraph: {
-    title: 'INPulse Hub — Tech News, Crypto & Live Markets',
+    title: 'Information Pulse Hub — Tech News, Crypto & Live Markets',
     description:
       'Real-time Hacker News, Google News, crypto & stock tickers, and local weather in one privacy-first developer dashboard.',
     url: '/blog',

@@ -46,8 +46,8 @@ export function Footer() {
 
           {/* Converters & Formatters */}
           <div>
-            <h4 className="text-xs font-black uppercase tracking-wider text-foreground mb-4">
-              {t('converters')} & {t('formatters')}
+            <h4 className="text-xs font-bold uppercase tracking-wider text-foreground mb-4">
+              Converters
             </h4>
             <ul className="space-y-2.5">
               <li>
@@ -97,8 +97,8 @@ export function Footer() {
 
           {/* Generators & Utilities */}
           <div>
-            <h4 className="text-xs font-black uppercase tracking-wider text-foreground mb-4">
-              {t('generators')} & {t('utilities')}
+            <h4 className="text-xs font-bold uppercase tracking-wider text-foreground mb-4">
+              Tools & Utilities
             </h4>
             <ul className="space-y-2.5">
               <li>
@@ -160,8 +160,8 @@ export function Footer() {
 
           {/* Privacy Checklist */}
           <div>
-            <h4 className="text-xs font-black uppercase tracking-wider text-foreground mb-4">
-              {t('privacyTitle')}
+            <h4 className="text-xs font-bold uppercase tracking-wider text-foreground mb-4">
+              Privacy
             </h4>
             <ul className="space-y-2 text-xs text-muted-foreground">
               <li className="flex items-center gap-1.5">
@@ -181,8 +181,8 @@ export function Footer() {
 
           {/* Support & Links */}
           <div>
-            <h4 className="text-xs font-black uppercase tracking-wider text-foreground mb-4">
-              {t('support')} & Links
+            <h4 className="text-xs font-bold uppercase tracking-wider text-foreground mb-4">
+              Resources
             </h4>
             <ul className="space-y-2.5">
               <li>
