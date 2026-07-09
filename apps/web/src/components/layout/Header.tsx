@@ -492,7 +492,7 @@ export function Header() {
 
             {/* Premium Multi-column Dropdown Popover */}
             {desktopOpen && (
-              <div className="absolute top-[34px] left-1/2 -translate-x-1/2 w-[760px] bg-card/95 backdrop-blur-md border border-primary/20 dark:border-primary/30 shadow-[0_20px_50px_rgba(59,130,246,0.15)] dark:shadow-[0_20px_50px_rgba(99,102,241,0.25)] rounded-2xl p-5 grid grid-cols-12 gap-5 animate-fade-in z-50 before:content-[''] before:absolute before:top-[-15px] before:left-0 before:right-0 before:h-[15px]">
+              <div className="absolute top-12 left-1/2 -translate-x-1/2 w-[760px] bg-card/95 backdrop-blur-md border border-primary/20 dark:border-primary/30 shadow-[0_20px_50px_rgba(59,130,246,0.15)] dark:shadow-[0_20px_50px_rgba(99,102,241,0.25)] rounded-2xl p-5 grid grid-cols-12 gap-5 animate-fade-in z-50 before:content-[''] before:absolute before:top-[-20px] before:left-0 before:right-0 before:h-5">
                 {/* Column 1 (Left): Formatters & Generators */}
                 <div className="col-span-4 space-y-4">
                   {toolCategories.filter(c => ['Formatters & Viewers', 'Generators'].includes(c.name)).map((cat) => (
