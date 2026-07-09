@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
@@ -238,75 +238,24 @@ function HeaderClock() {
 type ConnectionStatus = 'online' | 'offline' | 'checking';
 
 function HeaderStatus() {
+  // Start as 'checking' until component mounts and reads navigator.onLine
   const [status, setStatus] = useState<ConnectionStatus>('checking');
 
-  const checkConnectivity = useCallback(async () => {
-    // 1. Quick check using navigator.onLine (instant offline detection)
-    if (typeof navigator !== 'undefined' && !navigator.onLine) {
-      setStatus('offline');
-      return;
-    }
-
-    try {
-      const controller = new AbortController();
-      const tid = setTimeout(() => controller.abort(), 3000);
-
-      // 2. Perform a lightweight no-cors request to a highly reliable public service.
-      // Fetch throws if truly offline or DNS cannot resolve, but avoids CORS blocks.
-      await fetch(`https://www.google.com/favicon.ico?_=${Date.now()}`, {
-        mode: 'no-cors',
-        cache: 'no-store',
-        signal: controller.signal,
-      });
-
-      clearTimeout(tid);
-      setStatus('online');
-    } catch {
-      // 3. Fallback: If public check fails (network restriction/captive portal),
-      // try querying the local backend api to verify if server is reachable.
-      try {
-        const controller = new AbortController();
-        const tid = setTimeout(() => controller.abort(), 2000);
-        const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
-        const res = await fetch(`${apiUrl}/health`, {
-          cache: 'no-store',
-          signal: controller.signal,
-        });
-        clearTimeout(tid);
-        if (res.ok) {
-          setStatus('online');
-          return;
-        }
-      } catch {
-        // Fallback failed too
-      }
-      setStatus('offline');
-    }
-  }, []);
-
   useEffect(() => {
-    checkConnectivity();
+    // Read actual browser network state on mount
+    setStatus(navigator.onLine ? 'online' : 'offline');
 
-    const handleOnline = () => {
-      setStatus('checking');
-      checkConnectivity();
-    };
-    const handleOffline = () => {
-      setStatus('offline');
-    };
+    const handleOnline = () => setStatus('online');
+    const handleOffline = () => setStatus('offline');
 
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
-    
-    // Check connectivity periodically every 15 seconds
-    const pingInterval = setInterval(checkConnectivity, 15000);
 
     return () => {
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
-      clearInterval(pingInterval);
     };
-  }, [checkConnectivity]);
+  }, []);
 
   return (
     <div className={cn(

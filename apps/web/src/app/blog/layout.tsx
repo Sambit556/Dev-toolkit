@@ -18,7 +18,7 @@ export const metadata: Metadata = {
   ],
   alternates: { canonical: '/blog' },
   openGraph: {
-    title: 'DevPulse Hub — Tech News, Crypto & Live Markets',
+    title: 'INPulse Hub — Tech News, Crypto & Live Markets',
     description:
       'Real-time Hacker News, Google News, crypto & stock tickers, and local weather in one privacy-first developer dashboard.',
     url: '/blog',

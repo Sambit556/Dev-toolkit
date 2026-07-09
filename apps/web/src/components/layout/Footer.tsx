@@ -193,7 +193,7 @@ export function Footer() {
               </li>
               <li>
                 <a
-                  href="https://github.com"
+                  href="https://github.com/Sambit556/Dev-toolkit"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground transition-colors"
@@ -209,7 +209,7 @@ export function Footer() {
         <div className="mt-10 pt-6 border-t flex flex-col sm:flex-row items-center justify-between gap-2 text-[11px] text-muted-foreground">
           <p>© 2026 DevToolkit. Built for developers by <span className="font-semibold text-foreground">Sambit</span>.</p>
           <a
-            href="https://github.com"
+            href="https://github.com/Sambit556/Dev-toolkit"
             target="_blank"
             rel="noopener noreferrer"
             className="flex items-center gap-1.5 hover:text-foreground transition-colors"
