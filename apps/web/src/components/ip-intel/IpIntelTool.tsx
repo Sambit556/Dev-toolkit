@@ -116,7 +116,7 @@ const COUNTRY_CALLING_CODES: Record<string, { country: string; code: string; fla
 export function IpIntelTool() {
   const { t } = useLocale();
   const [activeTab, setActiveTab] = useState<'ip' | 'identity'>('ip');
-  
+
   // IP states
   const [userIpInfo, setUserIpInfo] = useState<IpInfo | null>(null);
   const [lookupIp, setLookupIp] = useState('');
@@ -124,45 +124,77 @@ export function IpIntelTool() {
   const [ipLoading, setIpLoading] = useState(false);
   const [ipError, setIpError] = useState<string | null>(null);
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
+  const [userIpv4, setUserIpv4] = useState<string | null>(null);
+  const [userIpv6, setUserIpv6] = useState<string | null>(null);
+  const [copiedIpv4, setCopiedIpv4] = useState(false);
+  const [copiedIpv6, setCopiedIpv6] = useState(false);
 
   // Identity states
   const [inputVal, setInputVal] = useState('');
   const [validationResult, setValidationResult] = useState<any | null>(null);
 
   useEffect(() => {
-    // Fetch current user IP on mount
+    // Fetch current user IP and both protocols on mount
     fetchUserIp();
+    fetchIpv4();
+    fetchIpv6();
   }, []);
+
+  const fetchIpv4 = async () => {
+    try {
+      const res = await fetch('https://api.ipify.org?format=json');
+      if (res.ok) {
+        const data = await res.json();
+        setUserIpv4(data.ip);
+      }
+    } catch (e) {
+      console.warn('IPv4 discovery failed:', e);
+    }
+  };
+
+  const fetchIpv6 = async () => {
+    try {
+      const res = await fetch('https://api6.ipify.org?format=json');
+      if (res.ok) {
+        const data = await res.json();
+        setUserIpv6(data.ip);
+      }
+    } catch (e) {
+      console.warn('IPv6 discovery failed (host may not support IPv6 routing):', e);
+    }
+  };
 
   const fetchUserIp = async () => {
     setIpLoading(true);
     setIpError(null);
 
-    // Helper: map ip-api.com response to IpInfo
-    const mapIpApi = (d: any): IpInfo => ({
-      ip: d.query,
-      version: d.query?.includes(':') ? 'IPv6' : 'IPv4',
+    // Equivalent to Node package: var ipapi = require('ipapi.co');
+    const mapIpApiCo = (d: any): IpInfo => ({
+      ip: d.ip,
+      version: d.version,
       city: d.city,
-      region: d.regionName,
-      country_name: d.country,
-      country_code: d.countryCode,
-      postal: d.zip,
-      latitude: d.lat,
-      longitude: d.lon,
+      region: d.region,
+      country_name: d.country_name,
+      country_code: d.country_code,
+      postal: d.postal,
+      latitude: d.latitude,
+      longitude: d.longitude,
       timezone: d.timezone,
-      org: d.isp || d.org,
-      asn: d.as,
+      utc_offset: d.utc_offset,
+      country_calling_code: d.country_calling_code,
+      currency: d.currency,
+      org: d.org,
+      asn: d.asn,
     });
 
-    // Helper: map ipwho.is response to IpInfo
-    const mapIpWho = (d: any): IpInfo => ({
+    const mapIpWhoIs = (d: any): IpInfo => ({
       ip: d.ip,
       version: d.type,
       city: d.city,
       region: d.region,
       country_name: d.country,
       country_code: d.country_code,
-      postal: d.postal,
+      postal: d.postal_code || d.postal,
       latitude: d.latitude,
       longitude: d.longitude,
       timezone: d.timezone?.id,
@@ -171,34 +203,41 @@ export function IpIntelTool() {
       asn: d.connection?.asn ? `AS${d.connection.asn}` : undefined,
     });
 
-    // Chain: ip-api.com -> ipwho.is -> ipify (IP only)
+    const apiKey = 'sk.22211c1063dc1ee04dc4acfad4c5b14a96342543ca490ca19bf428a9eb07ae1d';
+
     try {
-      // ip-api.com: 45 req/min free, proper CORS, no key needed
-      const fields = 'status,message,query,country,countryCode,regionName,city,zip,lat,lon,timezone,isp,org,as';
-      const res = await fetch(`https://ip-api.com/json/?fields=${fields}`);
-      if (!res.ok) throw new Error('ip-api.com HTTP error');
+      // 1. Try ipapi.co (HTTPS, CORS-enabled, keyless)
+      const res = await fetch('https://ipapi.co/json/');
+      if (!res.ok) throw new Error('ipapi.co failed');
       const data = await res.json();
-      if (data.status !== 'success') throw new Error(data.message || 'ip-api.com failed');
-      const info = mapIpApi(data);
+      if (data.error) throw new Error(data.reason || 'ipapi.co failed');
+      const info = mapIpApiCo(data);
       setUserIpInfo(info);
       setSearchResult(info);
     } catch (err: any) {
-      console.warn('Primary IP API failed, trying ipwho.is...', err);
+      console.warn('Primary IP API failed, trying api.ipwho.org with key...', err);
       try {
-        const res = await fetch('https://ipwho.is/');
-        if (!res.ok) throw new Error('ipwho.is HTTP error');
+        // 2. Try api.ipwho.org (HTTPS, CORS-enabled, using user API key)
+        const res = await fetch(`https://api.ipwho.org/ip?apiKey=${apiKey}`);
+        if (!res.ok) throw new Error('api.ipwho.org failed');
         const data = await res.json();
-        if (!data.success) throw new Error(data.message || 'ipwho.is error');
-        const info = mapIpWho(data);
+        if (data.success === false) throw new Error(data.message || 'api.ipwho.org failed');
+        const info = mapIpWhoIs(data);
         setUserIpInfo(info);
         setSearchResult(info);
       } catch (err2: any) {
-        console.warn('Secondary IP API failed, trying ipify...', err2);
+        console.warn('Secondary IP API failed, trying api.ipify.org...', err2);
         try {
+          // 3. Try ipify (gets IP address only)
           const res = await fetch('https://api.ipify.org?format=json');
-          if (!res.ok) throw new Error('ipify failed');
+          if (!res.ok) throw new Error('api.ipify.org failed');
           const data = await res.json();
-          const fallback: IpInfo = { ip: data.ip, city: 'Geodata unavailable', country_name: 'Unknown', org: 'ISP lookup offline' };
+          const fallback: IpInfo = {
+            ip: data.ip,
+            city: 'Geodata unavailable',
+            country_name: 'Unknown',
+            org: 'Lookup services rate limited/offline',
+          };
           setUserIpInfo(fallback);
           setSearchResult(fallback);
         } catch {
@@ -218,52 +257,78 @@ export function IpIntelTool() {
     setIpError(null);
     const trimmedIp = lookupIp.trim();
 
+    // Equivalent to Node package: var ipapi = require('ipapi.co');
+    const mapIpApiCo = (d: any): IpInfo => ({
+      ip: d.ip,
+      version: d.version,
+      city: d.city,
+      region: d.region,
+      country_name: d.country_name,
+      country_code: d.country_code,
+      postal: d.postal,
+      latitude: d.latitude,
+      longitude: d.longitude,
+      timezone: d.timezone,
+      utc_offset: d.utc_offset,
+      country_calling_code: d.country_calling_code,
+      currency: d.currency,
+      org: d.org,
+      asn: d.asn,
+    });
+
+    const mapIpWhoIs = (d: any): IpInfo => ({
+      ip: d.ip,
+      version: d.type,
+      city: d.city,
+      region: d.region,
+      country_name: d.country,
+      country_code: d.country_code,
+      postal: d.postal_code || d.postal,
+      latitude: d.latitude,
+      longitude: d.longitude,
+      timezone: d.timezone?.id,
+      utc_offset: d.timezone?.utc,
+      org: d.connection?.org || d.connection?.isp,
+      asn: d.connection?.asn ? `AS${d.connection.asn}` : undefined,
+    });
+
+    const apiKey = 'sk.22211c1063dc1ee04dc4acfad4c5b14a96342543ca490ca19bf428a9eb07ae1d';
+
     try {
-      // ip-api.com supports direct IP lookup with field selection
-      const fields = 'status,message,query,country,countryCode,regionName,city,zip,lat,lon,timezone,isp,org,as';
-      const res = await fetch(`https://ip-api.com/json/${trimmedIp}?fields=${fields}`);
-      if (!res.ok) throw new Error('ip-api.com HTTP error');
+      // 1. Try ipapi.co (HTTPS, CORS-enabled, keyless)
+      const res = await fetch(`https://ipapi.co/${trimmedIp}/json/`);
+      if (!res.ok) throw new Error('ipapi.co lookup failed');
       const data = await res.json();
-      if (data.status !== 'success') throw new Error(data.message || 'Lookup failed — verify IP format.');
-      setSearchResult({
-        ip: data.query,
-        version: data.query?.includes(':') ? 'IPv6' : 'IPv4',
-        city: data.city,
-        region: data.regionName,
-        country_name: data.country,
-        country_code: data.countryCode,
-        postal: data.zip,
-        latitude: data.lat,
-        longitude: data.lon,
-        timezone: data.timezone,
-        org: data.isp || data.org,
-        asn: data.as,
-      });
+      if (data.error) throw new Error(data.reason || 'ipapi.co lookup failed');
+      const info = mapIpApiCo(data);
+      setSearchResult(info);
     } catch (err: any) {
-      console.warn('Primary lookup failed, trying ipwho.is...', err);
+      console.warn('Primary lookup failed, trying api.ipwho.org with key...', err);
       try {
-        const res = await fetch(`https://ipwho.is/${trimmedIp}`);
-        if (!res.ok) throw new Error('ipwho.is failed');
+        // 2. Try api.ipwho.org (HTTPS, CORS-enabled, using user API key)
+        const res = await fetch(`https://api.ipwho.org/ip/${trimmedIp}?apiKey=${apiKey}`);
+        if (!res.ok) throw new Error('api.ipwho.org failed');
         const data = await res.json();
-        if (!data.success) throw new Error(data.message || 'Invalid IP address.');
-        setSearchResult({
-          ip: data.ip,
-          version: data.type,
-          city: data.city,
-          region: data.region,
-          country_name: data.country,
-          country_code: data.country_code,
-          postal: data.postal,
-          latitude: data.latitude,
-          longitude: data.longitude,
-          timezone: data.timezone?.id,
-          utc_offset: data.timezone?.utc,
-          org: data.connection?.org || data.connection?.isp,
-          asn: data.connection?.asn ? `AS${data.connection.asn}` : undefined,
-        });
+        if (data.success === false) throw new Error(data.message || 'Invalid IP address.');
+        const info = mapIpWhoIs(data);
+        setSearchResult(info);
       } catch (err2: any) {
-        setIpError(err2.message || 'Lookup failed. Verify target IP format.');
-        setSearchResult(null);
+        console.warn('Secondary lookup failed, trying api.ipify.org fallback...', err2);
+        try {
+          // 3. Try ipify fallback
+          const res = await fetch('https://api.ipify.org?format=json');
+          if (!res.ok) throw new Error('api.ipify.org failed');
+          const data = await res.json();
+          setSearchResult({
+            ip: trimmedIp,
+            city: 'Geodata unavailable',
+            country_name: 'Unknown',
+            org: 'Lookup services rate limited/offline',
+          });
+        } catch (err3: any) {
+          setIpError(err3.message || 'Lookup failed. Verify target IP format and connectivity.');
+          setSearchResult(null);
+        }
       }
     } finally {
       setIpLoading(false);
@@ -485,6 +550,67 @@ export function IpIntelTool() {
             </Card>
           </div>
 
+          {/* Active Client IPs Copy Banner */}
+          <div className="lg:col-span-12 grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Card className="bg-muted/10 border-border/80 shadow-sm backdrop-blur-sm">
+              <CardContent className="py-3 flex items-center justify-between">
+                <div className="flex items-center gap-2.5">
+                  <div className="bg-emerald-500/10 p-1.5 rounded-lg text-emerald-500 font-bold text-[10px] uppercase tracking-wider">
+                    IPv4
+                  </div>
+                  <div>
+                    <p className="text-[10px] text-muted-foreground font-semibold leading-none">Client IPv4</p>
+                    <p className="font-mono text-xs font-black mt-1">{userIpv4 || 'Resolving...'}</p>
+                  </div>
+                </div>
+                {userIpv4 && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 hover:bg-muted/80 shrink-0"
+                    onClick={() => {
+                      navigator.clipboard.writeText(userIpv4);
+                      setCopiedIpv4(true);
+                      setTimeout(() => setCopiedIpv4(false), 1500);
+                    }}
+                  >
+                    {copiedIpv4 ? <Check className="h-3.5 w-3.5 text-green-500" /> : <Copy className="h-3.5 w-3.5 text-muted-foreground/80" />}
+                  </Button>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card className="bg-muted/10 border-border/80 shadow-sm backdrop-blur-sm">
+              <CardContent className="py-3 flex items-center justify-between">
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <div className="bg-indigo-500/10 p-1.5 rounded-lg text-indigo-500 font-bold text-[10px] uppercase tracking-wider">
+                    IPv6
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-[10px] text-muted-foreground font-semibold leading-none">Client IPv6</p>
+                    <p className="font-mono text-xs font-black mt-1 truncate" title={userIpv6 || 'Not detected'}>
+                      {userIpv6 || 'Not detected'}
+                    </p>
+                  </div>
+                </div>
+                {userIpv6 && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 hover:bg-muted/80 shrink-0"
+                    onClick={() => {
+                      navigator.clipboard.writeText(userIpv6);
+                      setCopiedIpv6(true);
+                      setTimeout(() => setCopiedIpv6(false), 1500);
+                    }}
+                  >
+                    {copiedIpv6 ? <Check className="h-3.5 w-3.5 text-green-500" /> : <Copy className="h-3.5 w-3.5 text-muted-foreground/80" />}
+                  </Button>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+
           {/* Results Grid */}
           <div className="lg:col-span-8 space-y-6">
             {searchResult && (
@@ -593,6 +719,32 @@ export function IpIntelTool() {
                     </div>
                   </CardContent>
                 </Card>
+
+                {/* Visual Position Radar Map */}
+                {searchResult.latitude && searchResult.longitude && (
+                  <Card className="bg-card/45 border-border/80 md:col-span-2 overflow-hidden">
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                        <Globe className="h-3.5 w-3.5 text-primary" /> Visual Position Radar Map
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="pt-0">
+                      <div className="w-full h-56 rounded-xl overflow-hidden border border-border/60 relative bg-muted/20">
+                        <iframe
+                          title="Geographic Position Map"
+                          width="100%"
+                          height="100%"
+                          frameBorder="0"
+                          scrolling="no"
+                          marginHeight={0}
+                          marginWidth={0}
+                          src={`https://www.openstreetmap.org/export/embed.html?bbox=${searchResult.longitude - 0.025}%2C${searchResult.latitude - 0.025}%2C${searchResult.longitude + 0.025}%2C${searchResult.latitude + 0.025}&layer=mapnik&marker=${searchResult.latitude}%2C${searchResult.longitude}`}
+                          className="w-full h-full grayscale invert opacity-75 contrast-125 brightness-90 hover:opacity-90 transition-opacity"
+                        />
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
               </div>
             )}
           </div>

@@ -20,7 +20,8 @@ import {
   ShieldCheck,
   AlertCircle,
   Gamepad2,
-  RotateCcw
+  RotateCcw,
+  Play
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -36,6 +37,8 @@ interface NewsItem {
   description: string;
   pubDate: string;
   source: string;
+  thumbnail?: string;
+  videoUrl?: string;
 }
 
 interface StockItem {
@@ -95,6 +98,7 @@ export default function BlogPage() {
   const [weather, setWeatherData] = useState<WeatherData | null>(null);
   const [weatherLoading, setWeatherLoading] = useState(false);
   const [weatherError, setWeatherError] = useState<string | null>(null);
+  const [weatherSearchQuery, setWeatherSearchQuery] = useState('');
 
   // Game states
   const [cards, setCards] = useState<GameCard[]>([]);
@@ -103,6 +107,7 @@ export default function BlogPage() {
   const [matches, setMatches] = useState<number>(0);
   const [bestScore, setBestScore] = useState<number>(0);
   const [gameStarted, setGameStarted] = useState<boolean>(false);
+  const [forceArcadeMode, setForceArcadeMode] = useState<boolean>(false);
 
   // Connectivity detection using native browser APIs
   useEffect(() => {
@@ -159,120 +164,91 @@ export default function BlogPage() {
     }
   };
 
-  // Weather: Open-Meteo Integration
-  const fetchWeatherForecast = async () => {
+  // Weather: OpenWeatherMap Integration
+  const fetchWeatherForecast = async (searchCity?: string) => {
     setWeatherLoading(true);
     setWeatherError(null);
 
-    const defaultCoords = { lat: 28.6139, lon: 77.2090, name: 'New Delhi, India' };
+    const apiKey = '6f17dd2d66b202ab4c8c52e73210089c';
 
-    const loadWeather = async (lat: number, lon: number, name: string) => {
-      try {
-        const url = new URL('https://api.open-meteo.com/v1/forecast');
-        url.searchParams.set('latitude', lat.toString());
-        url.searchParams.set('longitude', lon.toString());
-        url.searchParams.set('current_weather', 'true');
-        url.searchParams.set('hourly', 'relativehumidity_2m');
-        url.searchParams.set('forecast_days', '1');
-        url.searchParams.set('timezone', 'auto');
-
-        const response = await fetch(url.toString());
-        if (!response.ok) throw new Error(`Open-Meteo HTTP ${response.status}`);
-        const data = await response.json();
-
-        const cw = data.current_weather;
-        const temp: number = cw.temperature;
-        const windSpeed: number = cw.windspeed;
-        const weathercode: number = cw.weathercode;
-
-        const currentTime: string = cw.time;
-        const hourlyTimes: string[] = data.hourly?.time ?? [];
-        let humidityIdx = hourlyTimes.findIndex((t: string) => t === currentTime);
-        if (humidityIdx < 0) {
-          const currentHour = new Date().getHours();
-          humidityIdx = Math.min(currentHour, hourlyTimes.length - 1);
-        }
-        const humidity: number = data.hourly?.relativehumidity_2m?.[humidityIdx] ?? 60;
-
-        const getCondition = (code: number): { condition: string; icon: string } => {
-          if (code === 0)                          return { condition: 'Clear Sky',         icon: '☀️' };
-          if (code === 1)                          return { condition: 'Mainly Clear',      icon: '🌤️' };
-          if (code === 2)                          return { condition: 'Partly Cloudy',     icon: '⛅' };
-          if (code === 3)                          return { condition: 'Overcast',          icon: '☁️' };
-          if (code === 45 || code === 48)          return { condition: 'Fog',               icon: '🌫️' };
-          if (code >= 51 && code <= 53)            return { condition: 'Light Drizzle',     icon: '🌦️' };
-          if (code >= 55 && code <= 57)            return { condition: 'Heavy Drizzle',     icon: '🌧️' };
-          if (code >= 61 && code <= 63)            return { condition: 'Rain',              icon: '🌧️' };
-          if (code === 65)                         return { condition: 'Heavy Rain',        icon: '🌧️' };
-          if (code >= 66 && code <= 67)            return { condition: 'Freezing Rain',     icon: '🌨️' };
-          if (code >= 71 && code <= 73)            return { condition: 'Snow',              icon: '❄️' };
-          if (code === 75)                         return { condition: 'Heavy Snowfall',    icon: '🌨️' };
-          if (code === 77)                         return { condition: 'Snow Grains',       icon: '❄️' };
-          if (code >= 80 && code <= 82)            return { condition: 'Rain Showers',      icon: '🌦️' };
-          if (code === 83 || code === 84)          return { condition: 'Heavy Showers',     icon: '🌧️' };
-          if (code === 85 || code === 86)          return { condition: 'Snow Showers',      icon: '🌨️' };
-          if (code === 95)                         return { condition: 'Thunderstorm',      icon: '⛈️' };
-          if (code === 96 || code === 99)          return { condition: 'Hail Storm',        icon: '⛈️' };
-          return { condition: 'Variable', icon: '🌡️' };
-        };
-
-        const { condition, icon } = getCondition(weathercode);
-        const now = new Date();
-        const updatedAt = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-        setWeatherData({ temp, humidity, windSpeed, condition, icon, location: name, updatedAt });
-      } catch (err: any) {
-        console.warn('Open-Meteo fetch failed:', err.message);
-        setWeatherError('Weather data unavailable.');
-        setWeatherData({
-          temp: 24,
-          humidity: 60,
-          windSpeed: 10,
-          condition: 'Data Unavailable',
-          icon: '⛅',
-          location: name || 'Unknown',
-          updatedAt: '--:--',
-        });
-      } finally {
-        setWeatherLoading(false);
-      }
+    const getOwmIconEmoji = (iconCode: string): string => {
+      if (iconCode.startsWith('01')) return '☀️';
+      if (iconCode.startsWith('02')) return '🌤️';
+      if (iconCode.startsWith('03')) return '⛅';
+      if (iconCode.startsWith('04')) return '☁️';
+      if (iconCode.startsWith('09')) return '🌦️';
+      if (iconCode.startsWith('10')) return '🌧️';
+      if (iconCode.startsWith('11')) return '⛈️';
+      if (iconCode.startsWith('13')) return '❄️';
+      if (iconCode.startsWith('50')) return '🌫️';
+      return '🌡️';
     };
 
-    // Resolve user location: Geolocation API → IP-based fallback → default coords
-    if (typeof window !== 'undefined' && 'geolocation' in navigator) {
-      navigator.geolocation.getCurrentPosition(
-        async (pos) => {
-          // Try to reverse-geocode coordinates to get city name
-          let locationName = 'Your Location';
-          // Use ipapi.co for city name based on IP (more reliable than reverse geocoding)
+    try {
+      let url = '';
+      if (searchCity && searchCity.trim() !== '') {
+        url = `https://api.openweathermap.org/data/2.5/weather?q=${encodeURIComponent(searchCity.trim())}&appid=${apiKey}&units=metric`;
+      } else {
+        // Resolve user location: Geolocation API → IP-based fallback → default coords
+        let lat = 28.6139;
+        let lon = 77.2090;
+        
+        if (typeof window !== 'undefined' && 'geolocation' in navigator) {
           try {
-            const ipRes = await fetch('https://ipapi.co/json/');
-            if (ipRes.ok) {
-              const ipData = await ipRes.json();
-              if (ipData.city && ipData.country_name) {
-                locationName = `${ipData.city}, ${ipData.country_name}`;
+            const pos = await new Promise<GeolocationPosition>((resolve, reject) => {
+              navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 4000 });
+            });
+            lat = pos.coords.latitude;
+            lon = pos.coords.longitude;
+          } catch {
+            // Geolocation failed/denied, try IP fallback
+            try {
+              const res = await fetch('https://ipapi.co/json/');
+              if (res.ok) {
+                const d = await res.json();
+                if (d.latitude && d.longitude) {
+                  lat = d.latitude;
+                  lon = d.longitude;
+                }
               }
-            }
-          } catch { /* use default name */ }
-          await loadWeather(pos.coords.latitude, pos.coords.longitude, locationName);
-        },
-        async () => {
-          // Permission denied or timed out — fall back to IP-based geolocation
-          try {
-            const res = await fetch('https://ipapi.co/json/');
-            if (res.ok) {
-              const d = await res.json();
-              if (d.latitude && d.longitude) {
-                await loadWeather(d.latitude, d.longitude, `${d.city || 'Unknown'}, ${d.country_name || d.country || ''}`);
-                return;
-              }
-            }
-          } catch { /* silently fall through */ }
-          await loadWeather(defaultCoords.lat, defaultCoords.lon, defaultCoords.name);
-        },
-        { timeout: 6000, enableHighAccuracy: false }
-      );
-    } else {
-      await loadWeather(defaultCoords.lat, defaultCoords.lon, defaultCoords.name);
+            } catch { /* ignore */ }
+          }
+        }
+        url = `https://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${lon}&appid=${apiKey}&units=metric`;
+      }
+
+      const response = await fetch(url);
+      if (!response.ok) {
+        if (response.status === 404) {
+          throw new Error('Location not found. Try searching another city or state.');
+        }
+        throw new Error(`OpenWeatherMap HTTP error ${response.status}`);
+      }
+      const data = await response.json();
+
+      const temp = Math.round(data.main.temp);
+      const humidity = data.main.humidity;
+      const windSpeed = Math.round(data.wind.speed * 3.6); // m/s to km/h
+      const condition = data.weather[0]?.main || 'Variable';
+      const iconEmoji = getOwmIconEmoji(data.weather[0]?.icon || '');
+      const location = `${data.name}, ${data.sys.country}`;
+      const now = new Date();
+      const updatedAt = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+      setWeatherData({
+        temp,
+        humidity,
+        windSpeed,
+        condition,
+        icon: iconEmoji,
+        location,
+        updatedAt
+      });
+    } catch (err: any) {
+      console.warn('OpenWeatherMap fetch failed:', err.message);
+      setWeatherError(err.message || 'Weather data unavailable.');
+    } finally {
+      setWeatherLoading(false);
     }
   };
 
@@ -334,6 +310,33 @@ export default function BlogPage() {
     setNewsLoading(true);
     setActiveFeed(feedType);
 
+    const getKeywordImage = (title: string): string => {
+      const t = title.toLowerCase();
+      if (t.includes('apple') || t.includes('iphone') || t.includes('mac') || t.includes('ipad') || t.includes('ios')) {
+        return 'https://images.unsplash.com/photo-1510557880182-3d4d3cba35a5?auto=format&fit=crop&w=300&q=80';
+      }
+      if (t.includes('google') || t.includes('android') || t.includes('alphabet') || t.includes('chrome')) {
+        return 'https://images.unsplash.com/photo-1573804633927-bfcbcd909acd?auto=format&fit=crop&w=300&q=80';
+      }
+      if (t.includes('ai') || t.includes('artificial intelligence') || t.includes('gpt') || t.includes('llm') || t.includes('openai') || t.includes('intelligence') || t.includes('model')) {
+        return 'https://images.unsplash.com/photo-1677442136019-21780efad99a?auto=format&fit=crop&w=300&q=80';
+      }
+      if (t.includes('crypto') || t.includes('bitcoin') || t.includes('ethereum') || t.includes('btc') || t.includes('sol') || t.includes('blockchain') || t.includes('coin')) {
+        return 'https://images.unsplash.com/photo-1621761191319-c6fb62004040?auto=format&fit=crop&w=300&q=80';
+      }
+      if (t.includes('security') || t.includes('hack') || t.includes('cyber') || t.includes('leak') || t.includes('breach') || t.includes('encrypt') || t.includes('password')) {
+        return 'https://images.unsplash.com/photo-1550751827-4bd374c3f58b?auto=format&fit=crop&w=300&q=80';
+      }
+      if (t.includes('code') || t.includes('dev') || t.includes('program') || t.includes('rust') || t.includes('react') || t.includes('javascript') || t.includes('python') || t.includes('wasm')) {
+        return 'https://images.unsplash.com/photo-1607799279861-4dd421887fb3?auto=format&fit=crop&w=300&q=80';
+      }
+      if (t.includes('game') || t.includes('arcade') || t.includes('play') || t.includes('nintendo') || t.includes('sony') || t.includes('xbox')) {
+        return 'https://images.unsplash.com/photo-1538481199705-c710c4e965fc?auto=format&fit=crop&w=300&q=80';
+      }
+      // General abstract premium blue/purple code texture
+      return 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=300&q=80';
+    };
+
     try {
       if (feedType === 'hn') {
         const topStoriesRes = await fetch('https://hacker-news.firebaseio.com/v0/topstories.json');
@@ -353,7 +356,8 @@ export default function BlogPage() {
           link: story.url || `https://news.ycombinator.com/item?id=${story.id}`,
           description: `Author: ${story.by} | Score: ${story.score} points | Comments: ${story.descendants || 0}`,
           pubDate: new Date(story.time * 1000).toLocaleDateString(),
-          source: 'Hacker News'
+          source: 'Hacker News',
+          thumbnail: getKeywordImage(story.title || '')
         }));
         
         setNews(mappedNews);
@@ -368,21 +372,46 @@ export default function BlogPage() {
 
         if (data.status !== 'ok' || !data.items) throw new Error('RSS2JSON returned error status.');
 
-        const parsedItems: NewsItem[] = data.items.slice(0, 12).map((item: any) => ({
-          title: item.title || 'Untitled',
-          link: item.link || '#',
-          description: (item.description || 'No description preview available.').replace(/<[^>]*>/g, ''),
-          pubDate: item.pubDate ? new Date(item.pubDate).toLocaleDateString() : 'N/A',
-          source: item.author || 'Google News'
-        }));
+        const parsedItems: NewsItem[] = data.items.slice(0, 12).map((item: any) => {
+          const thumbnail = getKeywordImage(item.title || '');
+
+          let videoUrl = item.enclosure?.type?.startsWith('video/') ? item.enclosure.link : undefined;
+          if (item.link?.includes('youtube.com') || item.link?.includes('youtu.be')) {
+            videoUrl = item.link;
+          }
+
+          return {
+            title: item.title || 'Untitled',
+            link: item.link || '#',
+            description: (item.description || 'No description preview available.').replace(/<[^>]*>/g, '').trim(),
+            pubDate: item.pubDate ? new Date(item.pubDate).toLocaleDateString() : 'N/A',
+            source: item.author || 'Google News',
+            thumbnail,
+            videoUrl
+          };
+        });
         setNews(parsedItems);
 
       }
     } catch (err: any) {
       // Fallback arrays if CORS or parser locks occur
       setNews([
-        { title: 'Tech Trends 2026: The Rise of WebAssembly Hubs', link: '#', description: 'Exploring browser sandboxed development structures.', pubDate: 'Today', source: 'Internal' },
-        { title: 'Securing PWA Offline Cache Storage Policies', link: '#', description: 'Best practices for private Client-side local applications.', pubDate: 'Yesterday', source: 'Security' }
+        { 
+          title: 'Tech Trends 2026: The Rise of WebAssembly Hubs', 
+          link: '#', 
+          description: 'Exploring browser sandboxed development structures.', 
+          pubDate: 'Today', 
+          source: 'Internal',
+          thumbnail: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=300&q=80'
+        },
+        { 
+          title: 'Securing PWA Offline Cache Storage Policies', 
+          link: '#', 
+          description: 'Best practices for private Client-side local applications.', 
+          pubDate: 'Yesterday', 
+          source: 'Security',
+          thumbnail: 'https://images.unsplash.com/photo-1563986768609-322da13575f3?auto=format&fit=crop&w=300&q=80'
+        }
       ]);
     } finally {
       setNewsLoading(false);
@@ -489,7 +518,25 @@ export default function BlogPage() {
             Your real-time developer terminal for tech news, stock market indexes, crypto prices, and regional weather.
           </p>
         </div>
-        <div className="flex gap-2 shrink-0">
+        <div className="flex gap-2.5 items-center shrink-0">
+          <div className="flex items-center gap-2 bg-muted/65 border border-border/80 rounded-xl p-1 shadow-sm">
+            <span className="text-[10px] uppercase font-black tracking-wider text-muted-foreground pl-2 select-none">
+              Arcade Mode
+            </span>
+            <Button
+              size="sm"
+              variant={forceArcadeMode ? "default" : "outline"}
+              className="text-[10px] font-bold h-7 px-3.5 transition-all rounded-lg"
+              onClick={() => {
+                const next = !forceArcadeMode;
+                setForceArcadeMode(next);
+                if (next) initializeGame();
+              }}
+            >
+              {forceArcadeMode ? "Active" : "Launch"}
+            </Button>
+          </div>
+
           <Button 
             size="sm" 
             className={cn(
@@ -514,7 +561,7 @@ export default function BlogPage() {
           <Card className="bg-card/45 border-border/80 shadow-md backdrop-blur-sm relative overflow-hidden">
             <CardHeader className="pb-3 flex flex-row items-center justify-between space-y-0">
               <div>
-                <CardTitle className="text-xs font-black uppercase tracking-wider text-muted-foreground">Local Weather</CardTitle>
+                <CardTitle className="text-xs font-black uppercase tracking-wider text-muted-foreground">Weather</CardTitle>
                 {weather && (
                   <CardDescription className="text-[10px] font-bold mt-1 flex items-center gap-1">
                     <MapPin className="h-3 w-3 text-primary" />
@@ -537,6 +584,28 @@ export default function BlogPage() {
               </Button>
             </CardHeader>
             <CardContent className="pt-0">
+              <div className="flex gap-1.5 mb-3">
+                <Input
+                  placeholder="City, State (e.g. Mumbai, CA, NY)"
+                  value={weatherSearchQuery}
+                  onChange={(e) => setWeatherSearchQuery(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      fetchWeatherForecast(weatherSearchQuery);
+                    }
+                  }}
+                  className="h-8 text-xs bg-background/30 border-border/80"
+                />
+                <Button 
+                  size="sm" 
+                  className="h-8 px-3 text-xs font-bold bg-primary/20 text-primary hover:bg-primary/30 border border-primary/30"
+                  onClick={() => fetchWeatherForecast(weatherSearchQuery)}
+                  disabled={weatherLoading}
+                >
+                  Search
+                </Button>
+              </div>
               {weatherLoading ? (
                 <div className="py-6 text-center space-y-2">
                   <RefreshCw className="h-6 w-6 animate-spin text-primary/70 mx-auto" />
@@ -662,19 +731,19 @@ export default function BlogPage() {
 
         {/* Right Section (Col-span-8): News Feed or Offline Recovery Arcade Grid */}
         <div className="lg:col-span-8 space-y-6">
-          <Card className="bg-card/45 border-border/80 shadow-md backdrop-blur-sm h-full flex flex-col">
-            {!isOnline ? (
+          <Card className="bg-card/45 border-border/80 shadow-md backdrop-blur-sm h-full flex flex-col overflow-hidden">
+            {!isOnline || forceArcadeMode ? (
               /* Offline Memory Match Game Board */
-              <>
+              <div key="arcade-board" className="animate-in fade-in zoom-in-95 duration-500 flex-1 flex flex-col">
                 <CardHeader className="pb-3 border-b border-border/50">
                   <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
                     <div>
                       <CardTitle className="text-base font-bold flex items-center gap-2 text-amber-500">
                         <Gamepad2 className="h-5 w-5 animate-bounce" />
-                        Offline Recovery Arcade
+                        Arcade Recovery Mode
                       </CardTitle>
                       <CardDescription className="text-xs">
-                        No internet connection detected. Flip and match DevToolkit technology tags to clear the board!
+                        Flip and match DevToolkit technology tags to clear the board!
                       </CardDescription>
                     </div>
                     
@@ -714,15 +783,15 @@ export default function BlogPage() {
                     </Button>
                   </div>
                 </CardContent>
-              </>
+              </div>
             ) : (
               /* Normal Streams Feed & Parser */
-              <>
+              <div key="news-feed" className="animate-in fade-in zoom-in-95 duration-500 flex-1 flex flex-col">
                 <CardHeader className="pb-3 border-b border-border/50">
                   <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
                     <div>
-                      <CardTitle className="text-base font-bold">Tech Streams & Custom Parser</CardTitle>
-                      <CardDescription className="text-xs">Browse Hacker News or Google News tech stories.</CardDescription>
+                      <CardTitle className="text-base font-bold">Tech Streams</CardTitle>
+                      <CardDescription className="text-xs">Browse News & Tech Stories</CardDescription>
                     </div>
                     
                     <div className="flex gap-1 bg-muted/50 p-0.5 rounded-lg border border-border/60">
@@ -744,7 +813,6 @@ export default function BlogPage() {
                       </Button>
                     </div>
                   </div>
-
                 </CardHeader>
 
                 <CardContent className="flex-1 p-0 flex flex-col justify-between">
@@ -771,15 +839,39 @@ export default function BlogPage() {
                       </div>
                     ) : (
                       filteredNews.map((item, idx) => (
-                        <div key={idx} className="py-3.5 first:pt-0 last:pb-0 group">
-                          <div className="flex justify-between items-start gap-3">
-                            <div className="space-y-1">
+                        <div key={idx} className="py-4 first:pt-0 last:pb-0 group">
+                          <div className="flex flex-col sm:flex-row gap-4 items-start">
+                            {/* Thumbnail image if available */}
+                            {item.thumbnail && (
+                              <div className="relative w-full sm:w-24 h-24 sm:h-16 shrink-0 rounded-lg overflow-hidden border border-border/60 shadow-sm bg-muted/30">
+                                <img 
+                                  src={item.thumbnail} 
+                                  alt={item.title} 
+                                  className="w-full h-full object-cover transition-transform duration-350 group-hover:scale-105"
+                                />
+                                {item.videoUrl && (
+                                  <div className="absolute inset-0 flex items-center justify-center bg-black/40">
+                                    <div className="bg-primary text-primary-foreground p-1 rounded-full shadow-md">
+                                      <Play className="h-2.5 w-2.5 fill-current" />
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            )}
+
+                            <div className="flex-1 space-y-1 w-full">
                               <div className="flex items-center gap-2">
                                 <Badge variant="secondary" className="text-[9px] font-bold px-1.5 py-0.5 leading-none">
                                   {item.source}
                                 </Badge>
                                 <span className="text-[9px] text-muted-foreground font-semibold font-mono">{item.pubDate}</span>
+                                {item.videoUrl && (
+                                  <Badge className="text-[8px] font-bold px-1.5 py-0.5 leading-none bg-red-500/10 text-red-500 hover:bg-red-500/20 border-red-500/25">
+                                    🎥 Video Stream
+                                  </Badge>
+                                )}
                               </div>
+                              
                               <a 
                                 href={item.link} 
                                 target="_blank" 
@@ -789,9 +881,24 @@ export default function BlogPage() {
                                 {item.title}
                                 <ExternalLink className="h-3 w-3 opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
                               </a>
+                              
                               <p className="text-[10px] text-muted-foreground leading-relaxed mt-0.5 line-clamp-2">
                                 {item.description}
                               </p>
+
+                              {/* If a video is available, display play options */}
+                              {item.videoUrl && (item.videoUrl.includes('youtube.com') || item.videoUrl.includes('youtu.be')) && (
+                                <div className="mt-1 text-[9px] font-bold">
+                                  <a 
+                                    href={item.videoUrl} 
+                                    target="_blank" 
+                                    rel="noopener noreferrer" 
+                                    className="inline-flex items-center gap-1 text-primary hover:underline"
+                                  >
+                                    🎬 Watch Video Stream
+                                  </a>
+                                </div>
+                              )}
                             </div>
                           </div>
                         </div>
@@ -799,7 +906,7 @@ export default function BlogPage() {
                     )}
                   </div>
                 </CardContent>
-              </>
+              </div>
             )}
           </Card>
         </div>

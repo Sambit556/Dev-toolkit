@@ -22,7 +22,7 @@ const nextConfig = {
           { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
           {
             key: 'Permissions-Policy',
-            value: 'camera=(), microphone=(), geolocation=()',
+            value: 'camera=(), microphone=(), geolocation=(self)',
           },
           {
             key: 'Content-Security-Policy',
@@ -30,9 +30,19 @@ const nextConfig = {
               "default-src 'self'",
               "script-src 'self' 'unsafe-eval' 'unsafe-inline' blob:",
               "style-src 'self' 'unsafe-inline'",
-              "img-src 'self' data: blob:",
+              "img-src 'self' data: blob: https://images.unsplash.com",
               "font-src 'self'",
-              "connect-src 'self' " + (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'),
+              "connect-src 'self' " + (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001') + 
+              " https://api.openweathermap.org" +
+              " https://ipapi.co" +
+              " https://api.ipwho.org" +
+              " https://api.ipify.org" +
+              " https://api.coingecko.com" +
+              " https://speed.cloudflare.com" +
+              " https://hacker-news.firebaseio.com" +
+              " https://api.rss2json.com",
+              "frame-src 'self' https://www.openstreetmap.org",
+              "child-src 'self' https://www.openstreetmap.org",
               "worker-src 'self' blob:",
             ].join('; '),
           },
