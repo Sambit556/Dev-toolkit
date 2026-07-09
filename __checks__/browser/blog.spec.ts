@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 
-const WEB_URL = process.env.WEB_URL ?? 'https://dev-toolkit-web-sigma.vercel.app';
+const WEB_URL = process.env.WEB_URL;
 
 test('blog dashboard renders with live feed widgets', async ({ page }) => {
   const response = await page.goto(`${WEB_URL}/blog`);

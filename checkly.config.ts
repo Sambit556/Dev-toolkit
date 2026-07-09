@@ -3,7 +3,7 @@ import { Frequency } from 'checkly/constructs';
 
 // Set in .env for local `checkly test` runs; set via `npx checkly env add`
 // (or the Checkly dashboard) for the values used by deployed checks.
-const WEB_URL = process.env.WEB_URL ?? 'https://dev-toolkit-web-sigma.vercel.app';
+const WEB_URL = process.env.WEB_URL || 'https://dev-toolkit-web-sigma.vercel.app';
 
 export default defineConfig({
   projectName: 'DevChrono JSONLab',

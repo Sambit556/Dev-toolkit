@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { version } from '../../package.json';
+import { renderHealthPage } from './healthPage';
 
 const router = Router();
 
@@ -10,6 +11,7 @@ const startTime = Date.now();
  * /health:
  *   get:
  *     summary: Health check endpoint
+ *     description: Returns JSON for API clients (Accept application/json), or a styled HTML status page for browsers.
  *     tags: [System]
  *     responses:
  *       200:
@@ -29,13 +31,20 @@ const startTime = Date.now();
  *                 timestamp:
  *                   type: string
  */
-router.get('/', (_req: Request, res: Response) => {
-  res.json({
+router.get('/', (req: Request, res: Response) => {
+  const snapshot = {
     status: 'ok',
     version,
     uptime: Math.floor((Date.now() - startTime) / 1000),
     timestamp: new Date().toISOString(),
-  });
+  };
+
+  if (req.accepts(['json', 'html']) === 'html') {
+    res.type('html').send(renderHealthPage(snapshot));
+    return;
+  }
+
+  res.json(snapshot);
 });
 
 export default router;
