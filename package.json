@@ -16,9 +16,12 @@
     "start": "concurrently \"npm run start --workspace=apps/api\" \"npm run start --workspace=apps/web\"",
     "test": "npm run test --workspaces --if-present",
     "lint": "npm run lint --workspaces --if-present",
-    "clean": "rimraf apps/*/node_modules apps/*/.next apps/*/dist packages/*/dist node_modules"
+    "clean": "rimraf apps/*/node_modules apps/*/.next apps/*/dist packages/*/dist node_modules",
+    "checkly:test": "checkly test",
+    "checkly:deploy": "checkly deploy"
   },
   "devDependencies": {
+    "checkly": "^8.14.1",
     "concurrently": "^8.2.2",
     "rimraf": "^5.0.5",
     "typescript": "^5.3.3"
