@@ -202,7 +202,7 @@ export function IpIntelTool() {
           setUserIpInfo(fallback);
           setSearchResult(fallback);
         } catch {
-          setIpError('All IP discovery services are offline. Check your network.');
+          setIpError('All IP discovery services are offline.');
         }
       }
     } finally {
