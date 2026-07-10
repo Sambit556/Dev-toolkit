@@ -40,9 +40,9 @@ export function Footer() {
           <div className="space-y-3">
             <div className="flex items-center gap-2 font-bold">
               <div className="flex h-6 w-6 items-center justify-center rounded bg-primary text-primary-foreground text-xs font-black">
-                DT
+                DK
               </div>
-              DevToolkit
+              DevKits
             </div>
             <p className="text-xs text-muted-foreground leading-relaxed">
               {t('tagline')} {t('privacyNote')}
@@ -261,7 +261,7 @@ export function Footer() {
         </div>
 
         <div className="mt-10 pt-6 border-t flex flex-col sm:flex-row items-center justify-between gap-2 text-[11px] text-muted-foreground">
-          <p>© 2026 DevToolkit. Built for developers by <span className="font-semibold text-foreground">Sambit</span>.</p>
+          <p>© 2026 DevKits. Built for developers by <span className="font-semibold text-foreground">Sambit</span>.</p>
           <a
             href="https://github.com/Sambit556/Dev-toolkit"
             target="_blank"

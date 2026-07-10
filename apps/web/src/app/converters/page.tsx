@@ -1,7 +1,19 @@
 import type { Metadata } from 'next';
-import { RefreshCw } from 'lucide-react';
-import { ConvertersTool } from '@/components/converters/ConvertersTool';
+import { RefreshCw, Loader2 } from 'lucide-react';
+import dynamic from 'next/dynamic';
 import { Separator } from '@/components/ui/separator';
+
+const ConvertersTool = dynamic(
+  () => import('@/components/converters/ConvertersTool').then((m) => m.ConvertersTool),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="flex items-center justify-center p-12 bg-muted/20 border border-dashed rounded-xl">
+        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+      </div>
+    ),
+  }
+);
 
 export const metadata: Metadata = {
   title: 'Conversions — CSV, XML, JSON, Markdown, HTML, PDF',

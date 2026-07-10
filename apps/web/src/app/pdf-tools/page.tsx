@@ -1,7 +1,19 @@
 import type { Metadata } from 'next';
-import { FileText } from 'lucide-react';
-import { PdfTools } from '@/components/pdf-tools/PdfTools';
+import { FileText, Loader2 } from 'lucide-react';
+import dynamic from 'next/dynamic';
 import { Separator } from '@/components/ui/separator';
+
+const PdfTools = dynamic(
+  () => import('@/components/pdf-tools/PdfTools').then((m) => m.PdfTools),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="flex items-center justify-center p-12 bg-muted/20 border border-dashed rounded-xl">
+        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+      </div>
+    ),
+  }
+);
 
 export const metadata: Metadata = {
   title: 'Client-Side PDF Utilities — Merge, Split, and Protect PDFs',

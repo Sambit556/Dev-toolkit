@@ -30,7 +30,7 @@ const TOOL_ROUTES = [
 ];
 
 export default function sitemap(): MetadataRoute.Sitemap {
-  const base = process.env.NEXT_PUBLIC_APP_URL || 'https://devtoolkit.app';
+  const base = process.env.NEXT_PUBLIC_APP_URL || 'https://www.devkits.space';
 
   const home = {
     url: base,

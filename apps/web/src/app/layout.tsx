@@ -11,8 +11,8 @@ import { HexCanvasBg } from '@/components/layout/HexCanvasBg';
 
 const inter = Inter({ subsets: ['latin'], variable: '--font-inter' });
 
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://devtoolkit.app';
-const APP_NAME = 'DevToolkit';
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://www.devkits.space';
+const APP_NAME = 'DevKits';
 const APP_DESCRIPTION =
   'Fast, privacy-first developer tools — all processing runs client-side in your browser. Convert Unix timestamps, format & validate JSON, decode JWT tokens, calculate EMIs, generate UUIDs & ULIDs, convert YAML, pick colors, test internet speed, and more.';
 
@@ -23,6 +23,9 @@ export const metadata: Metadata = {
     template: `%s | ${APP_NAME}`,
   },
   description: APP_DESCRIPTION,
+  verification: {
+    google: process.env.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION || '',
+  },
   keywords: [
     'developer tools',
     'utility suite',

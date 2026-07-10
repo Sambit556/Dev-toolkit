@@ -1,7 +1,19 @@
 import type { Metadata } from 'next';
-import { Activity } from 'lucide-react';
-import { SpeedTestTool } from '@/components/speed-test/SpeedTestTool';
+import { Activity, Loader2 } from 'lucide-react';
+import dynamic from 'next/dynamic';
 import { Separator } from '@/components/ui/separator';
+
+const SpeedTestTool = dynamic(
+  () => import('@/components/speed-test/SpeedTestTool').then((m) => m.SpeedTestTool),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="flex items-center justify-center p-12 bg-muted/20 border border-dashed rounded-xl">
+        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+      </div>
+    ),
+  }
+);
 
 export const metadata: Metadata = {
   title: 'Internet Speed Tester',

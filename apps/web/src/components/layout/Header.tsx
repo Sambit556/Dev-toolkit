@@ -467,10 +467,10 @@ export function Header() {
         {/* Logo */}
         <Link href="/" className="flex items-center gap-2 font-bold text-lg">
           <div className="flex h-7 w-7 items-center justify-center rounded-md bg-primary text-primary-foreground text-xs font-black">
-            DT
+            DK
           </div>
           <span className="hidden sm:inline">
-            DevToolkit
+            DevKits
           </span>
         </Link>
 

@@ -39,7 +39,7 @@ export const SUPPORTED_LANGUAGES: Record<string, { label: string; flag: string }
 // Complete translation dictionaries
 const TRANSLATION_BUNDLES: Record<string, Record<string, string>> = {
   en: {
-    welcome: 'Welcome to DevToolkit',
+    welcome: 'Welcome to DevKits',
     tagline: 'Fast, secure, offline-ready developer utilities.',
     changeLanguage: 'Change Language',
     home: 'Home',
@@ -99,7 +99,7 @@ const TRANSLATION_BUNDLES: Record<string, Record<string, string>> = {
     builtForDevs: 'Built for developers.',
     openSource: 'Open Source',
     allToolsPrivate: 'All Tools Private & Local',
-    privacyEngineDesc: 'Data never leaves your device. DevToolkit uses Web Assembly and client-side scripts to guarantee privacy.',
+    privacyEngineDesc: 'Data never leaves your device. DevKits uses Web Assembly and client-side scripts to guarantee privacy.',
     toolboxCount: 'Toolbox Count',
     storageState: 'Storage State',
     prodSandbox: 'Production Sandbox',
@@ -112,7 +112,7 @@ const TRANSLATION_BUNDLES: Record<string, Record<string, string>> = {
     fileConverterDesc: 'Securely convert CSV, JSON, Markdown documents, and images locally in your browser.',
   },
   fr: {
-    welcome: 'Bienvenue sur DevToolkit',
+    welcome: 'Bienvenue sur DevKits',
     tagline: 'Utilitaires de développement rapides, sécurisés et prêts pour le mode hors ligne.',
     changeLanguage: 'Changer de langue',
     home: 'Accueil',
@@ -129,7 +129,7 @@ const TRANSLATION_BUNDLES: Record<string, Record<string, string>> = {
     privacyNote: 'Tous les traitements sont effectués côté client. Vos données ne quittent pas votre appareil.',
   },
   de: {
-    welcome: 'Willkommen bei DevToolkit',
+    welcome: 'Willkommen bei DevKits',
     tagline: 'Schnelle, sichere und offline-bereite Entwickler-Tools.',
     changeLanguage: 'Sprache ändern',
     home: 'Startseite',
@@ -146,7 +146,7 @@ const TRANSLATION_BUNDLES: Record<string, Record<string, string>> = {
     privacyNote: 'Alle Berechnungen laufen clientseitig. Ihre Eingaben verlassen Ihr Gerät nicht.',
   },
   es: {
-    welcome: 'Bienvenido a DevToolkit',
+    welcome: 'Bienvenido a DevKits',
     tagline: 'Herramientas de desarrollo rápidas, seguras y sin conexión.',
     changeLanguage: 'Cambiar idioma',
     home: 'Inicio',
@@ -163,7 +163,7 @@ const TRANSLATION_BUNDLES: Record<string, Record<string, string>> = {
     privacyNote: 'Todo el procesamiento se realiza en el cliente. Sus datos no salen del navegador.',
   },
   ja: {
-    welcome: 'DevToolkit へようこそ',
+    welcome: 'DevKits へようこそ',
     tagline: '高速で安全、オフライン対応の開発者向けユーティリティスイート。',
     changeLanguage: '言語を変更',
     home: 'ホーム',
@@ -180,7 +180,7 @@ const TRANSLATION_BUNDLES: Record<string, Record<string, string>> = {
     privacyNote: 'すべての処理はクライアント側で実行されます。入力データがデバイスから送信されることはありません。',
   },
   pt: {
-    welcome: 'Bem-vindo ao DevToolkit',
+    welcome: 'Bem-vindo ao DevKits',
     tagline: 'Utilitários de desenvolvedor rápidos, seguros e prontos para uso offline.',
     changeLanguage: 'Alterar idioma',
     home: 'Início',
@@ -197,7 +197,7 @@ const TRANSLATION_BUNDLES: Record<string, Record<string, string>> = {
     privacyNote: 'Todo o processamento é feito localmente no cliente. Seus dados nunca saem do seu navegador.',
   },
   ar: {
-    welcome: 'مرحباً بك في DevToolkit',
+    welcome: 'مرحباً بك في DevKits',
     tagline: 'أدوات تطوير سريعة، آمنة، وتعمل بدون اتصال بالإنترنت.',
     changeLanguage: 'تغيير اللغة',
     home: 'الرئيسية',
@@ -214,7 +214,7 @@ const TRANSLATION_BUNDLES: Record<string, Record<string, string>> = {
     privacyNote: 'تتم جميع العمليات محلياً على جهازك. لا يتم إرسال بياناتك نهائياً إلى أي خادم خارجي.',
   },
   he: {
-    welcome: 'ברוכים הבאים ל-DevToolkit',
+    welcome: 'ברוכים הבאים ל-DevKits',
     tagline: 'כלי פיתוח מהירים, מאובטחים וזמינים ללא חיבור לאינטרנט.',
     changeLanguage: 'שנה שפה',
     home: 'בית',
@@ -231,7 +231,7 @@ const TRANSLATION_BUNDLES: Record<string, Record<string, string>> = {
     privacyNote: 'כל העיבודים מתבצעים בדפדפן הלקוח. הנתונים שלך לעולם אינם עוזבים את המכשיר שלך.',
   },
   hi: {
-    welcome: 'DevToolkit में आपका स्वागत है',
+    welcome: 'DevKits में आपका स्वागत है',
     tagline: 'तेज़, सुरक्षित, ऑफ़लाइन-तैयार डेवलपर उपयोगिताएँ।',
     changeLanguage: 'भाषा बदलें',
     home: 'होम',
@@ -289,7 +289,7 @@ const TRANSLATION_BUNDLES: Record<string, Record<string, string>> = {
     builtForDevs: 'डेवलपर्स के लिए निर्मित।',
     openSource: 'ओपन सोर्स',
     allToolsPrivate: 'सभी उपकरण निजी और स्थानीय',
-    privacyEngineDesc: 'डेटा कभी भी आपके डिवाइस से बाहर नहीं जाता है। देवटूलकिट गोपनीयता की गारंटी के लिए वेब असेंबली और क्लाइंट-साइड स्क्रिप्ट का उपयोग करता है।',
+    privacyEngineDesc: 'डेटा कभी भी आपके डिवाइस से बाहर नहीं जाता है। देवकिट्स गोपनीयता की गारंटी के लिए वेब असेंबली और क्लाइंट-साइड स्क्रिप्ट का उपयोग करता है।',
     toolboxCount: 'टूलबॉक्स संख्या',
     storageState: 'स्टोरेज स्थिति',
     prodSandbox: 'उत्पादन सैंडबॉक्स',
@@ -302,7 +302,7 @@ const TRANSLATION_BUNDLES: Record<string, Record<string, string>> = {
     fileConverterDesc: 'अपने ब्राउज़र में सुरक्षित रूप से CSV, JSON, मार्कडाउन दस्तावेज़ और छवियों को स्थानीय रूप से परिवर्तित करें।',
   },
   or: {
-    welcome: 'DevToolkit କୁ ସ୍ୱାଗତ',
+    welcome: 'DevKits କୁ ସ୍ୱାଗତ',
     tagline: 'ଦ୍ରୁତ, ସୁରକ୍ଷିତ, ଅଫଲାଇନ-ପ୍ରସ୍ତୁତ ଡେଭଲପର୍ ଉପଯୋଗିତା।',
     changeLanguage: 'ଭାଷା ପରିବର୍ତ୍ତନ କରନ୍ତୁ',
     home: 'ହୋମ୍',
@@ -360,7 +360,7 @@ const TRANSLATION_BUNDLES: Record<string, Record<string, string>> = {
     builtForDevs: 'ଡେଭଲପର୍ସ ମାନଙ୍କ ପାଇଁ ନିର୍ମିତ।',
     openSource: 'ଓପନ୍ ସୋର୍ସ',
     allToolsPrivate: 'ସମସ୍ତ ଉପକରଣ ବ୍ୟକ୍ତିଗତ ଏବଂ ସ୍ଥାନୀୟ',
-    privacyEngineDesc: 'ତଥ୍ୟ କଦାପି ଆପଣଙ୍କ ଡିଭାଇସ୍ ବାହାରକୁ ଯାଏ ନାହିଁ। ଗୋପନୀୟତା ରକ୍ଷା ପାଇଁ ଦେଭ୍‌ଟୁଲ୍‌କିଟ୍ ୱେବ୍ ଆସେମ୍ବଲି ଏବଂ କ୍ଲାଏଣ୍ଟ-ସାଇଡ୍ ସ୍କ୍ରିପ୍ଟ ବ୍ୟବହାର କରେ।',
+    privacyEngineDesc: 'ତଥ୍ୟ କଦାପି ଆପଣଙ୍କ ଡିଭାଇସ୍ ବାହାରକୁ ଯାଏ ନାହିଁ। ଗୋପନୀୟତା ରକ୍ଷା ପାଇଁ ଦେଭ୍‌କିଟ୍ସ ୱେବ୍ ଆସେମ୍ବଲି ଏବଂ କ୍ଲାଏଣ୍ଟ-ସାଇଡ୍ ସ୍କ୍ରିପ୍ଟ ବ୍ୟବହାର କରେ।',
     toolboxCount: 'ଟୁଲ୍‌ବକ୍ସ ସଂଖ୍ୟା',
     storageState: 'ଷ୍ଟୋରେଜ୍ ସ୍ଥିତି',
     prodSandbox: 'ପ୍ରଡକ୍ସନ୍ ସ୍ୟାଣ୍ଡବକ୍ସ',

@@ -1,7 +1,19 @@
 import type { Metadata } from 'next';
-import { Ruler } from 'lucide-react';
-import { UnitTool } from '@/components/unit/UnitTool';
+import { Ruler, Loader2 } from 'lucide-react';
+import dynamic from 'next/dynamic';
 import { Separator } from '@/components/ui/separator';
+
+const UnitTool = dynamic(
+  () => import('@/components/unit/UnitTool').then((m) => m.UnitTool),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="flex items-center justify-center p-12 bg-muted/20 border border-dashed rounded-xl">
+        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+      </div>
+    ),
+  }
+);
 
 export const metadata: Metadata = {
   title: 'All Unit Converter',

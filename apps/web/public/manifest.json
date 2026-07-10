@@ -1,6 +1,6 @@
 {
-  "name": "DevToolkit — Developer Utility Suite",
-  "short_name": "DevToolkit",
+  "name": "DevKits — Developer Utility Suite",
+  "short_name": "DevKits",
   "description": "Fast, privacy-first developer utilities: JSON viewer, JWT decoder, UUID generator, epoch converter, currency exchanger, internet speed test, and 10 more tools — all offline-ready.",
   "start_url": "/",
   "scope": "/",
@@ -64,7 +64,7 @@
       "sizes": "1200x630",
       "type": "image/png",
       "form_factor": "wide",
-      "label": "DevToolkit home page showing all 16 developer tools"
+      "label": "DevKits home page showing all 16 developer tools"
     }
   ]
 }
