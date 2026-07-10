@@ -81,8 +81,14 @@ export async function verifySignature(
   if (parts.length !== 3) return false;
 
   const data = new TextEncoder().encode(`${parts[0]}.${parts[1]}`);
+  
+  let sigBase64 = parts[2].replace(/-/g, '+').replace(/_/g, '/');
+  while (sigBase64.length % 4) {
+    sigBase64 += '=';
+  }
+
   const signatureBytes = new Uint8Array(
-    atob(parts[2].replace(/-/g, '+').replace(/_/g, '/'))
+    atob(sigBase64)
       .split('')
       .map((c) => c.charCodeAt(0))
   );

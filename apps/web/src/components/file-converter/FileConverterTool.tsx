@@ -2,6 +2,7 @@
 
 import React, { useState, useRef } from 'react';
 import { marked } from 'marked';
+import jsyaml from 'js-yaml';
 import { 
   FileUp, 
   RefreshCw, 
@@ -20,6 +21,127 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useLocale } from '@/context/LocalizationContext';
+
+const fileToBase64 = (file: File): Promise<string> => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = () => {
+      if (typeof reader.result === 'string') {
+        resolve(reader.result);
+      } else {
+        reject(new Error('Failed to read file.'));
+      }
+    };
+    reader.onerror = () => reject(reader.error);
+  });
+};
+
+function jsonToXml(obj: any, rootName = 'root'): string {
+  let xml = '';
+  if (typeof obj !== 'object' || obj === null) {
+    return String(obj);
+  }
+  for (const key in obj) {
+    if (Object.prototype.hasOwnProperty.call(obj, key)) {
+      const val = obj[key];
+      const cleanKey = key.replace(/[^a-zA-Z0-9_-]/g, '_');
+      if (Array.isArray(val)) {
+        val.forEach((item) => {
+          xml += `<${cleanKey}>${jsonToXml(item, '')}</${cleanKey}>`;
+        });
+      } else if (typeof val === 'object' && val !== null) {
+        xml += `<${cleanKey}>${jsonToXml(val, '')}</${cleanKey}>`;
+      } else {
+        xml += `<${cleanKey}>${val}</${cleanKey}>`;
+      }
+    }
+  }
+  return rootName ? `<${rootName}>${xml}</${rootName}>` : xml;
+}
+
+function xmlToJson(xmlNode: Node): any {
+  if (xmlNode.nodeType === Node.TEXT_NODE) {
+    return xmlNode.nodeValue?.trim();
+  }
+  const obj: any = {};
+  if (xmlNode.nodeType === Node.ELEMENT_NODE) {
+    const element = xmlNode as Element;
+    if (element.hasAttributes()) {
+      obj['@attributes'] = {};
+      for (let j = 0; j < element.attributes.length; j++) {
+        const attribute = element.attributes.item(j);
+        if (attribute) {
+          obj['@attributes'][attribute.nodeName] = attribute.nodeValue;
+        }
+      }
+    }
+  }
+  if (xmlNode.hasChildNodes()) {
+    for (let i = 0; i < xmlNode.childNodes.length; i++) {
+      const item = xmlNode.childNodes.item(i);
+      const nodeName = item.nodeName;
+      if (item.nodeType === Node.TEXT_NODE) {
+        const text = item.nodeValue?.trim();
+        if (text) {
+          if (xmlNode.childNodes.length === 1) {
+            return text;
+          } else {
+            obj['#text'] = text;
+          }
+        }
+        continue;
+      }
+      const childVal = xmlToJson(item);
+      if (obj[nodeName] === undefined) {
+        obj[nodeName] = childVal;
+      } else {
+        if (!Array.isArray(obj[nodeName])) {
+          obj[nodeName] = [obj[nodeName]];
+        }
+        obj[nodeName].push(childVal);
+      }
+    }
+  }
+  return obj;
+}
+
+function jsonToIni(obj: any): string {
+  let ini = '';
+  for (const key in obj) {
+    if (typeof obj[key] === 'object' && obj[key] !== null && !Array.isArray(obj[key])) {
+      ini += `[${key}]\n`;
+      for (const subKey in obj[key]) {
+        ini += `${subKey}=${obj[key][subKey]}\n`;
+      }
+      ini += '\n';
+    } else {
+      ini += `${key}=${obj[key]}\n`;
+    }
+  }
+  return ini.trim();
+}
+
+function iniToJson(text: string): any {
+  const obj: any = {};
+  let currentSection = obj;
+  const lines = text.split('\n');
+  lines.forEach((line) => {
+    const cleanLine = line.trim();
+    if (!cleanLine || cleanLine.startsWith(';') || cleanLine.startsWith('#')) return;
+    if (cleanLine.startsWith('[') && cleanLine.endsWith(']')) {
+      const sectionName = cleanLine.substring(1, cleanLine.length - 1).trim();
+      obj[sectionName] = {};
+      currentSection = obj[sectionName];
+    } else if (cleanLine.includes('=')) {
+      const parts = cleanLine.split('=');
+      const key = parts[0].trim();
+      const val = parts.slice(1).join('=').trim();
+      currentSection[key] = val;
+    }
+  });
+  return obj;
+}
 
 interface ConversionStat {
   duration: number;
@@ -49,17 +171,37 @@ export function FileConverterTool() {
     const ext = file.name.split('.').pop()?.toLowerCase();
     
     if (['csv'].includes(ext || '')) return [{ label: 'JSON Array', value: 'json' }];
-    if (['json'].includes(ext || '')) return [{ label: 'CSV Spreadsheet', value: 'csv' }];
+    if (['json'].includes(ext || '')) {
+      return [
+        { label: 'CSV Spreadsheet', value: 'csv' },
+        { label: 'YAML Configuration', value: 'yaml' },
+        { label: 'XML Configuration', value: 'xml' },
+        { label: 'INI Configuration', value: 'ini' },
+        { label: 'Base64 Encoded Text', value: 'base64' },
+      ];
+    }
+    if (['yaml', 'yml'].includes(ext || '')) return [{ label: 'JSON Format', value: 'json' }];
+    if (['xml'].includes(ext || '')) return [{ label: 'JSON Format', value: 'json' }];
+    if (['ini'].includes(ext || '')) return [{ label: 'JSON Format', value: 'json' }];
     if (['md', 'markdown'].includes(ext || '')) return [{ label: 'HTML Webpage', value: 'html' }];
     if (['html', 'htm'].includes(ext || '')) return [{ label: 'Markdown Document', value: 'md' }];
     if (['png', 'jpg', 'jpeg', 'webp', 'svg'].includes(ext || '')) {
       return [
         { label: 'WebP Image', value: 'webp' },
         { label: 'PNG Image', value: 'png' },
-        { label: 'JPEG Image', value: 'jpg' }
+        { label: 'JPEG Image', value: 'jpg' },
+        { label: 'Base64 Encoded Text', value: 'base64' },
       ].filter(f => f.value !== ext && !(ext === 'jpeg' && f.value === 'jpg'));
     }
-    return [];
+    if (ext === 'txt') {
+      return [
+        { label: 'Base64 Encoded Text', value: 'base64' },
+        { label: 'Decode Base64 to Binary File', value: 'binary' }
+      ];
+    }
+    return [
+      { label: 'Base64 Encoded Text', value: 'base64' }
+    ];
   };
 
   const handleDrag = (e: React.DragEvent) => {
@@ -131,7 +273,168 @@ export function FileConverterTool() {
     const baseName = selectedFile.name.substring(0, selectedFile.name.lastIndexOf('.'));
 
     try {
-      if (ext === 'csv' && targetFormat === 'json') {
+      // 1. JSON to YAML
+      if (ext === 'json' && targetFormat === 'yaml') {
+        const text = await selectedFile.text();
+        const parsed = JSON.parse(text);
+        const yamlStr = jsyaml.dump(parsed, { indent: 2 });
+        const blob = new Blob([yamlStr], { type: 'text/yaml;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        setConvertedDataUrl(url);
+        setConvertedFilename(`${baseName}.yaml`);
+        const convertedSize = blob.size;
+        setStats({
+          duration: Math.round(performance.now() - startTime),
+          originalSize,
+          convertedSize,
+          savings: Math.round(((originalSize - convertedSize) / originalSize) * 100)
+        });
+        setConverting(false);
+      }
+      // 2. YAML to JSON
+      else if ((ext === 'yaml' || ext === 'yml') && targetFormat === 'json') {
+        const text = await selectedFile.text();
+        const parsed = jsyaml.load(text);
+        const jsonStr = JSON.stringify(parsed, null, 2);
+        const blob = new Blob([jsonStr], { type: 'application/json;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        setConvertedDataUrl(url);
+        setConvertedFilename(`${baseName}.json`);
+        const convertedSize = blob.size;
+        setStats({
+          duration: Math.round(performance.now() - startTime),
+          originalSize,
+          convertedSize,
+          savings: Math.round(((originalSize - convertedSize) / originalSize) * 100)
+        });
+        setConverting(false);
+      }
+      // 3. JSON to XML
+      else if (ext === 'json' && targetFormat === 'xml') {
+        const text = await selectedFile.text();
+        const parsed = JSON.parse(text);
+        const xmlStr = '<?xml version="1.0" encoding="UTF-8"?>\n' + jsonToXml(parsed, 'root');
+        const blob = new Blob([xmlStr], { type: 'application/xml;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        setConvertedDataUrl(url);
+        setConvertedFilename(`${baseName}.xml`);
+        const convertedSize = blob.size;
+        setStats({
+          duration: Math.round(performance.now() - startTime),
+          originalSize,
+          convertedSize,
+          savings: Math.round(((originalSize - convertedSize) / originalSize) * 100)
+        });
+        setConverting(false);
+      }
+      // 4. XML to JSON
+      else if (ext === 'xml' && targetFormat === 'json') {
+        const text = await selectedFile.text();
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(text, 'application/xml');
+        const errorNode = doc.querySelector('parsererror');
+        if (errorNode) throw new Error('XML parsing failed');
+        const parsed = xmlToJson(doc.documentElement);
+        const jsonStr = JSON.stringify({ [doc.documentElement.nodeName]: parsed }, null, 2);
+        const blob = new Blob([jsonStr], { type: 'application/json;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        setConvertedDataUrl(url);
+        setConvertedFilename(`${baseName}.json`);
+        const convertedSize = blob.size;
+        setStats({
+          duration: Math.round(performance.now() - startTime),
+          originalSize,
+          convertedSize,
+          savings: Math.round(((originalSize - convertedSize) / originalSize) * 100)
+        });
+        setConverting(false);
+      }
+      // 5. JSON to INI
+      else if (ext === 'json' && targetFormat === 'ini') {
+        const text = await selectedFile.text();
+        const parsed = JSON.parse(text);
+        const iniStr = jsonToIni(parsed);
+        const blob = new Blob([iniStr], { type: 'text/plain;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        setConvertedDataUrl(url);
+        setConvertedFilename(`${baseName}.ini`);
+        const convertedSize = blob.size;
+        setStats({
+          duration: Math.round(performance.now() - startTime),
+          originalSize,
+          convertedSize,
+          savings: Math.round(((originalSize - convertedSize) / originalSize) * 100)
+        });
+        setConverting(false);
+      }
+      // 6. INI to JSON
+      else if (ext === 'ini' && targetFormat === 'json') {
+        const text = await selectedFile.text();
+        const parsed = iniToJson(text);
+        const jsonStr = JSON.stringify(parsed, null, 2);
+        const blob = new Blob([jsonStr], { type: 'application/json;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        setConvertedDataUrl(url);
+        setConvertedFilename(`${baseName}.json`);
+        const convertedSize = blob.size;
+        setStats({
+          duration: Math.round(performance.now() - startTime),
+          originalSize,
+          convertedSize,
+          savings: Math.round(((originalSize - convertedSize) / originalSize) * 100)
+        });
+        setConverting(false);
+      }
+      // 7. File to Base64
+      else if (targetFormat === 'base64') {
+        const base64Str = await fileToBase64(selectedFile);
+        const blob = new Blob([base64Str], { type: 'text/plain;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        setConvertedDataUrl(url);
+        setConvertedFilename(`${baseName}_base64.txt`);
+        const convertedSize = blob.size;
+        setStats({
+          duration: Math.round(performance.now() - startTime),
+          originalSize,
+          convertedSize,
+          savings: Math.round(((originalSize - convertedSize) / originalSize) * 100)
+        });
+        setConverting(false);
+      }
+      // 8. Base64 back to binary file
+      else if (targetFormat === 'binary') {
+        const text = await selectedFile.text();
+        const base64Regex = /^(?:data:\w+\/\w+;base64,)?([A-Za-z0-9+/=]+)$/;
+        const match = text.trim().match(base64Regex);
+        if (!match) throw new Error('Invalid Base64 text file content');
+        const base64Data = match[1];
+        
+        const byteCharacters = atob(base64Data);
+        const byteNumbers = new Array(byteCharacters.length);
+        for (let i = 0; i < byteCharacters.length; i++) {
+          byteNumbers[i] = byteCharacters.charCodeAt(i);
+        }
+        const byteArray = new Uint8Array(byteNumbers);
+        
+        let mime = 'application/octet-stream';
+        const mimeMatch = text.trim().match(/^data:([\w+\/\w+]+);base64,/);
+        if (mimeMatch) mime = mimeMatch[1];
+        const fileExt = mime.split('/')[1] || 'bin';
+
+        const blob = new Blob([byteArray], { type: mime });
+        const url = URL.createObjectURL(blob);
+        setConvertedDataUrl(url);
+        setConvertedFilename(`${baseName}_decoded.${fileExt}`);
+        const convertedSize = blob.size;
+        setStats({
+          duration: Math.round(performance.now() - startTime),
+          originalSize,
+          convertedSize,
+          savings: Math.round(((originalSize - convertedSize) / originalSize) * 100)
+        });
+        setConverting(false);
+      }
+      else if (ext === 'csv' && targetFormat === 'json') {
         const text = await selectedFile.text();
         const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 0);
         if (lines.length === 0) throw new Error('Empty CSV data.');
@@ -381,7 +684,7 @@ export function FileConverterTool() {
               ref={fileInputRef} 
               className="hidden" 
               onChange={handleFileChange} 
-              accept=".csv,.json,.md,.markdown,.html,.png,.jpg,.jpeg,.webp,.svg"
+              accept=".csv,.json,.md,.markdown,.html,.png,.jpg,.jpeg,.webp,.svg,.yaml,.yml,.xml,.ini,.txt"
             />
 
             {!selectedFile ? (
@@ -402,7 +705,7 @@ export function FileConverterTool() {
                 </div>
                 <h4 className="text-sm font-bold mb-1">Drag and drop file here</h4>
                 <p className="text-xs text-muted-foreground max-w-xs leading-relaxed">
-                  Support formats include CSV, JSON, Markdown, HTML, PNG, JPG, WebP, and SVG files.
+                  Support formats include CSV, JSON, XML, YAML, INI, Markdown, HTML, PNG, JPG, WebP, SVG, and Base64 text.
                 </p>
                 <Button size="sm" variant="secondary" className="mt-4 font-bold">
                   Browse Files

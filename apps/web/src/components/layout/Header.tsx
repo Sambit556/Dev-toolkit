@@ -34,7 +34,9 @@ import {
   QrCode,
   FileText,
   Lock,
-  Search
+  Search,
+  Home,
+  Link2
 } from 'lucide-react';
 import { CommandPalette } from './CommandPalette';
 import { toolCategories } from '@/lib/tools';
@@ -51,6 +53,49 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog';
+
+const TOOL_COLORS: Record<string, string> = {
+  '/epoch': 'blue',
+  '/json': 'green',
+  '/jwt': 'red',
+  '/diff-checker': 'sky',
+  '/html-preview': 'indigo',
+  '/encoder-decoder': 'emerald',
+  '/converters': 'teal',
+  '/text-utils': 'rose',
+  '/file-converter': 'amber',
+  '/cron': 'indigo',
+  '/security-tools': 'purple',
+  '/qr-barcode': 'violet',
+  '/lorem-ipsum': 'pink',
+  '/fake-address': 'teal',
+  '/calculator': 'sky',
+  '/currency': 'blue',
+  '/unit-converter': 'orange',
+  '/color-picker': 'pink',
+  '/image-tool': 'amber',
+  '/speed-test': 'cyan',
+  '/ip-intel': 'cyan',
+  '/fun-tools': 'red',
+  '/pdf-tools': 'fuchsia',
+};
+
+const COLOR_MAPS: Record<string, string> = {
+  blue: 'bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400 border-blue-500/20',
+  green: 'bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400 border-green-500/20',
+  red: 'bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400 border-red-500/20',
+  purple: 'bg-purple-100 text-purple-600 dark:bg-purple-900/30 dark:text-purple-400 border-purple-500/20',
+  indigo: 'bg-indigo-100 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-400 border-indigo-500/20',
+  orange: 'bg-orange-100 text-orange-600 dark:bg-orange-900/30 dark:text-orange-400 border-orange-500/20',
+  pink: 'bg-pink-100 text-pink-600 dark:bg-pink-900/30 dark:text-pink-400 border-pink-500/20',
+  emerald: 'bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400 border-emerald-500/20',
+  sky: 'bg-sky-100 text-sky-600 dark:bg-sky-900/30 dark:text-sky-400 border-sky-500/20',
+  violet: 'bg-violet-100 text-violet-600 dark:bg-violet-900/30 dark:text-violet-400 border-violet-500/20',
+  amber: 'bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400 border-amber-500/20',
+  teal: 'bg-teal-100 text-teal-600 dark:bg-teal-900/30 dark:text-teal-400 border-teal-500/20',
+  fuchsia: 'bg-fuchsia-100 text-fuchsia-600 dark:bg-fuchsia-900/30 dark:text-fuchsia-400 border-fuchsia-500/20',
+  rose: 'bg-rose-100 text-rose-600 dark:bg-rose-900/30 dark:text-rose-400 border-rose-500/20',
+};
 
 
 
@@ -433,12 +478,13 @@ export function Header() {
           <Link
             href="/"
             className={cn(
-              'inline-flex items-center rounded-md px-3 py-1.5 text-sm font-medium transition-colors',
+              'inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors',
               pathname === '/'
                 ? 'bg-accent text-accent-foreground'
                 : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
             )}
           >
+            <Home className="h-4 w-4" />
             {t('home')}
           </Link>
 
@@ -481,7 +527,10 @@ export function Header() {
                                 isSelected && "bg-primary/5 border border-primary/20 text-primary"
                               )}
                             >
-                              <div className="h-7 w-7 rounded-md bg-primary/10 text-primary flex items-center justify-center shrink-0">
+                              <div className={cn(
+                                "h-7 w-7 rounded-md flex items-center justify-center shrink-0 border",
+                                COLOR_MAPS[TOOL_COLORS[item.href] || 'blue']
+                              )}>
                                 <Icon className="h-3.5 w-3.5" />
                               </div>
                               <span className="text-xs font-bold leading-snug min-w-0">

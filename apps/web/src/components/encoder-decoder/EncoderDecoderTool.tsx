@@ -1,14 +1,13 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { RefreshCw, Copy, ArrowLeftRight, Link, Braces, Code, Info, Play, Trash2, Plus } from 'lucide-react';
+import { RefreshCw, Copy, ArrowLeftRight } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
 
 // Morse Code mappings
@@ -33,15 +32,6 @@ export function EncoderDecoderTool() {
   const [outputVal, setOutputVal] = useState<string>('');
   const [isDecodeMode, setIsDecodeMode] = useState<boolean>(false);
   const [caesarShift, setCaesarShift] = useState<number>(3);
-
-  // URL Parser States
-  const [urlInput, setUrlInput] = useState<string>('https://example.com:8080/path/to/page?search=devchrono&category=developer#section-1');
-  const [urlProtocol, setUrlProtocol] = useState<string>('');
-  const [urlHost, setUrlHost] = useState<string>('');
-  const [urlPort, setUrlPort] = useState<string>('');
-  const [urlPath, setUrlPath] = useState<string>('');
-  const [urlHash, setUrlHash] = useState<string>('');
-  const [urlParams, setUrlParams] = useState<{ id: string; key: string; value: string }[]>([]);
 
   // 1. Convert Text (Encode/Decode)
   const processConversion = () => {
@@ -163,86 +153,6 @@ export function EncoderDecoderTool() {
     processConversion();
   }, [inputVal, conversionType, isDecodeMode, caesarShift]);
 
-  // 2. Parse URL
-  const parseUrlString = (urlStr: string) => {
-    try {
-      const parsed = new URL(urlStr);
-      setUrlProtocol(parsed.protocol);
-      setUrlHost(parsed.hostname);
-      setUrlPort(parsed.port || (parsed.protocol === 'https:' ? '443' : '80'));
-      setUrlPath(parsed.pathname);
-      setUrlHash(parsed.hash);
-
-      const paramsList: { id: string; key: string; value: string }[] = [];
-      parsed.searchParams.forEach((value, key) => {
-        paramsList.push({
-          id: crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`,
-          key,
-          value,
-        });
-      });
-      setUrlParams(paramsList);
-    } catch {
-      // Ignore parsing errors for partial URL typing
-    }
-  };
-
-  useEffect(() => {
-    parseUrlString(urlInput);
-  }, [urlInput]);
-
-  // Regenerate URL string from components
-  const rebuildUrl = (params: typeof urlParams) => {
-    try {
-      const url = new URL(urlInput);
-      url.protocol = urlProtocol;
-      url.hostname = urlHost;
-      if (urlPort && urlPort !== '80' && urlPort !== '443') {
-        url.port = urlPort;
-      } else {
-        url.port = '';
-      }
-      url.pathname = urlPath;
-      url.hash = urlHash;
-
-      // Clear searchParams and reload
-      const searchParams = new URLSearchParams();
-      params.forEach((p) => {
-        if (p.key) searchParams.append(p.key, p.value);
-      });
-      url.search = searchParams.toString();
-
-      setUrlInput(url.toString());
-    } catch (e) {
-      // Ignore
-    }
-  };
-
-  const handleParamChange = (id: string, field: 'key' | 'value', value: string) => {
-    const updated = urlParams.map((p) => (p.id === id ? { ...p, [field]: value } : p));
-    setUrlParams(updated);
-    rebuildUrl(updated);
-  };
-
-  const handleAddParam = () => {
-    const updated = [
-      ...urlParams,
-      {
-        id: crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`,
-        key: 'new_param',
-        value: 'value',
-      },
-    ];
-    setUrlParams(updated);
-    rebuildUrl(updated);
-  };
-
-  const handleDeleteParam = (id: string) => {
-    const updated = urlParams.filter((p) => p.id !== id);
-    setUrlParams(updated);
-    rebuildUrl(updated);
-  };
-
   const handleCopyText = (text: string, label: string) => {
     navigator.clipboard.writeText(text);
     toast.success(`${label} copied!`);
@@ -255,11 +165,10 @@ export function EncoderDecoderTool() {
       const reader = new FileReader();
       reader.onload = () => {
         if (typeof reader.result === 'string') {
-          // If Base64 or standard hex representation is needed
           if (conversionType === 'base64') {
             const rawB64 = reader.result.split(',')[1] || reader.result;
             setInputVal(rawB64);
-            setIsDecodeMode(true); // Switch to decode/display
+            setIsDecodeMode(true);
             toast.success(`Loaded file: ${file.name} to Base64`);
           } else {
             setInputVal(reader.result);
@@ -275,234 +184,145 @@ export function EncoderDecoderTool() {
   };
 
   return (
-    <Tabs defaultValue="encoders" className="space-y-6">
-      <TabsList>
-        <TabsTrigger value="encoders" className="gap-2">
-          <Code className="h-4 w-4" />
-          Encoder / Decoder
-        </TabsTrigger>
-        <TabsTrigger value="url-parser" className="gap-2">
-          <Link className="h-4 w-4" />
-          URL Parser & Param Editor
-        </TabsTrigger>
-      </TabsList>
-
-      {/* --- ENCODER/DECODER TAB --- */}
-      <TabsContent value="encoders" className="space-y-6">
-        <div className="grid gap-6 md:grid-cols-2">
-          {/* Input Panel */}
-          <Card>
-            <CardContent className="p-4 space-y-4">
-              <div className="flex flex-wrap items-center justify-between gap-3 border-b pb-2">
-                <div className="flex items-center gap-2">
-                  <Select value={conversionType} onValueChange={(v) => setConversionType(v)}>
-                    <SelectTrigger className="w-44 h-8 text-xs">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="base64">Base64</SelectItem>
-                      <SelectItem value="url">URL Encoding</SelectItem>
-                      <SelectItem value="html">HTML Entities</SelectItem>
-                      <SelectItem value="hex">Hexadecimal</SelectItem>
-                      <SelectItem value="binary">Binary</SelectItem>
-                      <SelectItem value="octal">Octal</SelectItem>
-                      <SelectItem value="rot13">ROT13</SelectItem>
-                      <SelectItem value="caesar">Caesar Cipher</SelectItem>
-                      <SelectItem value="morse">Morse Code</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  
-                  {conversionType !== 'rot13' && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setIsDecodeMode(!isDecodeMode)}
-                      className="h-8 text-xs gap-1"
-                    >
-                      <ArrowLeftRight className="h-3 w-3" />
-                      {isDecodeMode ? 'Decode' : 'Encode'}
-                    </Button>
-                  )}
-                </div>
+    <div className="space-y-6">
+      <div className="grid gap-6 md:grid-cols-2">
+        {/* Input Panel */}
+        <Card>
+          <CardContent className="p-4 space-y-4">
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b pb-2">
+              <div className="flex items-center gap-2">
+                <Select value={conversionType} onValueChange={(v) => setConversionType(v)}>
+                  <SelectTrigger className="w-44 h-8 text-xs">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="base64">Base64 Encode/Decode</SelectItem>
+                    <SelectItem value="url">URL Query Enc/Dec</SelectItem>
+                    <SelectItem value="html">HTML Entities Enc/Dec</SelectItem>
+                    <SelectItem value="hex">Hexadecimal Code</SelectItem>
+                    <SelectItem value="binary">Binary Bits Represent</SelectItem>
+                    <SelectItem value="octal">Octal Numbers Format</SelectItem>
+                    <SelectItem value="rot13">ROT13 Cipher</SelectItem>
+                    <SelectItem value="caesar">Caesar Substitution</SelectItem>
+                    <SelectItem value="morse">Morse Code Audio Dots</SelectItem>
+                  </SelectContent>
+                </Select>
 
                 {conversionType === 'caesar' && (
-                  <div className="flex items-center gap-1.5 text-xs">
-                    <Label htmlFor="caesar-shift">Shift</Label>
+                  <div className="flex items-center gap-1.5 ml-2">
+                    <Label htmlFor="caesar-shift" className="text-[10px] uppercase font-bold text-muted-foreground shrink-0">Shift:</Label>
                     <Input
                       id="caesar-shift"
                       type="number"
-                      min={1}
-                      max={25}
-                      className="w-12 h-7 p-1 text-center"
+                      min="1"
+                      max="25"
                       value={caesarShift}
                       onChange={(e) => setCaesarShift(Number(e.target.value))}
+                      className="w-14 h-7 text-xs font-mono font-bold"
                     />
                   </div>
                 )}
               </div>
 
-              <div className="space-y-1.5">
-                <Label htmlFor="conv-input">Input String</Label>
-                <Textarea
-                  id="conv-input"
-                  placeholder={
-                    conversionType === 'base64' && !isDecodeMode
-                      ? 'Type string to encode, or drag & drop files here to Base64 encode...'
-                      : 'Type string to convert...'
-                  }
-                  value={inputVal}
-                  onChange={(e) => setInputVal(e.target.value)}
-                  onDragOver={(e) => e.preventDefault()}
-                  onDrop={handleFileDrop}
-                  className="font-mono text-xs h-60 resize-y"
-                />
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Output Panel */}
-          <Card className="h-full flex flex-col justify-between">
-            <CardContent className="p-4 flex-1 flex flex-col space-y-4">
-              <div className="flex items-center justify-between border-b pb-2">
-                <span className="text-sm font-bold">Converted Output</span>
-                <Button variant="outline" size="sm" onClick={() => handleCopyText(outputVal, 'Output')} className="h-7 text-xs">
-                  <Copy className="h-3 w-3 mr-1" />
-                  Copy Output
+              <div className="flex items-center gap-1">
+                <Button
+                  size="sm"
+                  variant={!isDecodeMode ? 'default' : 'outline'}
+                  onClick={() => setIsDecodeMode(false)}
+                  className="h-7.5 text-[11px] font-bold"
+                >
+                  Encode
+                </Button>
+                <Button
+                  size="sm"
+                  variant={isDecodeMode ? 'default' : 'outline'}
+                  onClick={() => setIsDecodeMode(true)}
+                  className="h-7.5 text-[11px] font-bold"
+                >
+                  Decode
                 </Button>
               </div>
+            </div>
 
-              <Textarea
-                value={outputVal}
-                readOnly
-                className="font-mono text-xs flex-1 h-60 resize-y select-all"
-              />
-            </CardContent>
-          </Card>
-        </div>
-      </TabsContent>
-
-      {/* --- URL PARSER TAB --- */}
-      <TabsContent value="url-parser" className="space-y-6">
-        <div className="space-y-4">
-          {/* Main URL input bar */}
-          <Card>
-            <CardContent className="p-4 space-y-4">
-              <div className="space-y-1.5">
-                <div className="flex items-center justify-between">
-                  <Label htmlFor="url-bar" className="font-bold text-sm">Target URL</Label>
-                  <Button variant="ghost" size="icon-sm" onClick={() => handleCopyText(urlInput, 'URL')} className="h-6 w-6 text-muted-foreground">
-                    <Copy className="h-4 w-4" />
-                  </Button>
-                </div>
-                <Input
-                  id="url-bar"
-                  value={urlInput}
-                  onChange={(e) => setUrlInput(e.target.value)}
-                  className="font-mono text-xs"
-                />
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between">
+                <Label htmlFor="raw-input" className="font-bold text-xs">
+                  {isDecodeMode ? 'Encoded Input String' : 'Raw Text String'}
+                </Label>
+                <span className="text-[10px] text-muted-foreground/80">Drag and drop file here</span>
               </div>
-            </CardContent>
-          </Card>
+              <Textarea
+                id="raw-input"
+                placeholder={isDecodeMode ? 'Paste code to decode...' : 'Type plain text to encode...'}
+                value={inputVal}
+                onChange={(e) => setInputVal(e.target.value)}
+                onDragOver={(e) => e.preventDefault()}
+                onDrop={handleFileDrop}
+                className="h-72 text-xs font-mono bg-background/50 leading-relaxed scrollbar-thin"
+              />
+              <div className="flex justify-between items-center text-[10px] text-muted-foreground px-0.5">
+                <span>Lines: {inputVal.split('\n').length}</span>
+                <span>Length: {inputVal.length} chars</span>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
 
-          <div className="grid gap-6 md:grid-cols-3">
-            {/* Component breakdown */}
-            <Card className="md:col-span-1">
-              <CardContent className="p-4 space-y-4 text-xs font-mono">
-                <div className="flex items-center gap-1.5 text-xs font-bold text-muted-foreground uppercase border-b pb-2">
-                  <Info className="h-3.5 w-3.5" />
-                  Structure Breakdown
-                </div>
-                <div className="space-y-3">
-                  <div className="space-y-1">
-                    <span className="text-muted-foreground text-[10px]">Protocol / Scheme:</span>
-                    <Input value={urlProtocol} onChange={(e) => { setUrlProtocol(e.target.value); rebuildUrl(urlParams); }} className="h-8 text-xs font-mono text-primary font-bold" />
-                  </div>
-                  <div className="space-y-1">
-                    <span className="text-muted-foreground text-[10px]">Host / Domain:</span>
-                    <Input value={urlHost} onChange={(e) => { setUrlHost(e.target.value); rebuildUrl(urlParams); }} className="h-8 text-xs font-mono" />
-                  </div>
-                  <div className="space-y-1">
-                    <span className="text-muted-foreground text-[10px]">Port:</span>
-                    <Input value={urlPort} onChange={(e) => { setUrlPort(e.target.value); rebuildUrl(urlParams); }} className="h-8 text-xs font-mono" />
-                  </div>
-                  <div className="space-y-1">
-                    <span className="text-muted-foreground text-[10px]">Path:</span>
-                    <Input value={urlPath} onChange={(e) => { setUrlPath(e.target.value); rebuildUrl(urlParams); }} className="h-8 text-xs font-mono" />
-                  </div>
-                  <div className="space-y-1">
-                    <span className="text-muted-foreground text-[10px]">Hash / Anchor:</span>
-                    <Input value={urlHash} onChange={(e) => { setUrlHash(e.target.value); rebuildUrl(urlParams); }} className="h-8 text-xs font-mono text-emerald-600 dark:text-emerald-400" />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+        {/* Output Panel */}
+        <Card>
+          <CardContent className="p-4 space-y-4">
+            <div className="flex items-center justify-between border-b pb-2 h-8">
+              <span className="font-bold text-xs flex items-center gap-1 text-primary">
+                <ArrowLeftRight className="h-3.5 w-3.5" />
+                Processed Result Output
+              </span>
 
-            {/* Query parameters table editor */}
-            <Card className="md:col-span-2">
-              <CardContent className="p-4 space-y-4">
-                <div className="flex items-center justify-between border-b pb-2">
-                  <h3 className="font-semibold text-sm flex items-center gap-1.5">
-                    <Braces className="h-4 w-4 text-primary" />
-                    Query Parameters ({urlParams.length})
-                  </h3>
-                  <Button variant="outline" size="sm" onClick={handleAddParam} className="h-7 text-xs">
-                    <Plus className="h-3 w-3 mr-1" />
-                    Add Parameter
-                  </Button>
-                </div>
+              <div className="flex items-center gap-1.5">
+                <Button
+                  size="icon-sm"
+                  variant="ghost"
+                  onClick={() => handleCopyText(outputVal, 'Result')}
+                  title="Copy result string"
+                  disabled={!outputVal}
+                >
+                  <Copy className="h-4 w-4" />
+                </Button>
+                <Button
+                  size="icon-sm"
+                  variant="ghost"
+                  onClick={() => {
+                    const temp = inputVal;
+                    setInputVal(outputVal);
+                    setOutputVal(temp);
+                    setIsDecodeMode(!isDecodeMode);
+                  }}
+                  title="Swap Input and Output"
+                  disabled={!outputVal}
+                >
+                  <RefreshCw className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
 
-                {urlParams.length > 0 ? (
-                  <div className="rounded-md border overflow-hidden">
-                    <table className="w-full text-xs font-mono border-collapse text-left">
-                      <thead className="bg-muted/40 border-b">
-                        <tr>
-                          <th className="p-2 border-r w-1/3 font-semibold text-muted-foreground">Parameter Key</th>
-                          <th className="p-2 border-r font-semibold text-muted-foreground">Value</th>
-                          <th className="p-2 w-16"></th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {urlParams.map((p) => (
-                          <tr key={p.id} className="border-b hover:bg-muted/10 last:border-0">
-                            <td className="p-2 border-r">
-                              <Input
-                                value={p.key}
-                                onChange={(e) => handleParamChange(p.id, 'key', e.target.value)}
-                                className="h-7 text-xs font-mono"
-                              />
-                            </td>
-                            <td className="p-2 border-r">
-                              <Input
-                                value={p.value}
-                                onChange={(e) => handleParamChange(p.id, 'value', e.target.value)}
-                                className="h-7 text-xs font-mono"
-                              />
-                            </td>
-                            <td className="p-2 text-center">
-                              <Button
-                                variant="ghost"
-                                size="icon-sm"
-                                onClick={() => handleDeleteParam(p.id)}
-                                className="h-6 w-6 text-muted-foreground hover:text-destructive"
-                              >
-                                <Trash2 className="h-3.5 w-3.5" />
-                              </Button>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                ) : (
-                  <div className="text-center py-12 text-xs text-muted-foreground italic">
-                    No query parameters found in this URL. Click 'Add Parameter' above to add one.
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </div>
-        </div>
-      </TabsContent>
-    </Tabs>
+            <div className="space-y-1.5">
+              <Label htmlFor="conv-output" className="font-bold text-xs">
+                {isDecodeMode ? 'Decoded Text Output' : 'Encoded Format Output'}
+              </Label>
+              <Textarea
+                id="conv-output"
+                readOnly
+                placeholder="Result output will render here..."
+                value={outputVal}
+                className="h-72 text-xs font-mono bg-muted/30 leading-relaxed scrollbar-thin focus-visible:ring-0"
+              />
+              <div className="flex justify-between items-center text-[10px] text-muted-foreground px-0.5">
+                <span>Lines: {outputVal.split('\n').length}</span>
+                <span>Length: {outputVal.length} chars</span>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    </div>
   );
 }

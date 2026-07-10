@@ -25,7 +25,9 @@ import {
   Gamepad2,
   FileCode,
   Scissors,
-  Combine
+  Combine,
+  Timer,
+  Calendar,
 } from 'lucide-react';
 import { useLocale } from '@/context/LocalizationContext';
 
@@ -76,7 +78,7 @@ export function Footer() {
               <li>
                 <Link href="/html-preview" className="flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground transition-colors">
                   <Sparkles className="h-3.5 w-3.5 text-primary/70" />
-                  HTML Sandbox
+                  HTML/CSS/JS Sandbox
                 </Link>
               </li>
             </ul>
@@ -122,6 +124,12 @@ export function Footer() {
                 <Link href="/cron" className="flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground transition-colors">
                   <CalendarRange className="h-3.5 w-3.5 text-primary/70" />
                   Cron Generator
+                </Link>
+              </li>
+              <li>
+                <Link href="/calendar" className="flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground transition-colors">
+                  <Calendar className="h-3.5 w-3.5 text-primary/70" />
+                  Calendar Planner
                 </Link>
               </li>
               <li>
@@ -203,6 +211,12 @@ export function Footer() {
                 <Link href="/pdf-tools" className="flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground transition-colors">
                   <FileCode className="h-3.5 w-3.5 text-primary/70" />
                   PDF Suite
+                </Link>
+              </li>
+              <li>
+                <Link href="/countdown" className="flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground transition-colors">
+                  <Timer className="h-3.5 w-3.5 text-primary/70" />
+                  Countdown & Stopwatch
                 </Link>
               </li>
               <li>

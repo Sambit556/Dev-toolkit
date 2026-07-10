@@ -12,7 +12,7 @@ Fast, secure, offline-ready. All core operations run client-side in the browser 
 - **JSON Viewer**: Format, validate, query, and explore JSON syntax tree (Monaco Editor based) with TypeScript interface generation and CSV export capabilities.
 - **JWT Decoder**: Decode token payloads, analyze headers, verify signatures, and generate signed JSON Web Tokens.
 - **Code Diff Checker**: Compare two text blocks, JSON files, or source code side-by-side or in a unified inline view.
-- **HTML Sandbox**: Live interactive sandbox playground for HTML/CSS/JS with console logs interception.
+- **HTML/CSS/JS Sandbox**: Live interactive sandbox playground for HTML/CSS/JS with console logs interception.
 
 ### 2. Converters & Parsers
 - **Epoch Converter**: Live Unix epoch timestamp clock, date-to-timestamp and timestamp-to-date conversions with timezones and duration math.
@@ -170,6 +170,9 @@ npm install
 cp .env.example .env
 cp apps/api/.env.example apps/api/.env
 cp apps/web/.env.local.example apps/web/.env.local
+
+# Kill existing process for frontend and backend
+npx kill-port 3001 4001
 
 # Start both frontend and backend
 npm run dev

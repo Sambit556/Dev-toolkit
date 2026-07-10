@@ -20,18 +20,68 @@ const CURRENCIES = [
   { value: 'AUD', symbol: 'A$', label: 'AUD - Australian Dollar' },
   { value: 'CHF', symbol: 'CHF', label: 'CHF - Swiss Franc' },
   { value: 'CNY', symbol: '¥', label: 'CNY - Chinese Yuan' },
+  { value: 'SGD', symbol: 'S$', label: 'SGD - Singapore Dollar' },
+  { value: 'AED', symbol: 'د.إ', label: 'AED - UAE Dirham' },
+  { value: 'SAR', symbol: 'ر.स', label: 'SAR - Saudi Riyal' },
+  { value: 'NZD', symbol: 'NZ$', label: 'NZD - New Zealand Dollar' },
+  { value: 'HKD', symbol: 'HK$', label: 'HKD - Hong Kong Dollar' },
+  { value: 'ZAR', symbol: 'R', label: 'ZAR - South African Rand' },
+  { value: 'RUB', symbol: '₽', label: 'RUB - Russian Ruble' },
+  { value: 'MXN', symbol: 'Mex$', label: 'MXN - Mexican Peso' },
+  { value: 'BRL', symbol: 'R$', label: 'BRL - Brazilian Real' },
+  { value: 'KRW', symbol: '₩', label: 'KRW - South Korean Won' },
+  { value: 'TRY', symbol: '₺', label: 'TRY - Turkish Lira' },
+  { value: 'SEK', symbol: 'kr', label: 'SEK - Swedish Krona' },
+  { value: 'NOK', symbol: 'kr', label: 'NOK - Norwegian Krone' },
+  { value: 'DKK', symbol: 'kr', label: 'DKK - Danish Krone' },
+  { value: 'PLN', symbol: 'zł', label: 'PLN - Polish Zloty' },
+  { value: 'THB', symbol: '฿', label: 'THB - Thai Baht' },
+  { value: 'MYR', symbol: 'RM', label: 'MYR - Malaysia Ringgit' },
+  { value: 'PHP', symbol: '₱', label: 'PHP - Philippine Peso' },
+  { value: 'IDR', symbol: 'Rp', label: 'IDR - Indonesian Rupiah' },
+  { value: 'PKR', symbol: '₨', label: 'PKR - Pakistan Rupee' },
+  { value: 'NPR', symbol: '₨', label: 'NPR - Nepalese Rupee' },
+  { value: 'BDT', symbol: '৳', label: 'BDT - Bangladeshi Taka' },
+  { value: 'LKR', symbol: '₨', label: 'LKR - Sri Lankan Rupee' },
+  { value: 'EGP', symbol: 'E£', label: 'EGP - Egyptian Pound' },
+  { value: 'ILS', symbol: '₪', label: 'ILS - Israeli Shekel' },
 ];
 
-const FALLBACK_RATES: Record<string, Record<string, number>> = {
-  USD: { USD: 1, EUR: 0.92, GBP: 0.78, INR: 83.5, JPY: 161.2, CAD: 1.36, AUD: 1.49, CHF: 0.89, CNY: 7.27 },
-  EUR: { USD: 1.09, EUR: 1, GBP: 0.85, INR: 90.8, JPY: 175.2, CAD: 1.48, AUD: 1.62, CHF: 0.97, CNY: 7.9 },
-  GBP: { USD: 1.28, EUR: 1.18, GBP: 1, INR: 107.1, JPY: 206.7, CAD: 1.74, AUD: 1.91, CHF: 1.14, CNY: 9.32 },
-  INR: { USD: 0.012, EUR: 0.011, GBP: 0.0093, INR: 1, JPY: 1.93, CAD: 0.016, AUD: 0.018, CHF: 0.011, CNY: 0.087 },
-  JPY: { USD: 0.0062, EUR: 0.0057, GBP: 0.0048, INR: 0.52, JPY: 1, CAD: 0.0084, AUD: 0.0092, CHF: 0.0055, CNY: 0.045 },
-  CAD: { USD: 0.74, EUR: 0.68, GBP: 0.57, INR: 61.4, JPY: 118.5, CAD: 1, AUD: 1.1, CHF: 0.65, CNY: 5.35 },
-  AUD: { USD: 0.67, EUR: 0.62, GBP: 0.52, INR: 56.0, JPY: 108.2, CAD: 0.91, AUD: 1, CHF: 0.6, CNY: 4.88 },
-  CHF: { USD: 1.12, EUR: 1.03, GBP: 0.88, INR: 93.8, JPY: 181.1, CAD: 1.53, AUD: 1.67, CHF: 1, CNY: 8.17 },
-  CNY: { USD: 0.14, EUR: 0.13, GBP: 0.11, INR: 8.71, JPY: 22.17, CAD: 0.19, AUD: 0.2, CHF: 0.12, CNY: 1 }
+const USD_RELATIVE_RATES: Record<string, number> = {
+  USD: 1.0,
+  EUR: 0.92,
+  GBP: 0.78,
+  INR: 83.5,
+  JPY: 161.2,
+  CAD: 1.36,
+  AUD: 1.49,
+  CHF: 0.89,
+  CNY: 7.27,
+  SGD: 1.34,
+  AED: 3.67,
+  SAR: 3.75,
+  NZD: 1.62,
+  HKD: 7.8,
+  ZAR: 18.0,
+  RUB: 88.0,
+  MXN: 18.0,
+  BRL: 5.5,
+  KRW: 1370,
+  TRY: 32.5,
+  SEK: 10.4,
+  NOK: 10.6,
+  DKK: 6.9,
+  PLN: 3.9,
+  THB: 36.3,
+  MYR: 4.7,
+  PHP: 58.5,
+  IDR: 16200,
+  PKR: 278,
+  NPR: 133,
+  BDT: 117,
+  LKR: 300,
+  EGP: 47.5,
+  ILS: 3.65,
 };
 
 export function CurrencyExchangerTool() {
@@ -39,10 +89,10 @@ export function CurrencyExchangerTool() {
   const [fromCurrency, setFromCurrency] = useState<string>('USD');
   const [toCurrency, setToCurrency] = useState<string>('EUR');
   
-  const [rates, setRates] = useState<Record<string, number>>(FALLBACK_RATES.USD);
+  const [rates, setRates] = useState<Record<string, number>>(USD_RELATIVE_RATES);
   const [loading, setLoading] = useState<boolean>(false);
   const [isCustomMode, setIsCustomMode] = useState<boolean>(false);
-  const [customRates, setCustomRates] = useState<Record<string, number>>(FALLBACK_RATES.USD);
+  const [customRates, setCustomRates] = useState<Record<string, number>>(USD_RELATIVE_RATES);
   const [lastUpdated, setLastUpdated] = useState<string>('Preloaded Local Rates');
 
   // Sparkline state coordinates
@@ -65,8 +115,12 @@ export function CurrencyExchangerTool() {
     } catch (err: any) {
       console.warn('Currency API error, using static fallback rates:', err.message);
       // Fallback relative to the selected base currency
-      const baseRates = FALLBACK_RATES[base] || FALLBACK_RATES.USD;
-      setRates(baseRates);
+      const baseRateInUsd = USD_RELATIVE_RATES[base] || 1.0;
+      const calculatedRates: Record<string, number> = {};
+      Object.entries(USD_RELATIVE_RATES).forEach(([cur, val]) => {
+        calculatedRates[cur] = val / baseRateInUsd;
+      });
+      setRates(calculatedRates);
       setLastUpdated('Offline static fallback rates');
     } finally {
       setLoading(false);

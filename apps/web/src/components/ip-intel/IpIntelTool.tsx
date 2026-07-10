@@ -21,7 +21,11 @@ import {
   Fingerprint,
   Zap,
   Play,
-  Trash2
+  Trash2,
+  Link2,
+  Info,
+  Plus,
+  Braces
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -157,7 +161,7 @@ const pingWithImage = (url: string): Promise<number> => {
 
 export function IpIntelTool() {
   const { t } = useLocale();
-  const [activeTab, setActiveTab] = useState<'ip' | 'identity' | 'ping'>('ip');
+  const [activeTab, setActiveTab] = useState<'ip' | 'identity' | 'ping' | 'url'>('ip');
 
   // IP states
   const [userIpInfo, setUserIpInfo] = useState<IpInfo | null>(null);
@@ -183,53 +187,79 @@ export function IpIntelTool() {
   ]);
   const [isPingingAll, setIsPingingAll] = useState(false);
 
-  const runPingTest = async (targetIdx: number) => {
-    const nextTargets = [...pingTargets];
-    const target = nextTargets[targetIdx];
-    
-    target.status = 'running';
-    target.history = [];
-    target.min = null;
-    target.max = null;
-    target.avg = null;
-    target.jitter = null;
-    setPingTargets([...nextTargets]);
+  // URL Parser States
+  const [urlInput, setUrlInput] = useState<string>('https://example.com:8080/path/to/page?search=devchrono&category=developer#section-1');
+  const [urlProtocol, setUrlProtocol] = useState<string>('');
+  const [urlHost, setUrlHost] = useState<string>('');
+  const [urlPort, setUrlPort] = useState<string>('');
+  const [urlPath, setUrlPath] = useState<string>('');
+  const [urlHash, setUrlHash] = useState<string>('');
+  const [urlParams, setUrlParams] = useState<{ id: string; key: string; value: string }[]>([]);
+
+  const runPingTest = async (targetIdx: number, currentTargetsList?: any[]) => {
+    const list = currentTargetsList || pingTargets;
+    const nextTargets = list.map((t, idx) => {
+      if (idx === targetIdx) {
+        return {
+          ...t,
+          status: 'running',
+          history: [],
+          min: null,
+          max: null,
+          avg: null,
+          jitter: null,
+        };
+      }
+      return t;
+    });
+    setPingTargets(nextTargets);
 
     const numTests = 4;
     const history: number[] = [];
+    const targetUrl = nextTargets[targetIdx].url;
 
     for (let i = 0; i < numTests; i++) {
       try {
-        const rtt = await pingWithImage(target.url);
+        const rtt = await pingWithImage(targetUrl);
         history.push(rtt);
       } catch (err) {
-        console.warn(`Ping attempt ${i} failed for ${target.url}`, err);
+        console.warn(`Ping attempt ${i} failed for ${targetUrl}`, err);
       }
       await new Promise(r => setTimeout(r, 120));
     }
 
-    if (history.length > 0) {
-      const min = Math.min(...history);
-      const max = Math.max(...history);
-      const avg = Math.round(history.reduce((a, b) => a + b, 0) / history.length);
-      
-      let diffSum = 0;
-      for (let i = 1; i < history.length; i++) {
-        diffSum += Math.abs(history[i] - history[i - 1]);
+    setPingTargets((prev) => {
+      const updated = [...prev];
+      if (updated[targetIdx]) {
+        if (history.length > 0) {
+          const min = Math.min(...history);
+          const max = Math.max(...history);
+          const avg = Math.round(history.reduce((a, b) => a + b, 0) / history.length);
+          
+          let diffSum = 0;
+          for (let i = 1; i < history.length; i++) {
+            diffSum += Math.abs(history[i] - history[i - 1]);
+          }
+          const jitter = history.length > 1 ? Math.round(diffSum / (history.length - 1)) : 0;
+
+          updated[targetIdx] = {
+            ...updated[targetIdx],
+            status: 'done',
+            history,
+            min,
+            max,
+            avg,
+            jitter,
+          };
+        } else {
+          updated[targetIdx] = {
+            ...updated[targetIdx],
+            status: 'failed',
+          };
+        }
       }
-      const jitter = history.length > 1 ? Math.round(diffSum / (history.length - 1)) : 0;
-
-      target.status = 'done';
-      target.history = history;
-      target.min = min;
-      target.max = max;
-      target.avg = avg;
-      target.jitter = jitter;
-    } else {
-      target.status = 'failed';
-    }
-
-    setPingTargets([...nextTargets]);
+      return updated;
+    });
   };
 
   const handlePingAll = async () => {
@@ -259,9 +289,13 @@ export function IpIntelTool() {
         jitter: null,
         history: [],
       };
-      setPingTargets([...pingTargets, newTarget]);
+      const newTargetsList = [...pingTargets, newTarget];
+      setPingTargets(newTargetsList);
       setCustomPingUrl('');
-      toast.success('Custom target endpoint added!');
+      toast.success('Custom target endpoint added! Testing latency...');
+      
+      // Auto run ping test on the newly added target!
+      runPingTest(newTargetsList.length - 1, newTargetsList);
     } catch {
       toast.error('Invalid URL format');
     }
@@ -269,6 +303,89 @@ export function IpIntelTool() {
 
   const handleRemovePingTarget = (idx: number) => {
     setPingTargets(pingTargets.filter((_, i) => i !== idx));
+  };
+
+  // URL Parser Logic
+  const parseUrlString = (urlStr: string) => {
+    try {
+      const parsed = new URL(urlStr);
+      setUrlProtocol(parsed.protocol);
+      setUrlHost(parsed.hostname);
+      setUrlPort(parsed.port || (parsed.protocol === 'https:' ? '443' : '80'));
+      setUrlPath(parsed.pathname);
+      setUrlHash(parsed.hash);
+
+      const paramsList: { id: string; key: string; value: string }[] = [];
+      parsed.searchParams.forEach((value, key) => {
+        paramsList.push({
+          id: crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`,
+          key,
+          value,
+        });
+      });
+      setUrlParams(paramsList);
+    } catch {
+      // Ignore parsing errors for partial URL typing
+    }
+  };
+
+  useEffect(() => {
+    parseUrlString(urlInput);
+  }, [urlInput]);
+
+  const rebuildUrl = (params: typeof urlParams) => {
+    try {
+      const url = new URL(urlInput);
+      url.protocol = urlProtocol;
+      url.hostname = urlHost;
+      if (urlPort && urlPort !== '80' && urlPort !== '443') {
+        url.port = urlPort;
+      } else {
+        url.port = '';
+      }
+      url.pathname = urlPath;
+      url.hash = urlHash;
+
+      const searchParams = new URLSearchParams();
+      params.forEach((p) => {
+        if (p.key) searchParams.append(p.key, p.value);
+      });
+      url.search = searchParams.toString();
+
+      setUrlInput(url.toString());
+    } catch (e) {
+      // Ignore
+    }
+  };
+
+  const handleParamChange = (id: string, field: 'key' | 'value', value: string) => {
+    const updated = urlParams.map((p) => (p.id === id ? { ...p, [field]: value } : p));
+    setUrlParams(updated);
+    rebuildUrl(updated);
+  };
+
+  const handleAddParam = () => {
+    const updated = [
+      ...urlParams,
+      {
+        id: crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`,
+        key: 'new_param',
+        value: 'value',
+      },
+    ];
+    setUrlParams(updated);
+    rebuildUrl(updated);
+  };
+
+  const handleDeleteParam = (id: string) => {
+    const updated = urlParams.filter((p) => p.id !== id);
+    setUrlParams(updated);
+    rebuildUrl(updated);
+  };
+
+  const copyUrlToClipboard = (text: string, label: string) => {
+    navigator.clipboard.writeText(text);
+    toast.success(`${label} copied!`);
   };
 
   useEffect(() => {
@@ -651,6 +768,17 @@ export function IpIntelTool() {
         >
           <Zap className="h-4 w-4" />
           Ping Latency Test
+        </button>
+        <button
+          onClick={() => setActiveTab('url')}
+          className={`px-4 py-2 text-sm font-bold transition-all border-b-2 -mb-[2px] flex items-center gap-2 ${
+            activeTab === 'url' 
+              ? 'border-primary text-primary' 
+              : 'border-transparent text-muted-foreground hover:text-foreground'
+          }`}
+        >
+          <Link2 className="h-4 w-4" />
+          URL Parser & Editor
         </button>
       </div>
 
@@ -1141,6 +1269,12 @@ export function IpIntelTool() {
                     placeholder="https://example.com or hostname"
                     value={customPingUrl}
                     onChange={(e) => setCustomPingUrl(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        handleAddCustomPing();
+                      }
+                    }}
                     className="h-9.5 text-xs bg-background/50 font-mono"
                   />
                   <Button onClick={handleAddCustomPing} size="sm" className="h-9.5 font-bold">
@@ -1156,6 +1290,152 @@ export function IpIntelTool() {
                     All requests are sent securely from your browser via <code>fetch</code> using <code>no-cors</code>. This timing method bypasses CORS block restrictions, though local firewall filters or proxy tools may affect latency reports.
                   </p>
                 </div>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      )}
+
+      {activeTab === 'url' && (
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 animate-fade-in">
+          {/* Main Parse Box */}
+          <div className="lg:col-span-12 space-y-4">
+            <Card className="bg-card/45 border-border/80 shadow-sm">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base font-bold flex items-center gap-2">
+                  <Link2 className="h-4 w-4 text-primary" />
+                  URL Parser & Parameters Editor
+                </CardTitle>
+                <CardDescription>
+                  Enter any valid URL endpoint below to parse its query parameters, hash anchor, port, host, and protocol structure instantly.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex gap-2">
+                  <Input
+                    placeholder="Paste URL query parameters..."
+                    value={urlInput}
+                    onChange={(e) => setUrlInput(e.target.value)}
+                    className="h-10 text-xs bg-background/50 font-mono"
+                  />
+                  <Button onClick={() => copyUrlToClipboard(urlInput, 'URL')} size="sm" className="h-10 font-bold shrink-0">
+                    Copy URL
+                  </Button>
+                </div>
+
+                <div className="grid grid-cols-2 md:grid-cols-5 gap-3 pt-2 text-xs">
+                  <div className="space-y-1">
+                    <span className="text-muted-foreground font-semibold">Protocol</span>
+                    <Input
+                      value={urlProtocol}
+                      onChange={(e) => {
+                        setUrlProtocol(e.target.value);
+                        setTimeout(() => rebuildUrl(urlParams), 0);
+                      }}
+                      className="h-8.5 font-mono text-[11px]"
+                    />
+                  </div>
+                  <div className="space-y-1 col-span-2">
+                    <span className="text-muted-foreground font-semibold">Hostname</span>
+                    <Input
+                      value={urlHost}
+                      onChange={(e) => {
+                        setUrlHost(e.target.value);
+                        setTimeout(() => rebuildUrl(urlParams), 0);
+                      }}
+                      className="h-8.5 font-mono text-[11px]"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <span className="text-muted-foreground font-semibold">Port</span>
+                    <Input
+                      value={urlPort}
+                      onChange={(e) => {
+                        setUrlPort(e.target.value);
+                        setTimeout(() => rebuildUrl(urlParams), 0);
+                      }}
+                      className="h-8.5 font-mono text-[11px]"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <span className="text-muted-foreground font-semibold">Anchor (Hash)</span>
+                    <Input
+                      value={urlHash}
+                      onChange={(e) => {
+                        setUrlHash(e.target.value);
+                        setTimeout(() => rebuildUrl(urlParams), 0);
+                      }}
+                      className="h-8.5 font-mono text-[11px]"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-1 text-xs pt-1">
+                  <span className="text-muted-foreground font-semibold">Pathname</span>
+                  <Input
+                    value={urlPath}
+                    onChange={(e) => {
+                      setUrlPath(e.target.value);
+                      setTimeout(() => rebuildUrl(urlParams), 0);
+                    }}
+                    className="h-8.5 font-mono text-[11px]"
+                  />
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Query Params Table */}
+          <div className="lg:col-span-12">
+            <Card className="bg-card/45 border-border/80 shadow-sm">
+              <CardHeader className="pb-2.5 flex flex-row items-center justify-between">
+                <div>
+                  <CardTitle className="text-sm font-bold flex items-center gap-1.5">
+                    <Braces className="h-4 w-4 text-primary" />
+                    Query Parameters ({urlParams.length})
+                  </CardTitle>
+                  <CardDescription className="text-[11px]">Manipulate query attributes. Changes automatically rebuild the main URL.</CardDescription>
+                </div>
+                <Button size="sm" variant="outline" onClick={handleAddParam} className="h-8 font-bold gap-1 text-[11px]">
+                  <Plus className="h-3.5 w-3.5" />
+                  Add Param
+                </Button>
+              </CardHeader>
+              <CardContent className="p-4 pt-1">
+                {urlParams.length > 0 ? (
+                  <div className="space-y-2">
+                    {urlParams.map((param) => (
+                      <div key={param.id} className="flex gap-2 items-center">
+                        <Input
+                          placeholder="Key"
+                          value={param.key}
+                          onChange={(e) => handleParamChange(param.id, 'key', e.target.value)}
+                          className="h-8 text-[11px] font-mono"
+                        />
+                        <span className="text-muted-foreground/60 font-semibold">=</span>
+                        <Input
+                          placeholder="Value"
+                          value={param.value}
+                          onChange={(e) => handleParamChange(param.id, 'value', e.target.value)}
+                          className="h-8 text-[11px] font-mono flex-1"
+                        />
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-red-500 hover:text-red-600 hover:bg-red-500/10"
+                          onClick={() => handleDeleteParam(param.id)}
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="py-8 text-center text-xs text-muted-foreground border border-dashed rounded-xl bg-muted/10">
+                    <Info className="h-5 w-5 mx-auto mb-2 text-muted-foreground/40" />
+                    No query parameters detected in the current URL string.
+                  </div>
+                )}
               </CardContent>
             </Card>
           </div>

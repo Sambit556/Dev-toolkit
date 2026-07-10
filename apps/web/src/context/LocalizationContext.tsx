@@ -83,7 +83,7 @@ const TRANSLATION_BUNDLES: Record<string, Record<string, string>> = {
     colorDesc: 'Pick colors, generate matching palette harmonies, and check WCAG contrast.',
     imageTitle: 'Image Compressor',
     imageDesc: 'Scale dimensions, compress files, and apply custom enhancement filters.',
-    convertersTitle: 'Data & PDF Converters',
+    convertersTitle: 'Data Converters',
     convertersDesc: 'Parse CSV grids, XML configurations, Markdown pages, and export PDF.',
     encoderDecoderTitle: 'Encoder / Decoder',
     encoderDecoderDesc: 'Convert Base64, URL encoding, HTML entities, Hex, Binary, and Morse code.',

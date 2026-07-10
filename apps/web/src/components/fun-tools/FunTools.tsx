@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Gamepad2, Coins, Disc, Users, RefreshCw, Trophy, Plus, Trash2, Sparkles } from 'lucide-react';
+import { Gamepad2, Coins, Disc, Users, RefreshCw, Trophy, Plus, Trash2, Sparkles, Info } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -13,6 +13,38 @@ import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+
+function DieFace({ value }: { value: number }) {
+  const pipsForValue: Record<number, number[]> = {
+    1: [4],
+    2: [0, 8],
+    3: [0, 4, 8],
+    4: [0, 2, 6, 8],
+    5: [0, 2, 4, 6, 8],
+    6: [0, 2, 3, 5, 6, 8]
+  };
+
+  const activePips = pipsForValue[value] || [4];
+
+  return (
+    <div className="w-20 h-20 bg-gradient-to-br from-red-500 via-red-650 to-red-800 border-2 border-red-400/40 rounded-[20px] shadow-[inset_0_4px_8px_rgba(255,255,255,0.25),0_12px_24px_rgba(220,38,38,0.35)] grid grid-cols-3 p-4 gap-2.5 items-center justify-items-center relative overflow-hidden transition-all duration-150">
+      <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-white/10 to-transparent pointer-events-none" />
+      {Array.from({ length: 9 }).map((_, idx) => {
+        const hasPip = activePips.includes(idx);
+        return (
+          <div key={idx} className="h-4 w-4 flex items-center justify-center">
+            <span
+              className={cn(
+                "h-3 w-3 rounded-full bg-white shadow-[0_1.5px_3px_rgba(0,0,0,0.45),inset_0_1px_1px_rgba(0,0,0,0.35)] transition-all duration-150 ease-out",
+                hasPip ? "scale-100 opacity-100" : "scale-0 opacity-0"
+              )}
+            />
+          </div>
+        );
+      })}
+    </div>
+  );
+}
 
 export function FunTools() {
   const [activeTab, setActiveTab] = useState('flip-coin');
@@ -28,13 +60,14 @@ export function FunTools() {
   const [diceValues, setDiceValues] = useState<number[]>([1]);
   const [isDiceRolling, setIsDiceRolling] = useState(false);
   const [diceTriggerCount, setDiceTriggerCount] = useState(0);
-  const [diceRotations, setDiceRotations] = useState<{ x: number; y: number }[]>([{ x: 0, y: 0 }]);
 
   // --- 3. RANDOM PICKER STATES ---
   const [pickerInput, setPickerInput] = useState<string>('Option A\nOption B\nOption C\nOption D');
   const [pickerCount, setPickerCount] = useState<number>(1);
   const [pickerDuplicates, setPickerDuplicates] = useState<boolean>(false);
   const [pickerResult, setPickerResult] = useState<string[]>([]);
+  const [isPicking, setIsPicking] = useState(false);
+  const [pickerAnimText, setPickerAnimText] = useState<string>('');
 
   // --- 4. TEAM GENERATOR STATES ---
   const [teamNames, setTeamNames] = useState<string>('John\nJane\nBob\nAlice\nCharlie\nEmma\nDavid\nSophia');
@@ -68,68 +101,78 @@ export function FunTools() {
     }, 1200); // match flip animation length
   };
 
+  // Synchronize initial dice values when diceCount changes
+  useEffect(() => {
+    setDiceValues(Array.from({ length: diceCount }).map(() => 1));
+  }, [diceCount]);
+
   // --- DICE ROLLER HANDLER ---
   const handleRollDice = () => {
     if (isDiceRolling) return;
     setIsDiceRolling(true);
     setDiceTriggerCount((prev) => prev + 1);
 
-    const values: number[] = [];
-    const rotations: { x: number; y: number }[] = [];
-
-    // Face rotation alignments: maps die value (1-6) to X/Y rotation degrees
-    const diceAlignments = [
-      { x: 0, y: 0 },       // 1
-      { x: 0, y: 180 },     // 2 (opposite 1)
-      { x: 0, y: 90 },      // 3
-      { x: 0, y: -90 },     // 4
-      { x: -90, y: 0 },     // 5
-      { x: 90, y: 0 },      // 6
-    ];
-
-    for (let i = 0; i < diceCount; i++) {
-      const val = Math.floor(Math.random() * 6) + 1;
-      values.push(val);
-      
-      const align = diceAlignments[val - 1];
-      // Add extra random full spins (e.g. 720 to 1440 deg)
-      const xRot = align.x + (Math.floor(Math.random() * 2) + 2) * 360;
-      const yRot = align.y + (Math.floor(Math.random() * 2) + 2) * 360;
-      rotations.push({ x: xRot, y: yRot });
-    }
-
-    setDiceRotations(rotations);
-
-    setTimeout(() => {
-      setDiceValues(values);
-      setIsDiceRolling(false);
-      const total = values.reduce((a, b) => a + b, 0);
-      toast.success(`You rolled a total of ${total}! (${values.join(', ')})`);
-    }, 1000);
+    let count = 0;
+    const interval = setInterval(() => {
+      setDiceValues((prev) =>
+        prev.map(() => Math.floor(Math.random() * 6) + 1)
+      );
+      count++;
+      if (count >= 16) {
+        clearInterval(interval);
+        
+        const finalValues = Array.from({ length: diceCount }).map(() =>
+          Math.floor(Math.random() * 6) + 1
+        );
+        setDiceValues(finalValues);
+        setIsDiceRolling(false);
+        const total = finalValues.reduce((a, b) => a + b, 0);
+        toast.success(`You rolled a total of ${total}! (${finalValues.join(', ')})`);
+      }
+    }, 75);
   };
 
   // --- RANDOM PICKER HANDLER ---
   const handlePickRandom = () => {
+    if (isPicking) return;
     const list = pickerInput.split('\n').map(o => o.trim()).filter(o => o.length > 0);
     if (list.length === 0) {
       toast.error('Please input options to pick from');
       return;
     }
 
-    const count = Math.max(1, Math.min(list.length, pickerCount));
-    const picked: string[] = [];
-    const pool = [...list];
+    setIsPicking(true);
+    setPickerResult([]);
+    
+    let cycles = 0;
+    const maxCycles = 15;
+    const interval = setInterval(() => {
+      const randomOption = list[Math.floor(Math.random() * list.length)];
+      setPickerAnimText(randomOption);
+      cycles++;
+      
+      if (cycles >= maxCycles) {
+        clearInterval(interval);
+        
+        const count = Math.max(1, Math.min(list.length, pickerCount));
+        const picked: string[] = [];
+        const pool = [...list];
 
-    for (let i = 0; i < count; i++) {
-      if (pool.length === 0) break;
-      const idx = Math.floor(Math.random() * pool.length);
-      picked.push(pool[idx]);
-      if (!pickerDuplicates) {
-        pool.splice(idx, 1);
+        for (let i = 0; i < count; i++) {
+          if (pool.length === 0) break;
+          const idx = Math.floor(Math.random() * pool.length);
+          picked.push(pool[idx]);
+          if (!pickerDuplicates) {
+            pool.splice(idx, 1);
+          }
+        }
+        
+        setPickerResult(picked);
+        setPickerAnimText('');
+        setIsPicking(false);
+        toast.success(`Picked ${picked.length} item(s)!`);
       }
-    }
-    setPickerResult(picked);
-    toast.success(`Picked ${picked.length} item(s)!`);
+    }, 90);
   };
 
   // --- TEAM GENERATOR HANDLER ---
@@ -348,17 +391,24 @@ export function FunTools() {
                     transform: !isCoinFlipping && coinSide === 'tails' ? 'rotateX(180deg)' : 'rotateX(0deg)'
                   }}
                 >
+                  {/* 3D Edge layers to give the coin true physical thickness */}
+                  <div className="absolute inset-0 rounded-full bg-amber-700/80 dark:bg-amber-800/80 preserve-3d" style={{ transform: 'translateZ(-2px)' }} />
+                  <div className="absolute inset-0 rounded-full bg-amber-700/90 dark:bg-amber-850/90 preserve-3d" style={{ transform: 'translateZ(-1px)' }} />
+                  <div className="absolute inset-0 rounded-full bg-amber-800 dark:bg-amber-900 preserve-3d" style={{ transform: 'translateZ(0px)' }} />
+                  <div className="absolute inset-0 rounded-full bg-amber-850/90 dark:bg-amber-950/90 preserve-3d" style={{ transform: 'translateZ(1px)' }} />
+                  <div className="absolute inset-0 rounded-full bg-amber-900/80 dark:bg-amber-950/80 preserve-3d" style={{ transform: 'translateZ(2px)' }} />
+
                   {/* Front Side (Heads) - Shiny Gold Medallion */}
-                  <div className="absolute inset-0 rounded-full border-4 border-yellow-600 bg-gradient-to-br from-yellow-300 via-amber-400 to-yellow-600 flex flex-col items-center justify-center font-black text-amber-950 text-xl shadow-[inset_0_3px_6px_rgba(255,255,255,0.45),0_10px_25px_rgba(245,158,11,0.35)] backface-hidden select-none coin-face-front">
-                    <div className="absolute inset-2 rounded-full border border-dashed border-amber-800/40" />
-                    <Sparkles className="h-6 w-6 text-amber-900 mb-0.5" />
-                    <span className="tracking-wider text-sm">HEADS</span>
+                  <div className="absolute inset-0 rounded-full border-[6px] border-amber-600 bg-gradient-to-br from-yellow-300 via-amber-400 to-yellow-600 flex flex-col items-center justify-center font-black text-amber-950 text-xl shadow-[inset_0_4px_8px_rgba(255,255,255,0.6),0_12px_28px_rgba(245,158,11,0.35)] backface-hidden select-none coin-face-front">
+                    <div className="absolute inset-2 rounded-full border-[2px] border-dashed border-amber-900/35" />
+                    <Sparkles className="h-7 w-7 text-amber-900 mb-1 drop-shadow-[0_1.5px_1px_rgba(255,255,255,0.4)]" />
+                    <span className="tracking-wider text-sm font-black drop-shadow-[0_1px_0_rgba(255,255,255,0.3)]">HEADS</span>
                   </div>
                   {/* Back Side (Tails) - Shiny Silver Medallion */}
-                  <div className="absolute inset-0 rounded-full border-4 border-slate-400 bg-gradient-to-br from-slate-100 via-slate-300 to-slate-500 flex flex-col items-center justify-center font-black text-slate-900 text-xl shadow-[inset_0_3px_6px_rgba(255,255,255,0.5),0_10px_25px_rgba(100,116,139,0.3)] backface-hidden select-none coin-face-back">
-                    <div className="absolute inset-2 rounded-full border border-dashed border-slate-500/40" />
-                    <Coins className="h-6 w-6 text-slate-800 mb-0.5" />
-                    <span className="tracking-wider text-sm">TAILS</span>
+                  <div className="absolute inset-0 rounded-full border-[6px] border-slate-400 bg-gradient-to-br from-slate-100 via-slate-300 to-slate-500 flex flex-col items-center justify-center font-black text-slate-900 text-xl shadow-[inset_0_4px_8px_rgba(255,255,255,0.6),0_12px_28px_rgba(100,116,139,0.3)] backface-hidden select-none coin-face-back">
+                    <div className="absolute inset-2 rounded-full border-[2px] border-dashed border-slate-500/45" />
+                    <Coins className="h-7 w-7 text-slate-800 mb-1 drop-shadow-[0_1.5px_1px_rgba(255,255,255,0.5)]" />
+                    <span className="tracking-wider text-sm font-black drop-shadow-[0_1px_0_rgba(255,255,255,0.4)]">TAILS</span>
                   </div>
                 </div>
               </div>
@@ -428,63 +478,19 @@ export function FunTools() {
             <CardContent className="flex flex-col items-center gap-8 w-full max-w-md">
               
               <div className="flex gap-12 justify-center py-6 min-h-[140px] items-center relative z-10">
-                {Array.from({ length: diceCount }).map((_, idx) => (
+                {diceValues.map((val, idx) => (
                   <div 
-                    key={`${idx}-${diceTriggerCount}`} 
+                    key={idx} 
                     className={cn(
-                      "w-20 h-20 relative perspective-800",
-                      isDiceRolling ? "animate-dice-bounce" : ""
+                      "transition-all duration-200",
+                      isDiceRolling ? "animate-bounce scale-[0.98]" : "scale-100"
                     )}
                     style={{
-                      animationDelay: `${idx * 150}ms`
+                      animationDuration: '0.6s',
+                      animationIterationCount: 'infinite',
                     }}
                   >
-                    <div
-                      className="w-full h-full relative transition-transform duration-[1000ms] ease-out preserve-3d"
-                      style={{
-                        transform: `rotateX(${diceRotations[idx]?.x || 0}deg) rotateY(${diceRotations[idx]?.y || 0}deg)`
-                      }}
-                    >
-                      {/* Face 1 (Front) */}
-                      <div className="absolute w-20 h-20 bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-950 border border-primary/35 rounded-2xl flex items-center justify-center shadow-lg backdrop-blur-sm die-face-1 backface-hidden">
-                        <span className="h-3.5 w-3.5 rounded-full bg-cyan-400 shadow-[0_0_8px_rgba(34,211,238,0.85)]" />
-                      </div>
-                      {/* Face 2 (Back) */}
-                      <div className="absolute w-20 h-20 bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-950 border border-primary/35 rounded-2xl grid grid-cols-2 p-4 gap-3 die-face-2 backface-hidden">
-                        <span className="h-3 w-3 rounded-full bg-cyan-400 shadow-[0_0_8px_rgba(34,211,238,0.85)] justify-self-start self-start" />
-                        <span className="h-3 w-3 rounded-full bg-cyan-400 shadow-[0_0_8px_rgba(34,211,238,0.85)] justify-self-end self-end col-start-2 row-start-2" />
-                      </div>
-                      {/* Face 3 (Left) */}
-                      <div className="absolute w-20 h-20 bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-950 border border-primary/35 rounded-2xl grid grid-cols-3 p-3 items-center die-face-3 backface-hidden">
-                        <span className="h-3 w-3 rounded-full bg-cyan-400 shadow-[0_0_8px_rgba(34,211,238,0.85)] justify-self-start" />
-                        <span className="h-3 w-3 rounded-full bg-cyan-400 shadow-[0_0_8px_rgba(34,211,238,0.85)] justify-self-center col-start-2" />
-                        <span className="h-3 w-3 rounded-full bg-cyan-400 shadow-[0_0_8px_rgba(34,211,238,0.85)] justify-self-end col-start-3" />
-                      </div>
-                      {/* Face 4 (Right) */}
-                      <div className="absolute w-20 h-20 bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-950 border border-primary/35 rounded-2xl grid grid-cols-2 p-4.5 gap-4 die-face-4 backface-hidden">
-                        <span className="h-3 w-3 rounded-full bg-cyan-400 shadow-[0_0_8px_rgba(34,211,238,0.85)]" />
-                        <span className="h-3 w-3 rounded-full bg-cyan-400 shadow-[0_0_8px_rgba(34,211,238,0.85)]" />
-                        <span className="h-3 w-3 rounded-full bg-cyan-400 shadow-[0_0_8px_rgba(34,211,238,0.85)]" />
-                        <span className="h-3 w-3 rounded-full bg-cyan-400 shadow-[0_0_8px_rgba(34,211,238,0.85)]" />
-                      </div>
-                      {/* Face 5 (Top) */}
-                      <div className="absolute w-20 h-20 bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-950 border border-primary/35 rounded-2xl grid grid-cols-3 p-3 gap-2.5 die-face-5 backface-hidden">
-                        <span className="h-3 w-3 rounded-full bg-cyan-400 shadow-[0_0_8px_rgba(34,211,238,0.85)] col-start-1" />
-                        <span className="h-3 w-3 rounded-full bg-cyan-400 shadow-[0_0_8px_rgba(34,211,238,0.85)] col-start-3" />
-                        <span className="h-3 w-3 rounded-full bg-cyan-400 shadow-[0_0_8px_rgba(34,211,238,0.85)] col-start-2 row-start-2" />
-                        <span className="h-3 w-3 rounded-full bg-cyan-400 shadow-[0_0_8px_rgba(34,211,238,0.85)] col-start-1 row-start-3" />
-                        <span className="h-3 w-3 rounded-full bg-cyan-400 shadow-[0_0_8px_rgba(34,211,238,0.85)] col-start-3 row-start-3" />
-                      </div>
-                      {/* Face 6 (Bottom) */}
-                      <div className="absolute w-20 h-20 bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-950 border border-primary/35 rounded-2xl grid grid-cols-2 p-4 gap-2.5 die-face-6 backface-hidden">
-                        <span className="h-3 w-3 rounded-full bg-cyan-400 shadow-[0_0_8px_rgba(34,211,238,0.85)]" />
-                        <span className="h-3 w-3 rounded-full bg-cyan-400 shadow-[0_0_8px_rgba(34,211,238,0.85)]" />
-                        <span className="h-3 w-3 rounded-full bg-cyan-400 shadow-[0_0_8px_rgba(34,211,238,0.85)]" />
-                        <span className="h-3 w-3 rounded-full bg-cyan-400 shadow-[0_0_8px_rgba(34,211,238,0.85)]" />
-                        <span className="h-3 w-3 rounded-full bg-cyan-400 shadow-[0_0_8px_rgba(34,211,238,0.85)]" />
-                        <span className="h-3 w-3 rounded-full bg-cyan-400 shadow-[0_0_8px_rgba(34,211,238,0.85)]" />
-                      </div>
-                    </div>
+                    <DieFace value={val} />
                   </div>
                 ))}
               </div>
@@ -551,16 +557,29 @@ export function FunTools() {
                 </div>
               </div>
 
-              <Button onClick={handlePickRandom} className="w-full text-xs font-bold gap-1">
-                Pick Winners
+              <Button onClick={handlePickRandom} disabled={isPicking} className="w-full text-xs font-bold gap-1">
+                {isPicking ? 'Drawing Winners...' : 'Pick Winners'}
               </Button>
 
-              {pickerResult.length > 0 && (
+              {isPicking && (
+                <div className="py-6 text-center animate-pulse">
+                  <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block mb-1">Lottery Drawing...</span>
+                  <div className="inline-block px-4 py-2 bg-primary/10 text-primary font-black rounded-lg border border-primary/20 scale-105 transition-all text-sm font-mono">
+                    {pickerAnimText}
+                  </div>
+                </div>
+              )}
+
+              {pickerResult.length > 0 && !isPicking && (
                 <div className="space-y-2 pt-3 border-t">
                   <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">Winner(s) Selected</span>
                   <div className="flex gap-2 flex-wrap">
                     {pickerResult.map((winner, idx) => (
-                      <Badge key={idx} className="text-xs font-bold py-1 px-2.5 bg-emerald-500 text-white hover:bg-emerald-600">
+                      <Badge 
+                        key={idx} 
+                        className="text-xs font-bold py-1 px-2.5 bg-emerald-500 text-white hover:bg-emerald-600 deal-card-animation"
+                        style={{ animationDelay: `${idx * 120}ms` }}
+                      >
                         {winner}
                       </Badge>
                     ))}
@@ -608,15 +627,26 @@ export function FunTools() {
               </Button>
 
               {generatedTeams.length > 0 && (
-                <div className="space-y-3 pt-3 border-t max-h-48 overflow-y-auto">
+                <div className="space-y-3 pt-3 border-t max-h-48 overflow-y-auto pr-1">
                   <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">Assigned Groups</span>
                   <div className="grid gap-3 sm:grid-cols-2">
                     {generatedTeams.map((team, idx) => (
-                      <div key={idx} className="border rounded-xl p-2.5 bg-muted/20 space-y-1.5">
+                      <div 
+                        key={idx} 
+                        className="border rounded-xl p-2.5 bg-muted/20 space-y-1.5 deal-card-animation"
+                        style={{ animationDelay: `${idx * 150}ms` }}
+                      >
                         <span className="font-bold text-[10px] uppercase text-primary tracking-wider">Team {idx + 1} ({team.length})</span>
                         <div className="flex flex-wrap gap-1">
                           {team.map((name, i) => (
-                            <Badge key={i} variant="secondary" className="text-[10px] font-semibold py-0.5 px-1.5">{name}</Badge>
+                            <Badge 
+                              key={i} 
+                              variant="secondary" 
+                              className="text-[10px] font-semibold py-0.5 px-1.5 deal-card-animation"
+                              style={{ animationDelay: `${idx * 150 + i * 60}ms` }}
+                            >
+                              {name}
+                            </Badge>
                           ))}
                         </div>
                       </div>
@@ -686,6 +716,21 @@ export function FunTools() {
           </Card>
         </div>
       </TabsContent>
+      <style>{`
+        @keyframes dealCard {
+          from {
+            opacity: 0;
+            transform: translateY(12px) scale(0.96);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0) scale(1);
+          }
+        }
+        .deal-card-animation {
+          animation: dealCard 0.38s cubic-bezier(0.175, 0.885, 0.32, 1.275) both;
+        }
+      `}</style>
     </Tabs>
   );
 }

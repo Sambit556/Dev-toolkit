@@ -1,7 +1,7 @@
 'use client';
 
-import React, { useState } from 'react';
-import { FileText, Plus, ArrowUp, ArrowDown, Trash2, Shield, Scissors, Combine, Loader2, Download } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { FileText, Plus, ArrowUp, ArrowDown, Trash2, Shield, Scissors, Combine, Loader2, Download, PenTool, Eraser, Move } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
-import { PDFDocument } from 'pdf-lib';
+import { PDFDocument, degrees } from 'pdf-lib';
 import { encryptPDF } from '@pdfsmaller/pdf-encrypt-lite';
 import { cn } from '@/lib/utils';
 import { jsPDF } from 'jspdf';
@@ -44,6 +44,240 @@ export function PdfTools() {
   );
   const [pdfFontSize, setPdfFontSize] = useState<number>(12);
   const [pdfTitle, setPdfTitle] = useState<string>('Developer Export');
+
+  // --- SIGNATURE STATES ---
+  const [sigFile, setSigFile] = useState<PdfFileEntry | null>(null);
+  const [sigImageSrc, setSigImageSrc] = useState<string | null>(null);
+  const [sigRawUploadedSrc, setSigRawUploadedSrc] = useState<string | null>(null);
+  const [sigRemoveBg, setSigRemoveBg] = useState<boolean>(true);
+  const [sigTolerance, setSigTolerance] = useState<number>(40);
+  
+  const [sigPage, setSigPage] = useState<number>(1);
+  const [sigPosX, setSigPosX] = useState<number>(50); // percentage 0-100
+  const [sigPosY, setSigPosY] = useState<number>(50); // percentage 0-100
+  const [sigScale, setSigScale] = useState<number>(1); // factor 0.1 - 3
+  const [sigRotation, setSigRotation] = useState<number>(0); // degrees -180 to 180
+  const [sigOpacity, setSigOpacity] = useState<number>(1); // 0 to 1
+  
+  const [isDraggingSig, setIsDraggingSig] = useState<boolean>(false);
+  const [sigBrushSize, setSigBrushSize] = useState<number>(3);
+  const [sigAspectRatio, setSigAspectRatio] = useState<number>(2.0); // default 2:1 ratio for canvas
+  
+  const sigCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const isDrawingRef = useRef<boolean>(false);
+
+  useEffect(() => {
+    if (sigRawUploadedSrc) {
+      processSignatureImage(sigRawUploadedSrc, sigRemoveBg, sigTolerance);
+    }
+  }, [sigRawUploadedSrc, sigRemoveBg, sigTolerance]);
+
+  const processSignatureImage = (rawSrc: string, removeBg: boolean, tolerance: number) => {
+    if (!removeBg) {
+      setSigImageSrc(rawSrc);
+      return;
+    }
+    const img = new Image();
+    img.src = rawSrc;
+    img.crossOrigin = 'anonymous';
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = img.width;
+      canvas.height = img.height;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
+      ctx.drawImage(img, 0, 0);
+      try {
+        const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        const data = imgData.data;
+        for (let i = 0; i < data.length; i += 4) {
+          const r = data[i];
+          const g = data[i + 1];
+          const b = data[i + 2];
+          // Calculate RGB Euclidean distance from pure white (255, 255, 255)
+          const dist = Math.sqrt((255 - r) ** 2 + (255 - g) ** 2 + (255 - b) ** 2);
+          if (dist < tolerance) {
+            data[i + 3] = 0; // transparent
+          }
+        }
+        ctx.putImageData(imgData, 0, 0);
+        setSigImageSrc(canvas.toDataURL('image/png'));
+        setSigAspectRatio(img.width / img.height);
+      } catch (err) {
+        console.warn('Background removal canvas error', err);
+        setSigImageSrc(rawSrc);
+      }
+    };
+  };
+
+  const startDrawing = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
+    const canvas = sigCanvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    
+    isDrawingRef.current = true;
+    const rect = canvas.getBoundingClientRect();
+    let clientX = 0;
+    let clientY = 0;
+    
+    if ('touches' in e) {
+      if (e.touches.length === 0) return;
+      clientX = e.touches[0].clientX;
+      clientY = e.touches[0].clientY;
+    } else {
+      clientX = e.clientX;
+      clientY = e.clientY;
+    }
+    
+    const x = clientX - rect.left;
+    const y = clientY - rect.top;
+    
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+    ctx.lineWidth = sigBrushSize;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.strokeStyle = '#000000';
+  };
+
+  const draw = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
+    if (!isDrawingRef.current) return;
+    const canvas = sigCanvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    
+    const rect = canvas.getBoundingClientRect();
+    let clientX = 0;
+    let clientY = 0;
+    
+    if ('touches' in e) {
+      if (e.touches.length === 0) return;
+      clientX = e.touches[0].clientX;
+      clientY = e.touches[0].clientY;
+      if (e.cancelable) e.preventDefault();
+    } else {
+      clientX = e.clientX;
+      clientY = e.clientY;
+    }
+    
+    const x = clientX - rect.left;
+    const y = clientY - rect.top;
+    
+    ctx.lineTo(x, y);
+    ctx.stroke();
+  };
+
+  const stopDrawing = () => {
+    if (!isDrawingRef.current) return;
+    isDrawingRef.current = false;
+    saveCanvasSignature();
+  };
+
+  const clearSigCanvas = () => {
+    const canvas = sigCanvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    setSigImageSrc(null);
+    setSigRawUploadedSrc(null);
+  };
+
+  const saveCanvasSignature = () => {
+    const canvas = sigCanvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    
+    const buffer = new Uint32Array(ctx.getImageData(0, 0, canvas.width, canvas.height).data.buffer);
+    const hasDrawing = buffer.some(color => color !== 0);
+    
+    if (hasDrawing) {
+      const dataUrl = canvas.toDataURL('image/png');
+      setSigImageSrc(dataUrl);
+      setSigRawUploadedSrc(null);
+      setSigAspectRatio(canvas.width / canvas.height);
+    } else {
+      setSigImageSrc(null);
+    }
+  };
+
+  const handleSigFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      const entry = await readPdfFile(file);
+      setSigFile(entry);
+      setSigPage(1);
+      toast.success(`Uploaded ${file.name} for signing`);
+    } catch (err: any) {
+      toast.error(err.message || 'Error uploading PDF file');
+    }
+  };
+
+  const handleSigImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === 'string') {
+        setSigRawUploadedSrc(reader.result);
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const executeAddSignature = async () => {
+    if (!sigFile) {
+      toast.error('Please upload a PDF file to sign');
+      return;
+    }
+    if (!sigImageSrc) {
+      toast.error('Please draw or upload a signature first');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const pdfDoc = await PDFDocument.load(sigFile.arrayBuffer);
+      const totalPages = pdfDoc.getPageCount();
+      const pageIndex = Math.max(0, Math.min(totalPages - 1, sigPage - 1));
+      const page = pdfDoc.getPages()[pageIndex];
+      const { width: pageWidth, height: pageHeight } = page.getSize();
+      
+      const response = await fetch(sigImageSrc);
+      const imageBytes = await response.arrayBuffer();
+      const sigImg = await pdfDoc.embedPng(imageBytes);
+      
+      const aspect = sigAspectRatio || (sigImg.width / sigImg.height);
+      const defaultWidth = 150;
+      const drawWidth = defaultWidth * sigScale;
+      const drawHeight = (defaultWidth / aspect) * sigScale;
+      
+      const pdfX = (sigPosX / 100) * pageWidth - drawWidth / 2;
+      const pdfY = (1 - (sigPosY / 100)) * pageHeight - drawHeight / 2;
+      
+      page.drawImage(sigImg, {
+        x: pdfX,
+        y: pdfY,
+        width: drawWidth,
+        height: drawHeight,
+        rotate: degrees(sigRotation),
+        opacity: sigOpacity,
+      });
+
+      const signedBytes = await pdfDoc.save();
+      downloadPdf(signedBytes, `signed_${sigFile.name}`);
+      toast.success('Signature successfully embedded in PDF!');
+    } catch (err: any) {
+      console.error(err);
+      toast.error(`Failed to add signature: ${err.message || err}`);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleGeneratePdf = () => {
     try {
@@ -375,11 +609,11 @@ export function PdfTools() {
   };
 
   // Support reading tab from query search params
-  React.useEffect(() => {
+  useEffect(() => {
     if (typeof window !== 'undefined') {
       const params = new URLSearchParams(window.location.search);
       const tabParam = params.get('tab');
-      if (tabParam && ['merge', 'split', 'protect', 'text-to-pdf'].includes(tabParam)) {
+      if (tabParam && ['merge', 'split', 'protect', 'text-to-pdf', 'signature'].includes(tabParam)) {
         setActiveTab(tabParam);
       }
     }
@@ -388,7 +622,7 @@ export function PdfTools() {
   return (
     <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
       <div className="flex justify-center">
-        <TabsList className="grid grid-cols-4 w-full max-w-3xl h-auto p-1 gap-1">
+        <TabsList className="grid grid-cols-5 w-full max-w-4xl h-auto p-1 gap-1">
           <TabsTrigger value="merge" className="gap-2 py-2 text-xs">
             <Combine className="h-4 w-4" />
             Merge PDF
@@ -400,6 +634,10 @@ export function PdfTools() {
           <TabsTrigger value="protect" className="gap-2 py-2 text-xs">
             <Shield className="h-4 w-4" />
             Protect PDF
+          </TabsTrigger>
+          <TabsTrigger value="signature" className="gap-2 py-2 text-xs">
+            <PenTool className="h-4 w-4" />
+            Add Signature
           </TabsTrigger>
           <TabsTrigger value="text-to-pdf" className="gap-2 py-2 text-xs">
             <FileText className="h-4 w-4" />
@@ -734,6 +972,337 @@ export function PdfTools() {
               )}
             </CardContent>
           </Card>
+        </div>
+      </TabsContent>
+
+      {/* --- ADD SIGNATURE TAB --- */}
+      <TabsContent value="signature" className="m-0 space-y-6 animate-fade-in">
+        <div className="grid gap-6 md:grid-cols-12">
+          {/* Controls Column */}
+          <div className="md:col-span-5 space-y-4">
+            
+            {/* Step 1: Target Document Uploader */}
+            <Card className="border bg-card/60 backdrop-blur-sm shadow-sm">
+              <CardContent className="p-4 space-y-3">
+                <div className="flex justify-between items-center border-b pb-2">
+                  <Label className="font-extrabold text-sm">1. Target PDF Document</Label>
+                  {sigFile && (
+                    <Button variant="ghost" size="icon-sm" onClick={() => setSigFile(null)} className="h-6 text-destructive text-[10px] font-bold">
+                      Remove
+                    </Button>
+                  )}
+                </div>
+
+                {!sigFile ? (
+                  <div className="border border-dashed rounded-xl p-6 text-center hover:bg-muted/40 transition-colors relative cursor-pointer">
+                    <input
+                      type="file"
+                      accept=".pdf"
+                      onChange={handleSigFileUpload}
+                      className="absolute inset-0 opacity-0 cursor-pointer"
+                    />
+                    <FileText className="h-8 w-8 text-primary mx-auto mb-2" />
+                    <span className="text-xs font-bold text-muted-foreground block">Upload target PDF to sign</span>
+                    <span className="text-[10px] text-muted-foreground/60 block mt-1">Files are processed 100% locally</span>
+                  </div>
+                ) : (
+                  <div className="flex justify-between items-center text-xs p-2 bg-muted/40 rounded-lg border">
+                    <div className="min-w-0">
+                      <p className="font-bold truncate max-w-[200px]">{sigFile.name}</p>
+                      <p className="text-[10px] text-muted-foreground mt-0.5">{formatSize(sigFile.size)} • {sigFile.pageCount} Pages</p>
+                    </div>
+                    <Badge variant="secondary" className="font-mono h-6 font-bold">{sigFile.pageCount} Pgs</Badge>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Step 2: Signature Input Generation */}
+            <Card className="border bg-card/60 backdrop-blur-sm shadow-sm">
+              <CardContent className="p-4 space-y-4">
+                <div className="border-b pb-2 flex justify-between items-center">
+                  <Label className="font-extrabold text-sm">2. Create Your Signature</Label>
+                  {sigImageSrc && (
+                    <Badge className="bg-emerald-500 text-white text-[8px] font-bold">Ready</Badge>
+                  )}
+                </div>
+
+                <Tabs defaultValue="draw" className="w-full">
+                  <TabsList className="grid grid-cols-2 w-full h-8.5 p-0.5">
+                    <TabsTrigger value="draw" className="text-[10.5px] py-1 gap-1"><PenTool className="h-3 w-3" /> Draw Pen</TabsTrigger>
+                    <TabsTrigger value="upload" className="text-[10.5px] py-1 gap-1"><Download className="h-3 w-3" /> Upload Image</TabsTrigger>
+                  </TabsList>
+
+                  {/* Draw Pad Canvas */}
+                  <TabsContent value="draw" className="space-y-3 mt-3">
+                    <div className="relative border rounded-xl overflow-hidden bg-white shadow-sm flex justify-center items-center">
+                      <canvas
+                        ref={sigCanvasRef}
+                        width={320}
+                        height={160}
+                        onMouseDown={startDrawing}
+                        onMouseMove={draw}
+                        onMouseUp={stopDrawing}
+                        onMouseLeave={stopDrawing}
+                        onTouchStart={startDrawing}
+                        onTouchMove={draw}
+                        onTouchEnd={stopDrawing}
+                        className="bg-transparent touch-none cursor-crosshair"
+                      />
+                    </div>
+                    
+                    <div className="flex justify-between items-center gap-2">
+                      <div className="flex items-center gap-1.5 text-xs flex-1">
+                        <Label htmlFor="sig-brush-size" className="text-[10px] text-muted-foreground shrink-0">Pen: {sigBrushSize}px</Label>
+                        <input
+                          type="range"
+                          id="sig-brush-size"
+                          min={1}
+                          max={10}
+                          value={sigBrushSize}
+                          onChange={(e) => setSigBrushSize(Number(e.target.value))}
+                          className="w-full accent-primary h-1 rounded cursor-pointer bg-muted"
+                        />
+                      </div>
+                      <Button type="button" variant="outline" size="sm" onClick={clearSigCanvas} className="h-7 text-xs font-bold gap-1 shrink-0">
+                        <Eraser className="h-3.5 w-3.5" /> Clear
+                      </Button>
+                    </div>
+                  </TabsContent>
+
+                  {/* Image Uploader */}
+                  <TabsContent value="upload" className="space-y-3 mt-3 text-xs">
+                    <div className="border border-dashed rounded-xl p-4 text-center hover:bg-muted/40 transition-colors relative cursor-pointer">
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={handleSigImageUpload}
+                        className="absolute inset-0 opacity-0 cursor-pointer"
+                      />
+                      <Plus className="h-6 w-6 text-primary mx-auto mb-1" />
+                      <span className="text-[11px] font-bold text-muted-foreground block">Select signature image</span>
+                    </div>
+
+                    {sigRawUploadedSrc && (
+                      <div className="space-y-3.5 border-t pt-3">
+                        <div className="flex items-center justify-between">
+                          <Label htmlFor="remove-bg-switch" className="cursor-pointer">Remove Background (Make Transparent)</Label>
+                          <input
+                            type="checkbox"
+                            id="remove-bg-switch"
+                            checked={sigRemoveBg}
+                            onChange={(e) => setSigRemoveBg(e.target.checked)}
+                            className="accent-primary h-4 w-4 cursor-pointer"
+                          />
+                        </div>
+
+                        {sigRemoveBg && (
+                          <div className="space-y-1">
+                            <div className="flex justify-between text-[10px]">
+                              <Label htmlFor="tolerance-slider">Color Tolerance</Label>
+                              <span className="font-mono font-bold">{sigTolerance}</span>
+                            </div>
+                            <input
+                              type="range"
+                              id="tolerance-slider"
+                              min={10}
+                              max={150}
+                              value={sigTolerance}
+                              onChange={(e) => setSigTolerance(Number(e.target.value))}
+                              className="w-full accent-primary h-1.5 rounded cursor-pointer bg-muted"
+                            />
+                            <span className="text-[9px] text-muted-foreground leading-normal block">Adjust slider to remove grey/dirty shadows from signed papers.</span>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </TabsContent>
+                </Tabs>
+
+                {/* Signature Preview */}
+                {sigImageSrc && (
+                  <div className="border border-dashed rounded-xl p-2.5 bg-muted/15 flex flex-col items-center justify-center space-y-1.5">
+                    <span className="text-[8px] font-black text-muted-foreground/60 uppercase tracking-widest block">Signature Output Preview</span>
+                    <div className="bg-white border rounded p-2 max-h-24 flex items-center justify-center shadow-inner relative overflow-hidden">
+                      <img src={sigImageSrc} alt="Signature Preview" className="max-h-20 object-contain" />
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Step 3: Embed Settings & Controls */}
+            {sigFile && sigImageSrc && (
+              <Card className="border bg-card/60 backdrop-blur-sm shadow-sm">
+                <CardContent className="p-4 space-y-4 text-xs">
+                  <div className="border-b pb-2">
+                    <Label className="font-extrabold text-sm">3. Overlay Adjustments</Label>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1.5">
+                      <Label htmlFor="sig-page-select">Target Page</Label>
+                      <Input
+                        id="sig-page-select"
+                        type="number"
+                        min={1}
+                        max={sigFile.pageCount}
+                        value={sigPage}
+                        onChange={(e) => setSigPage(Math.max(1, Math.min(sigFile.pageCount, parseInt(e.target.value) || 1)))}
+                        className="h-8.5 text-xs font-mono"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label htmlFor="sig-opacity">Opacity ({Math.round(sigOpacity * 100)}%)</Label>
+                      <input
+                        type="range"
+                        id="sig-opacity"
+                        min={0.1}
+                        max={1}
+                        step={0.05}
+                        value={sigOpacity}
+                        onChange={(e) => setSigOpacity(parseFloat(e.target.value))}
+                        className="w-full accent-primary h-1 rounded cursor-pointer bg-muted mt-2"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3 pt-1">
+                    <div className="space-y-1">
+                      <Label htmlFor="sig-scale">Scale ({Math.round(sigScale * 100)}%)</Label>
+                      <input
+                        type="range"
+                        id="sig-scale"
+                        min={0.2}
+                        max={3.0}
+                        step={0.05}
+                        value={sigScale}
+                        onChange={(e) => setSigScale(parseFloat(e.target.value))}
+                        className="w-full accent-primary h-1 rounded cursor-pointer bg-muted mt-1.5"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label htmlFor="sig-rotate">Rotation ({sigRotation}°)</Label>
+                      <input
+                        type="range"
+                        id="sig-rotate"
+                        min={-180}
+                        max={180}
+                        step={5}
+                        value={sigRotation}
+                        onChange={(e) => setSigRotation(parseInt(e.target.value))}
+                        className="w-full accent-primary h-1 rounded cursor-pointer bg-muted mt-1.5"
+                      />
+                    </div>
+                  </div>
+
+                  <Button onClick={executeAddSignature} className="w-full text-xs font-bold gap-1.5 h-9" disabled={loading}>
+                    {loading ? <Loader2 className="h-4 w-4 animate-spin mr-1.5" /> : null}
+                    Embed Signature & Download
+                  </Button>
+                </CardContent>
+              </Card>
+            )}
+          </div>
+
+          {/* Visual Placement Layout Sheet */}
+          <div className="md:col-span-7 space-y-4">
+            <Card className="border shadow-md h-full flex flex-col justify-center items-center py-6 min-h-[460px] relative overflow-hidden bg-slate-950/5">
+              <CardContent className="flex flex-col items-center gap-4 w-full">
+                <div className="flex items-center gap-1.5 text-xs text-muted-foreground border-b pb-2 w-full justify-between px-2">
+                  <span className="font-extrabold flex items-center gap-1.5">
+                    <Move className="h-4 w-4 text-primary" /> Visual Signature Editor
+                  </span>
+                  {sigFile && (
+                    <span className="font-mono text-[10px] bg-muted/40 px-2 py-0.5 rounded border">
+                      Coords: X: {Math.round(sigPosX)}% • Y: {Math.round(sigPosY)}%
+                    </span>
+                  )}
+                </div>
+
+                {sigFile ? (
+                  <div className="relative w-full max-w-[340px] flex justify-center py-4 select-none">
+                    
+                    {/* Interactive A4 Document Container */}
+                    <div
+                      onMouseMove={(e) => {
+                        if (!isDraggingSig) return;
+                        const rect = e.currentTarget.getBoundingClientRect();
+                        const x = ((e.clientX - rect.left) / rect.width) * 100;
+                        const y = ((e.clientY - rect.top) / rect.height) * 100;
+                        setSigPosX(Math.max(0, Math.min(100, x)));
+                        setSigPosY(Math.max(0, Math.min(100, y)));
+                      }}
+                      onTouchMove={(e) => {
+                        if (!isDraggingSig) return;
+                        if (e.touches.length === 0) return;
+                        const rect = e.currentTarget.getBoundingClientRect();
+                        const x = ((e.touches[0].clientX - rect.left) / rect.width) * 100;
+                        const y = ((e.touches[0].clientY - rect.top) / rect.height) * 100;
+                        setSigPosX(Math.max(0, Math.min(100, x)));
+                        setSigPosY(Math.max(0, Math.min(100, y)));
+                      }}
+                      onMouseUp={() => setIsDraggingSig(false)}
+                      onTouchEnd={() => setIsDraggingSig(false)}
+                      onMouseLeave={() => setIsDraggingSig(false)}
+                      style={{ aspectRatio: '595/842' }}
+                      className="relative w-full border bg-white rounded shadow-lg overflow-hidden flex flex-col justify-between p-4"
+                    >
+                      {/* Document Watermark background grid */}
+                      <div className="absolute inset-0 flex flex-col justify-between p-8 pointer-events-none opacity-[0.03] select-none text-black font-extrabold text-center uppercase tracking-widest">
+                        <span>DOCUMENT HEADER BOUNDS</span>
+                        <div className="text-lg">PAGE {sigPage} OF {sigFile.pageCount}</div>
+                        <span>DOCUMENT FOOTER BOUNDS</span>
+                      </div>
+
+                      {/* Guide margins */}
+                      <div className="absolute inset-4 border border-dashed border-slate-900/10 pointer-events-none rounded" />
+
+                      {/* Embedded Drag-and-Drop Signature Box Overlay */}
+                      {sigImageSrc && (
+                        <div
+                          onMouseDown={(e) => {
+                            e.preventDefault();
+                            setIsDraggingSig(true);
+                          }}
+                          onTouchStart={(e) => {
+                            setIsDraggingSig(true);
+                          }}
+                          style={{
+                            position: 'absolute',
+                            left: `${sigPosX}%`,
+                            top: `${sigPosY}%`,
+                            transform: `translate(-50%, -50%) rotate(${sigRotation}deg) scale(${sigScale})`,
+                            opacity: sigOpacity,
+                            cursor: isDraggingSig ? 'grabbing' : 'grab',
+                            transition: isDraggingSig ? 'none' : 'transform 0.15s ease-out'
+                          }}
+                          className={cn(
+                            "p-1 border border-dashed rounded bg-primary/5 hover:border-primary/80 transition-colors select-none z-20 shrink-0",
+                            isDraggingSig ? "border-primary bg-primary/10 shadow-md ring-2 ring-primary/20 scale-105" : "border-slate-300"
+                          )}
+                        >
+                          <img
+                            src={sigImageSrc}
+                            alt="Signature overlay"
+                            style={{
+                              width: '80px',
+                              height: `${80 / sigAspectRatio}px`
+                            }}
+                            className="object-contain pointer-events-none"
+                          />
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="text-center py-32 text-xs text-muted-foreground/50 italic border border-dashed rounded-xl bg-card w-full">
+                    Upload a PDF document to view interactive signature positioning
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
         </div>
       </TabsContent>
 

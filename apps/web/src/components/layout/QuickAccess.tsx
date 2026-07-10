@@ -23,6 +23,42 @@ export function QuickAccess() {
   const [dragOffset, setDragOffset] = useState<PanelPos>({ x: 0, y: 0 });
   const [draggingTool, setDraggingTool] = useState<ActiveTool>(null);
 
+  // Quick Dock Pos state and dragging refs
+  const [dockPos, setDockPos] = useState<PanelPos>({ x: 16, y: 250 });
+  const [isDraggingDock, setIsDraggingDock] = useState(false);
+  const dockDragOffsetRef = useRef<PanelPos>({ x: 0, y: 0 });
+  const dockRef = useRef<HTMLDivElement>(null);
+
+  // Load positions from localStorage on mount
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const savedDock = localStorage.getItem('devkits-quick-dock-pos');
+      if (savedDock) {
+        try { setDockPos(JSON.parse(savedDock)); } catch {}
+      }
+    }
+  }, []);
+
+  const handleDockMouseDown = (e: React.MouseEvent, dockEl: HTMLElement) => {
+    setIsDraggingDock(true);
+    const rect = dockEl.getBoundingClientRect();
+    dockDragOffsetRef.current = {
+      x: e.clientX - rect.left,
+      y: e.clientY - rect.top,
+    };
+  };
+
+  const handleDockTouchStart = (e: React.TouchEvent, dockEl: HTMLElement) => {
+    if (e.touches.length === 0) return;
+    setIsDraggingDock(true);
+    const touch = e.touches[0];
+    const rect = dockEl.getBoundingClientRect();
+    dockDragOffsetRef.current = {
+      x: touch.clientX - rect.left,
+      y: touch.clientY - rect.top,
+    };
+  };
+
   // Dragging logic
   const handleMouseDown = (tool: ActiveTool, e: React.MouseEvent, panelEl: HTMLElement) => {
     setDraggingTool(tool);
@@ -44,37 +80,63 @@ export function QuickAccess() {
     });
   };
 
+  // Dragging effect for both individual panels and dock
   useEffect(() => {
-    if (!draggingTool) return;
+    if (!draggingTool && !isDraggingDock) return;
 
     const handleMouseMove = (e: MouseEvent) => {
-      let newX = e.clientX - dragOffset.x;
-      let newY = e.clientY - dragOffset.y;
+      if (draggingTool) {
+        let newX = e.clientX - dragOffset.x;
+        let newY = e.clientY - dragOffset.y;
 
-      // Keep in viewport
-      newX = Math.max(10, Math.min(newX, window.innerWidth - 300));
-      newY = Math.max(10, Math.min(newY, window.innerHeight - 300));
+        newX = Math.max(10, Math.min(newX, window.innerWidth - 300));
+        newY = Math.max(10, Math.min(newY, window.innerHeight - 300));
 
-      if (draggingTool === 'calc') setCalcPos({ x: newX, y: newY });
-      if (draggingTool === 'epoch') setEpochPos({ x: newX, y: newY });
-      if (draggingTool === 'json') setJsonPos({ x: newX, y: newY });
+        if (draggingTool === 'calc') setCalcPos({ x: newX, y: newY });
+        if (draggingTool === 'epoch') setEpochPos({ x: newX, y: newY });
+        if (draggingTool === 'json') setJsonPos({ x: newX, y: newY });
+      } else if (isDraggingDock) {
+        let newX = e.clientX - dockDragOffsetRef.current.x;
+        let newY = e.clientY - dockDragOffsetRef.current.y;
+
+        newX = Math.max(5, Math.min(newX, window.innerWidth - 65));
+        newY = Math.max(5, Math.min(newY, window.innerHeight - 200));
+
+        setDockPos({ x: newX, y: newY });
+      }
     };
 
     const handleTouchMove = (e: TouchEvent) => {
       if (e.touches.length === 0) return;
       const touch = e.touches[0];
-      let newX = touch.clientX - dragOffset.x;
-      let newY = touch.clientY - dragOffset.y;
+      
+      if (draggingTool) {
+        let newX = touch.clientX - dragOffset.x;
+        let newY = touch.clientY - dragOffset.y;
 
-      newX = Math.max(10, Math.min(newX, window.innerWidth - 300));
-      newY = Math.max(10, Math.min(newY, window.innerHeight - 300));
+        newX = Math.max(10, Math.min(newX, window.innerWidth - 300));
+        newY = Math.max(10, Math.min(newY, window.innerHeight - 300));
 
-      if (draggingTool === 'calc') setCalcPos({ x: newX, y: newY });
-      if (draggingTool === 'epoch') setEpochPos({ x: newX, y: newY });
-      if (draggingTool === 'json') setJsonPos({ x: newX, y: newY });
+        if (draggingTool === 'calc') setCalcPos({ x: newX, y: newY });
+        if (draggingTool === 'epoch') setEpochPos({ x: newX, y: newY });
+        if (draggingTool === 'json') setJsonPos({ x: newX, y: newY });
+      } else if (isDraggingDock) {
+        let newX = touch.clientX - dockDragOffsetRef.current.x;
+        let newY = touch.clientY - dockDragOffsetRef.current.y;
+
+        newX = Math.max(5, Math.min(newX, window.innerWidth - 65));
+        newY = Math.max(5, Math.min(newY, window.innerHeight - 200));
+
+        setDockPos({ x: newX, y: newY });
+      }
     };
 
     const handleDragEnd = () => {
+      if (isDraggingDock) {
+        setIsDraggingDock(false);
+        // Persist dock position
+        localStorage.setItem('devkits-quick-dock-pos', JSON.stringify(dockPos));
+      }
       setDraggingTool(null);
     };
 
@@ -89,7 +151,7 @@ export function QuickAccess() {
       window.removeEventListener('touchmove', handleTouchMove);
       window.removeEventListener('touchend', handleDragEnd);
     };
-  }, [draggingTool, dragOffset]);
+  }, [draggingTool, dragOffset, isDraggingDock, dockPos]);
 
   const toggleTool = (tool: ActiveTool) => {
     setActiveTool((prev) => (prev === tool ? null : tool));
@@ -97,10 +159,27 @@ export function QuickAccess() {
 
   return (
     <>
-      {/* Floating Vertical Launch Dock (Left Side) */}
-      <div className="fixed left-4 top-1/2 -translate-y-1/2 z-40 flex flex-col gap-3.5 bg-background/70 dark:bg-slate-900/80 backdrop-blur-md border border-border/80 p-2 rounded-2xl shadow-2xl animate-fade-in select-none">
-        <div className="text-[8px] uppercase tracking-widest font-black text-center text-muted-foreground/60 border-b pb-1 px-1">
-          Quick
+      {/* Floating Vertical Launch Dock (Draggable toolbar) */}
+      <div 
+        ref={dockRef}
+        style={{
+          position: 'fixed',
+          left: `${dockPos.x}px`,
+          top: `${dockPos.y}px`,
+          zIndex: 40
+        }}
+        className="flex flex-col gap-3.5 bg-background/70 dark:bg-slate-900/80 backdrop-blur-md border border-border/80 p-2 rounded-2xl shadow-2xl animate-fade-in select-none"
+      >
+        <div 
+          onMouseDown={(e) => handleDockMouseDown(e, dockRef.current!)}
+          onTouchStart={(e) => handleDockTouchStart(e, dockRef.current!)}
+          className="cursor-move flex flex-col items-center gap-1 border-b pb-2 px-1 hover:text-primary transition-colors text-muted-foreground/80"
+          title="Drag to reposition toolbar"
+        >
+          <GripHorizontal className="h-3.5 w-3.5" />
+          <div className="text-[8px] uppercase tracking-widest font-black text-center">
+            Quick
+          </div>
         </div>
         <button
           onClick={() => toggleTool('calc')}

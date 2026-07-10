@@ -244,7 +244,13 @@ export function DiffCheckerTool() {
                   fontSize: 13,
                   fontFamily: 'Consolas, Monaco, "Courier New", monospace',
                   minimap: { enabled: false },
-                  scrollbar: { verticalScrollbarSize: 8, horizontalScrollbarSize: 8 },
+                  scrollbar: {
+                    vertical: 'visible',
+                    horizontal: 'visible',
+                    verticalScrollbarSize: 12,
+                    horizontalScrollbarSize: 12,
+                    useShadows: true,
+                  },
                   readOnly: true,
                 }}
               />

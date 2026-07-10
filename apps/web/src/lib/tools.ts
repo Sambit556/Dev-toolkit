@@ -21,6 +21,7 @@ import {
   QrCode,
   FileText,
   Lock,
+  Timer,
 } from 'lucide-react';
 
 export const toolCategories = [
@@ -30,7 +31,7 @@ export const toolCategories = [
       { href: '/json', label: 'JSON Viewer', icon: Braces, desc: 'Format and explore JSON text' },
       { href: '/jwt', label: 'JWT Decoder', icon: Shield, desc: 'Decode & encode tokens' },
       { href: '/diff-checker', label: 'Diff Checker', icon: ArrowRightLeft, desc: 'Compare text and code side-by-side' },
-      { href: '/html-preview', label: 'HTML Sandbox', icon: Code2, desc: 'Live preview HTML/CSS/JS playground' },
+      { href: '/html-preview', label: 'HTML / CSS / JS Sandbox', icon: Code2, desc: 'Live preview HTML/CSS/JS playground' },
     ],
   },
   {
@@ -46,6 +47,7 @@ export const toolCategories = [
   {
     name: 'Generators',
     items: [
+      { href: '/calendar', label: 'Calendar Planner', icon: CalendarRange, desc: 'Interactive calendar, task scheduler' },
       { href: '/cron', label: 'Cron Generator', icon: CalendarRange, desc: 'Visual cron scheduler' },
       { href: '/security-tools', label: 'Security & Key Suite', icon: Lock, desc: 'Passwords, Keys, HMAC, BCrypt, UUIDs' },
       { href: '/qr-barcode', label: 'QR & Barcode Creator', icon: QrCode, desc: 'Generate QR codes and barcodes' },
@@ -61,6 +63,7 @@ export const toolCategories = [
       { href: '/unit-converter', label: 'Unit Converter', icon: Ruler, desc: 'Length, weight, area conversions' },
       { href: '/color-picker', label: 'Color Tool Suite', icon: Palette, desc: 'Picker, contrast, random palettes' },
       { href: '/image-tool', label: 'Image Optimizer', icon: Sparkles, desc: 'Compress, scale, filter' },
+      { href: '/countdown', label: 'Countdown & Stopwatch', icon: Timer, desc: 'Visual timer and lap recorder' },
     ],
   },
   {

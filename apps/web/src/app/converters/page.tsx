@@ -29,7 +29,7 @@ export default function ConvertersPage() {
       <div className="mb-6">
         <div className="flex items-center gap-2 mb-1">
           <RefreshCw className="h-5 w-5 text-primary" />
-          <h1 className="text-2xl font-bold">Data & Document Converters</h1>
+          <h1 className="text-2xl font-bold">Data Converters</h1>
         </div>
         <p className="text-muted-foreground text-sm">
           A collection of format converters to translate CSV grids, XML nodes, Markdown documents, 

@@ -40,6 +40,11 @@ export function StickyNotes() {
   const [activeDragId, setActiveDragId] = useState<string | null>(null);
   const dragOffsetRef = useRef({ x: 0, y: 0 });
 
+  // Floating trigger Y position state
+  const [triggerY, setTriggerY] = useState(250);
+  const [isDraggingTrigger, setIsDraggingTrigger] = useState(false);
+  const triggerDragStartRef = useRef<{ y: number; triggerY: number } | null>(null);
+
   // Load from local storage
   useEffect(() => {
     const saved = localStorage.getItem('devkits-sticky-notes');
@@ -50,7 +55,90 @@ export function StickyNotes() {
         console.error('Failed to parse sticky notes', e);
       }
     }
+    const savedY = localStorage.getItem('devkits-sticky-trigger-y');
+    if (savedY) {
+      setTriggerY(Number(savedY));
+    }
   }, []);
+
+  // Draggable Sticky notes trigger handlers
+  const startDragTrigger = (e: React.MouseEvent) => {
+    e.preventDefault();
+    setIsDraggingTrigger(true);
+    triggerDragStartRef.current = {
+      y: e.clientY,
+      triggerY: triggerY
+    };
+  };
+
+  const startTouchDragTrigger = (e: React.TouchEvent) => {
+    if (e.touches.length === 0) return;
+    setIsDraggingTrigger(true);
+    triggerDragStartRef.current = {
+      y: e.touches[0].clientY,
+      triggerY: triggerY
+    };
+  };
+
+  useEffect(() => {
+    if (!isDraggingTrigger) return;
+
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!triggerDragStartRef.current) return;
+      const deltaY = e.clientY - triggerDragStartRef.current.y;
+      let newY = triggerDragStartRef.current.triggerY + deltaY;
+      
+      const screenHeight = window.innerHeight;
+      newY = Math.max(50, Math.min(newY, screenHeight - 100));
+      setTriggerY(newY);
+    };
+
+    const handleTouchMove = (e: TouchEvent) => {
+      if (e.touches.length === 0 || !triggerDragStartRef.current) return;
+      const deltaY = e.touches[0].clientY - triggerDragStartRef.current.y;
+      let newY = triggerDragStartRef.current.triggerY + deltaY;
+      
+      const screenHeight = window.innerHeight;
+      newY = Math.max(50, Math.min(newY, screenHeight - 100));
+      setTriggerY(newY);
+    };
+
+    const handleDragEnd = (e: MouseEvent) => {
+      setIsDraggingTrigger(false);
+      if (triggerDragStartRef.current) {
+        const deltaY = Math.abs(e.clientY - triggerDragStartRef.current.y);
+        if (deltaY < 5) {
+          setIsOpen((prev) => !prev);
+        }
+      }
+      triggerDragStartRef.current = null;
+      localStorage.setItem('devkits-sticky-trigger-y', String(triggerY));
+    };
+
+    const handleTouchEnd = (e: TouchEvent) => {
+      setIsDraggingTrigger(false);
+      if (triggerDragStartRef.current && e.changedTouches.length > 0) {
+        const deltaY = Math.abs(e.changedTouches[0].clientY - triggerDragStartRef.current.y);
+        if (deltaY < 5) {
+          setIsOpen((prev) => !prev);
+        }
+      }
+      triggerDragStartRef.current = null;
+      localStorage.setItem('devkits-sticky-trigger-y', String(triggerY));
+    };
+
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleDragEnd);
+    window.addEventListener('touchmove', handleTouchMove);
+    window.addEventListener('touchend', handleTouchEnd);
+
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleDragEnd);
+      window.removeEventListener('touchmove', handleTouchMove);
+      window.removeEventListener('touchend', handleTouchEnd);
+    };
+  }, [isDraggingTrigger, triggerY]);
 
   // Save to local storage
   const saveNotes = (updatedNotes: StickyNoteData[]) => {
@@ -183,26 +271,41 @@ export function StickyNotes() {
   return (
     <TooltipProvider>
       {/* Floating Collapsible Stickies Dock - Placed defaultly on Right Side */}
-      <div className="fixed right-0 top-1/4 z-40 flex flex-col items-end">
+      <div 
+        style={{
+          position: 'fixed',
+          right: 0,
+          top: `${triggerY}px`,
+          zIndex: 40
+        }}
+        className="flex flex-col items-end"
+      >
         <Tooltip>
           <TooltipTrigger asChild>
             <button
-              onClick={() => setIsOpen(!isOpen)}
+              onMouseDown={startDragTrigger}
+              onTouchStart={startTouchDragTrigger}
               className={cn(
-                "flex items-center gap-2 px-3 py-2 bg-primary text-primary-foreground font-semibold rounded-l-xl shadow-2xl transition-all duration-300 border-y border-l border-primary/20",
+                "flex items-center gap-2 pl-2 pr-3 py-2 bg-primary text-primary-foreground font-semibold rounded-l-xl shadow-2xl transition-all duration-300 border-y border-l border-primary/20 cursor-ns-resize select-none",
                 isOpen ? "translate-x-0" : "hover:-translate-x-1"
               )}
             >
-              <StickyNote className="h-4 w-4" />
+              {/* Drag handles indicator */}
+              <div className="flex flex-col gap-0.5 opacity-60">
+                <span className="h-0.5 w-0.5 bg-white rounded-full" />
+                <span className="h-0.5 w-0.5 bg-white rounded-full" />
+                <span className="h-0.5 w-0.5 bg-white rounded-full" />
+              </div>
+              <StickyNote className="h-4 w-4 shrink-0" />
               <span className="text-xs hidden sm:inline">Sticky Notes</span>
               {notes.length > 0 && (
-                <span className="flex h-4 w-4 items-center justify-center rounded-full bg-destructive text-[9px] font-black text-white">
+                <span className="flex h-4 w-4 items-center justify-center rounded-full bg-destructive text-[9px] font-black text-white shrink-0">
                   {notes.length}
                 </span>
               )}
             </button>
           </TooltipTrigger>
-          <TooltipContent side="left" className="text-xs">Toggle Sticky Notes Manager</TooltipContent>
+          <TooltipContent side="left" className="text-xs">Toggle / Drag Sticky Notes Manager</TooltipContent>
         </Tooltip>
       </div>
 

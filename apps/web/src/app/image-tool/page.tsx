@@ -16,9 +16,9 @@ const ImageTool = dynamic(
 );
 
 export const metadata: Metadata = {
-  title: 'Image Compression & Enhancer',
+  title: 'Image Compressor, Enhancer & Metadata Viewer',
   description:
-    'Compress, resize, and enhance images client-side. Convert format, adjust compression quality, apply brightness/contrast/saturation filters fully locally.',
+    'Compress, resize, enhance images and view camera EXIF metadata client-side. Convert formats, adjust quality, extract dominant color palettes fully locally.',
   alternates: { canonical: '/image-tool' },
 };
 
@@ -29,11 +29,11 @@ export default function ImagePage() {
       <div className="mb-6">
         <div className="flex items-center gap-2 mb-1">
           <Sparkles className="h-5 w-5 text-primary" />
-          <h1 className="text-2xl font-bold">Image Compression & Enhancer</h1>
+          <h1 className="text-2xl font-bold">Image Compressor, Enhancer & Metadata Viewer</h1>
         </div>
         <p className="text-muted-foreground text-sm">
-          Optimize, scale, and adjust your images fully client-side. 
-          Modify quality, swap formats (JPEG, PNG, WebP), and apply color filters locally without any server lag.
+          Optimize, scale, extract dominant color palettes, and inspect JPEG camera EXIF tags fully client-side. 
+          Modify quality factor, swap formats (JPEG, PNG, WebP), and apply enhancement filters locally without any server lag.
         </p>
       </div>
 

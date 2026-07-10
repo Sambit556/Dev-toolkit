@@ -49,6 +49,19 @@ export function JwtTool() {
   const [isVerified, setIsVerified] = useState<boolean | null>(null);
   const [verifying, setVerifying] = useState(false);
 
+  // Active Tab state
+  const [activeTab, setActiveTab] = useState('decode');
+
+  // Real-time ticking state
+  const [timeTick, setTimeTick] = useState(Date.now());
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setTimeTick(Date.now());
+    }, 1000);
+    return () => clearInterval(interval);
+  }, []);
+
   // Encoding states
   const [encHeader, setEncHeader] = useState(JSON.stringify(DEFAULT_HEADER, null, 2));
   const [encPayload, setEncPayload] = useState(JSON.stringify(DEFAULT_PAYLOAD, null, 2));
@@ -133,23 +146,137 @@ export function JwtTool() {
     }
   };
 
+  const editAndResign = () => {
+    if (!decoded) return;
+    setEncHeader(JSON.stringify(decoded.header, null, 2));
+    setEncPayload(JSON.stringify(decoded.payload, null, 2));
+    setEncSecret(secretKey);
+    setActiveTab('encode');
+    toast.success('Loaded headers and payload into the Encoder!');
+  };
+
+  function formatDurationMs(ms: number): string {
+    const sec = Math.floor(ms / 1000);
+    if (sec < 60) return `${sec}s`;
+    const min = Math.floor(sec / 60);
+    if (min < 60) return `${min}m ${sec % 60}s`;
+    const hr = Math.floor(min / 60);
+    if (hr < 24) return `${hr}h ${min % 60}m`;
+    const day = Math.floor(hr / 24);
+    return `${day}d ${hr % 24}h`;
+  }
+
+  const renderExpirationProgress = () => {
+    if (!decoded || !decoded.payload || !decoded.payload.exp) return null;
+
+    const exp = decoded.payload.exp * 1000;
+    const iat = decoded.payload.iat ? decoded.payload.iat * 1000 : exp - 3600000;
+    const now = timeTick;
+    const total = exp - iat;
+    const isExpired = now > exp;
+
+    let percent = 0;
+    if (total > 0) {
+      percent = Math.min(100, Math.max(0, ((now - iat) / total) * 100));
+    } else if (isExpired) {
+      percent = 100;
+    }
+
+    let statusText = '';
+    if (isExpired) {
+      const diff = now - exp;
+      statusText = `Expired ${formatDurationMs(diff)} ago`;
+    } else {
+      const diff = exp - now;
+      statusText = `Expires in ${formatDurationMs(diff)}`;
+    }
+
+    return (
+      <div className="space-y-1.5 p-3 rounded-lg border bg-muted/30">
+        <div className="flex justify-between items-center text-[10px]">
+          <span className="font-bold text-muted-foreground uppercase">Token Expiration Status</span>
+          <span className={`font-semibold font-mono ${isExpired ? "text-destructive" : "text-purple-600 dark:text-purple-400"}`}>
+            {statusText}
+          </span>
+        </div>
+        <div className="h-2 w-full bg-muted border rounded-full overflow-hidden relative">
+          <div
+            style={{ width: `${percent}%` }}
+            className={`h-full transition-all duration-1000 ${isExpired ? "bg-destructive" : percent > 85 ? "bg-amber-500" : "bg-purple-500"}`}
+          />
+        </div>
+        <div className="flex justify-between text-[9px] text-muted-foreground font-mono">
+          <span>Issued: {new Date(iat).toLocaleTimeString()}</span>
+          <span>Expires: {new Date(exp).toLocaleTimeString()}</span>
+        </div>
+      </div>
+    );
+  };
+
   // Styled representation of JWT in parts
   const getStyledJwt = () => {
     if (!tokenInput) return <span className="text-muted-foreground font-mono text-sm">Paste a JWT token here...</span>;
     const parts = tokenInput.split('.');
     return (
-      <span className="font-mono text-sm break-all leading-normal">
-        <span className="text-red-500 font-semibold">{parts[0]}</span>
-        {parts[1] && <span className="text-muted-foreground">.</span>}
-        {parts[1] && <span className="text-purple-500 font-semibold">{parts[1]}</span>}
-        {parts[2] && <span className="text-muted-foreground">.</span>}
-        {parts[2] && <span className="text-emerald-500 font-semibold">{parts[2]}</span>}
-      </span>
+      <div className="space-y-3 font-mono text-xs select-none">
+        {/* Header Block */}
+        <div className="flex flex-col gap-1.5 p-3 bg-red-500/5 dark:bg-red-500/10 border border-red-500/20 border-l-4 border-l-red-500 rounded-r-lg">
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] font-black uppercase text-red-600 dark:text-red-400 tracking-wider">Part 1: Header (Algorithm & Type)</span>
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              onClick={() => handleCopy(parts[0], 'Header segment')}
+              className="h-5 w-5 text-red-500 hover:text-red-600 hover:bg-red-500/10"
+              title="Copy header part"
+            >
+              <Copy className="h-3 w-3" />
+            </Button>
+          </div>
+          <span className="break-all text-red-600 dark:text-red-400 select-text leading-relaxed">{parts[0]}</span>
+        </div>
+        {/* Payload Block */}
+        {parts[1] && (
+          <div className="flex flex-col gap-1.5 p-3 bg-purple-500/5 dark:bg-purple-500/10 border border-purple-500/20 border-l-4 border-l-purple-500 rounded-r-lg">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] font-black uppercase text-purple-600 dark:text-purple-400 tracking-wider">Part 2: Payload (Claims & Data)</span>
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                onClick={() => handleCopy(parts[1], 'Payload segment')}
+                className="h-5 w-5 text-purple-500 hover:text-purple-600 hover:bg-purple-500/10"
+                title="Copy payload part"
+              >
+                <Copy className="h-3 w-3" />
+              </Button>
+            </div>
+            <span className="break-all text-purple-600 dark:text-purple-400 select-text leading-relaxed">{parts[1]}</span>
+          </div>
+        )}
+        {/* Signature Block */}
+        {parts[2] && (
+          <div className="flex flex-col gap-1.5 p-3 bg-emerald-500/5 dark:bg-emerald-500/10 border border-emerald-500/20 border-l-4 border-l-emerald-500 rounded-r-lg">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] font-black uppercase text-emerald-600 dark:text-emerald-455 tracking-wider">Part 3: Signature (Verification Signature)</span>
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                onClick={() => handleCopy(parts[2], 'Signature segment')}
+                className="h-5 w-5 text-emerald-500 hover:text-emerald-600 hover:bg-emerald-500/10"
+                title="Copy signature part"
+              >
+                <Copy className="h-3 w-3" />
+              </Button>
+            </div>
+            <span className="break-all text-emerald-600 dark:text-emerald-455 select-text leading-relaxed">{parts[2]}</span>
+          </div>
+        )}
+      </div>
     );
   };
 
   return (
-    <Tabs defaultValue="decode" className="space-y-6">
+    <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <TabsList>
           <TabsTrigger value="decode" className="gap-2">
@@ -185,7 +312,7 @@ export function JwtTool() {
                 </div>
                 <Textarea
                   id="jwt-input"
-                  className="font-mono h-40 text-xs resize-none"
+                  className="font-mono h-52 text-xs resize-none"
                   placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
                   value={tokenInput}
                   onChange={(e) => setTokenInput(e.target.value.trim())}
@@ -195,7 +322,7 @@ export function JwtTool() {
                 {tokenInput && (
                   <div className="p-3 bg-muted/40 rounded-md border border-dashed">
                     <p className="text-[10px] text-muted-foreground mb-1 font-semibold uppercase">Token Breakdown Preview</p>
-                    <div className="max-h-24 overflow-y-auto">{getStyledJwt()}</div>
+                    <div className="max-h-[380px] overflow-y-auto">{getStyledJwt()}</div>
                   </div>
                 )}
               </CardContent>
@@ -256,9 +383,21 @@ export function JwtTool() {
                       </p>
                     </div>
                   </div>
-                  <Badge variant={isVerified ? 'success' : 'destructive'} className="text-[10px] font-mono">
-                    {algorithm}
-                  </Badge>
+                  <div className="flex items-center gap-2 shrink-0">
+                    {decoded && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={editAndResign}
+                        className="h-7 text-[10px] font-bold border-purple-500/20 text-purple-600 hover:text-purple-700 hover:bg-purple-500/10 dark:text-purple-400 dark:hover:text-purple-300 dark:hover:bg-purple-500/15"
+                      >
+                        Edit & Re-sign
+                      </Button>
+                    )}
+                    <Badge variant={isVerified ? 'success' : 'destructive'} className="text-[10px] font-mono">
+                      {algorithm}
+                    </Badge>
+                  </div>
                 </CardContent>
               </Card>
             )}
@@ -304,6 +443,9 @@ export function JwtTool() {
                       readOnly
                       height="200px"
                     />
+
+                    {/* Expiration Progress Bar */}
+                    {renderExpirationProgress()}
 
                     {/* Unix Timestamp interpretations */}
                     {(decoded.payload.exp || decoded.payload.iat || decoded.payload.nbf) && (
