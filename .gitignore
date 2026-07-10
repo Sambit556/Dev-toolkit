@@ -55,3 +55,4 @@ packages/*/src/**/*.d.ts.map
 .cache/
 tmp/
 .claude/
+__checks__/
