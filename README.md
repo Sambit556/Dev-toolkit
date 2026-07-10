@@ -1,38 +1,45 @@
-# DevChrono JSONLab
+# DevKits
 
-> Production-grade developer utility platform: **Epoch Converter** + **JSON Viewer/Formatter/Validator**
+> Production-grade, privacy-first developer utility suite: **Epoch Converter**, **JSON Viewer**, **JWT Decoder**, **Cron Generator**, **PDF Utilities**, **Diff Checker**, and 15+ other developer tools.
 
-Fast, private, accurate. All core operations run client-side in the browser.
+Fast, secure, offline-ready. All core operations run client-side in the browser to guarantee maximum privacy.
 
 ---
 
 ## Features
 
-### Epoch Converter
-- **Live Unix timestamp clock** — seconds, ms, µs, ns — auto-refresh every second
-- **Timestamp → Date**: auto-detect unit, timezone support (IANA), ISO 8601, RFC 2822, UTC, Local
-- **Date → Timestamp**: parse YYYY-MM-DD, MM/DD/YYYY, DD-MM-YYYY, ISO 8601, RFC 2822
-- **Start/End calculator**: start/end of day, month, year in any timezone
-- **Duration converter**: seconds ↔ days/hours/minutes/seconds
-- **Code examples**: JavaScript, Python, Java, Go, PostgreSQL, MySQL, Linux shell
-- **Nanosecond precision**: BigInt-safe
-- **Keyboard shortcuts**: `C` to clear, `Ctrl+Enter` to convert
-- **Persistent preferences**: unit, timezone, date format, 12/24h
+### 1. Formatters & Viewers
+- **JSON Viewer**: Format, validate, query, and explore JSON syntax tree (Monaco Editor based) with TypeScript interface generation and CSV export capabilities.
+- **JWT Decoder**: Decode token payloads, analyze headers, verify signatures, and generate signed JSON Web Tokens.
+- **Code Diff Checker**: Compare two text blocks, JSON files, or source code side-by-side or in a unified inline view.
+- **HTML Sandbox**: Live interactive sandbox playground for HTML/CSS/JS with console logs interception.
 
-### JSON Viewer
-- **Monaco Editor** (VS Code engine) with JSON syntax highlighting and error markers
-- **Interactive tree view**: collapsible nodes, type badges, array/key counts
-- **Format / Minify / Validate** with exact error line/column
-- **Copy path**: `$.user.name`, `user.address.city`
-- **Advanced tools**:
-  - JSON → TypeScript interface
-  - JSON → CSV
-  - JSONPath tester
-  - Sort keys
-  - Remove null values
-  - Escape/unescape JSON string
-- **Large file support**: up to 10 MB
-- **Privacy**: 100% client-side, no data sent to server
+### 2. Converters & Parsers
+- **Epoch Converter**: Live Unix epoch timestamp clock, date-to-timestamp and timestamp-to-date conversions with timezones and duration math.
+- **Text Encoder / Decoder**: Convert text strings to/from Base64, URL queries, Hex, Binary, Morse code, ROT13, and HTML entities.
+- **Data Format Converter**: Map structured files between CSV, XML, YAML, JSON, and Markdown in real-time.
+- **Text & Case Utility**: Adjust word casings (camel, Pascal, snake, kebab) and calculate speaking, reading, and character metrics.
+- **Universal File Converter**: Client-side drag-and-drop file format conversions.
+
+### 3. Generators
+- **Cron Expression Generator**: Visually build cron schedules, translate them to human-readable sentences, and estimate execution dates.
+- **Security & Key Suite**: Generate secure passwords, cryptographically random UUIDs, sortable ULIDs, NanoIDs, sign HMAC hashes, and verify BCrypt strings.
+- **QR & Barcode Creator**: Export custom styled high-quality QR codes and barcodes to SVG or PNG.
+- **Lorem Ipsum**: Generate customizable dummy placeholder text sentences, paragraphs, or list items.
+- **Fake Person & Address**: Generate mock profiles datasets (addresses, CCs, occupations) for region-specific regions (US/UK/IN/CA).
+
+### 4. Calculators & Design
+- **Calculators Suite**: Amortization schedules for Loan EMIs, Gross/Net Salary intervals, and age offsets.
+- **Currency Exchange**: Convert currencies with live rate tables, simulated sparklines, and custom offline rate settings.
+- **Unit Converter**: Convert metric and imperial measurements across 10 categories (length, mass, digital data, temperature, etc.).
+- **Color Tool Suite**: HSL/RGB/CMYK picker, analogous/triadic palettes, and WCAG contrast validation.
+- **Image Optimizer**: Scale, compress, and apply canvas enhancement filters locally.
+
+### 5. System & Network
+- **IP & Identity**: Geolocation lookup, disposable email flags, and phone validation.
+- **Internet Speed Tester**: Animated speedometer dial tracking latency, jitter, download, and upload speeds.
+- **PDF Suite**: Merge documents, split pages, and password-protect PDFs client-side.
+- **Fun Utilities**: Split team participants, flip 3D coins, or roll 3D dice.
 
 ---
 
@@ -54,21 +61,22 @@ docker/
 ```mermaid
 graph TD
     subgraph Client [Browser Environment / Client-Side]
-        UI[Next.js Frontend Apps]
+        UI[Next.js Frontend Entry Pages]
         Store[Zustand Persistent Store]
         
-        subgraph LocalTools [Client-Side Processing Engines]
-            JWT[JWT Decoder / Web Crypto Subtle]
-            UUID[UUID/ULID Generator]
-            Cron[Cron visual scheduler]
-            Color[Color Harmony & WCAG Contrast Checker]
-            Units[Unit Converter Matrix]
-            EncDec[Morse, ROT13, Base64 File drop]
-            Canvas[Image compression/filters canvas]
-            DocConv[CSV, XML, MD parsing & jsPDF exporter]
+        subgraph LazyChunks [On-Demand Code-Split Chunks]
+            subgraph LocalTools [Client-Side Processing Engines]
+                JWT[JWT Decoder / Web Crypto Subtle]
+                UUID[UUID/ULID Generator]
+                Cron[Cron visual scheduler]
+                Color[Color Harmony & WCAG Contrast Checker]
+                Units[Unit Converter Matrix]
+                EncDec[Morse, ROT13, Base64 File drop]
+                Canvas[Image compression/filters canvas]
+                DocConv[CSV, XML, MD parsing & jsPDF exporter]
+            end
+            Monaco[Local Monaco Editor Worker ESM]
         end
-        
-        Monaco[Local Monaco Editor Worker ESM]
     end
 
     subgraph Server [Backend Environment]
@@ -82,16 +90,17 @@ graph TD
     end
 
     UI --> Store
-    UI -.-> LocalTools
-    UI --> Monaco
+    UI -- "dynamic(..., { ssr: false })" --> LazyChunks
     UI -- HTTPS Secure Endpoints --> Helmet
     Helmet --> RateLimiter
     RateLimiter --> API
     API --> Postgres
 ```
 
-### Architectural Component Descriptions
-- **Monorepo Layout**: The platform uses npm workspaces to isolate dependencies. Shared types, models, schemas, and helper libraries reside in `@devchrono/shared` and are loaded locally by the Next.js client (`@devchrono/web`) and the Express REST service (`@devchrono/api`).
+### Architectural Details
+
+- **Monorepo Layout**: Managed using npm workspaces to isolate dependencies. Shared types, models, schemas, and helper libraries reside in `@devchrono/shared` and are loaded locally by the Next.js client (`@devchrono/web`) and the Express REST service (`@devchrono/api`).
+- **Lightweight Dynamic Loading**: To achieve instant page loads, the frontend uses Next.js `dynamic()` lazy-loading. Heavy clientside engines (like Monaco Editor, pdf-lib, jspdf, marked, and speed test telemetries) are compiled into code-split chunks. They are downloaded on demand only when a user visits that utility's route. This keeps the initial shared JavaScript bundle size under 90 kB, improving Core Web Vitals and Lighthouse scores.
 - **Client-Side Execution Loop**: To guarantee maximum privacy, core formatters, viewer nodes, encoding converters, image canvas manipulation, and PDF document compilers run 100% in-browser. User configuration parameters are persisted locally inside the browser's `localStorage` via Zustand hooks.
 - **REST Backend Service**: The REST backend handles auxiliary server workflows, secured using Helmet header policies, strict CORS origins configurations, and Express rate-limit configurations.
 
@@ -102,15 +111,15 @@ graph TD
 To ensure the safety of developer inputs, configurations, and secrets, the suite incorporates the following security design patterns:
 
 ### 1. Data Privacy & Zero-Transmission Policy
-- **No Remote Operations for Sensitive Inputs**: None of the developer data (such as JWT payloads, private verification keys, configuration parameters, CSV contents, or YAML files) is ever transmitted to a server. All parser calculations are performed in-memory inside the browser tab context.
+- **No Remote Operations for Sensitive Inputs**: None of the developer data (such as JWT payloads, private verification keys, configuration contents, CSV contents, or YAML files) is ever transmitted to a server. All parser calculations are performed in-memory inside the browser tab context.
 - **No Third-Party Analytics / Loggers**: Excludes external trackers, preventing key logs or data capture.
 
 ### 2. Sandbox Signature Generation via Web Crypto API
 - Signature parsing for HS256/384/512 and RS256 algorithms is performed using the browser's native `window.crypto.subtle` Web Crypto APIs.
-- Avoids arbitrary JS library compilations for cryptography, isolating keys from side-channel script vulnerabilities.
+- Avoids arbitrary JS library compiles for cryptography, isolating keys from side-channel script vulnerabilities.
 
 ### 3. Local Monaco Editor ESM Config
-- Monaco Editor contributions, languages, and workers are loaded locally from the project dependencies via ES Modules imports instead of resolving unverified scripts from public CDNs. This aligns with strict **Content Security Policy (CSP)** rules.
+- Monaco Editor contributions, languages, and workers are loaded locally from the project dependencies via ES Modules imports instead of resolving scripts from public CDNs, aligning with strict Content Security Policy (CSP) rules.
 
 ### 4. CSV Formula Injection Defense
 - The CSV-to-JSON and JSON-to-CSV converters sanitize cell values containing formula triggers (such as `=`, `+`, `-`, `@`) by escaping them, preventing macro injection attacks when output sheets are opened in Microsoft Excel or Google Sheets.
@@ -120,7 +129,9 @@ To ensure the safety of developer inputs, configurations, and secrets, the suite
 - **CORS Protection**: Access to REST endpoints is restricted to configured origins.
 - **Rate-Limiting**: Prevents API abuse and DoS vectors using IP-based request throttles.
 
-### Tech Stack
+---
+
+## Tech Stack
 
 | Layer | Technology |
 |-------|-----------|
@@ -389,11 +400,4 @@ Designed for 100k+ monthly active users:
 
 ## License
 
-MIT © DevChrono JSONLab
-
-
-<!-- cp .env.example .env
-cp apps/api/.env.example apps/api/.env
-cp apps/web/.env.local.example apps/web/.env.local
-npm install
-npm run dev      # builds shared, starts API + web concurrently -->
+MIT © DevKits
