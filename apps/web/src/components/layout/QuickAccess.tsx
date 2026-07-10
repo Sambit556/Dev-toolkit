@@ -316,14 +316,15 @@ function MiniCalculator() {
     </div>
   );
 }
-
 /* Mini Epoch Converter Logic */
 function MiniEpochConverter() {
   const [liveEpoch, setLiveEpoch] = useState<number>(0);
   const [inputTs, setInputTs] = useState('');
-  const [dateOutput, setDateOutput] = useState('');
+  const [dateOutputLocal, setDateOutputLocal] = useState('');
+  const [dateOutputUtc, setDateOutputUtc] = useState('');
   const [inputDate, setInputDate] = useState('');
-  const [tsOutput, setTsOutput] = useState('');
+  const [tsOutputSec, setTsOutputSec] = useState('');
+  const [tsOutputMs, setTsOutputMs] = useState('');
 
   // Live timer clock
   useEffect(() => {
@@ -335,27 +336,38 @@ function MiniEpochConverter() {
   }, []);
 
   const convertTs = () => {
-    const val = Number(inputTs.trim());
-    if (isNaN(val) || val <= 0) {
-      setDateOutput('Invalid Timestamp');
+    const clean = inputTs.trim();
+    if (!clean) {
+      setDateOutputLocal('');
+      setDateOutputUtc('');
+      return;
+    }
+    const val = Number(clean);
+    if (isNaN(val) || val < 0) {
+      setDateOutputLocal('Invalid Timestamp');
+      setDateOutputUtc('Invalid Timestamp');
       return;
     }
     // Auto-detect seconds vs milliseconds
     const date = new Date(val > 99999999999 ? val : val * 1000);
-    setDateOutput(date.toLocaleString());
+    setDateOutputLocal(date.toLocaleString());
+    setDateOutputUtc(date.toUTCString());
   };
 
   const convertDate = () => {
     if (!inputDate.trim()) {
-      setTsOutput('Select a date');
+      setTsOutputSec('');
+      setTsOutputMs('');
       return;
     }
     const d = new Date(inputDate);
     if (isNaN(d.getTime())) {
-      setTsOutput('Invalid Date');
+      setTsOutputSec('Invalid Date');
+      setTsOutputMs('Invalid Date');
       return;
     }
-    setTsOutput(`Sec: ${Math.floor(d.getTime() / 1000)} | Ms: ${d.getTime()}`);
+    setTsOutputSec(Math.floor(d.getTime() / 1000).toString());
+    setTsOutputMs(d.getTime().toString());
   };
 
   return (
@@ -392,9 +404,48 @@ function MiniEpochConverter() {
             Go
           </button>
         </div>
-        {dateOutput && (
-          <div className="text-[11px] font-semibold text-foreground bg-muted/30 p-2 rounded-lg border font-mono break-all select-text">
-            {dateOutput}
+        {dateOutputLocal && (
+          <div className="space-y-1 animate-fade-in">
+            <div className="flex items-center justify-between bg-muted/30 p-2 rounded-lg border">
+              <div className="flex flex-col gap-0.5 flex-1 min-w-0">
+                <span className="text-[8px] text-muted-foreground uppercase font-bold">Local Time</span>
+                <span className="text-[10px] font-semibold text-foreground font-mono select-text truncate">
+                  {dateOutputLocal}
+                </span>
+              </div>
+              {dateOutputLocal !== 'Invalid Timestamp' && (
+                <button
+                  onClick={() => {
+                    navigator.clipboard.writeText(dateOutputLocal);
+                    toast.success('Copied local date!');
+                  }}
+                  className="p-1 text-muted-foreground hover:text-foreground hover:bg-muted rounded-md transition-colors ml-2 shrink-0"
+                  title="Copy local date"
+                >
+                  <Copy className="h-3 w-3" />
+                </button>
+              )}
+            </div>
+            {dateOutputUtc && dateOutputUtc !== 'Invalid Timestamp' && (
+              <div className="flex items-center justify-between bg-muted/30 p-2 rounded-lg border">
+                <div className="flex flex-col gap-0.5 flex-1 min-w-0">
+                  <span className="text-[8px] text-muted-foreground uppercase font-bold">UTC Time</span>
+                  <span className="text-[10px] font-semibold text-foreground font-mono select-text truncate">
+                    {dateOutputUtc}
+                  </span>
+                </div>
+                <button
+                  onClick={() => {
+                    navigator.clipboard.writeText(dateOutputUtc);
+                    toast.success('Copied UTC date!');
+                  }}
+                  className="p-1 text-muted-foreground hover:text-foreground hover:bg-muted rounded-md transition-colors ml-2 shrink-0"
+                  title="Copy UTC date"
+                >
+                  <Copy className="h-3 w-3" />
+                </button>
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -407,15 +458,55 @@ function MiniEpochConverter() {
             type="datetime-local"
             value={inputDate}
             onChange={(e) => setInputDate(e.target.value)}
+            step="1"
             className="flex-1 px-2.5 py-1.5 bg-muted/40 border rounded-lg text-xs outline-none text-foreground"
           />
           <button onClick={convertDate} className="px-2.5 bg-primary text-primary-foreground hover:opacity-90 rounded-lg text-xs font-bold shrink-0">
             Go
           </button>
         </div>
-        {tsOutput && (
-          <div className="text-[11px] font-semibold text-foreground bg-muted/30 p-2 rounded-lg border font-mono break-all select-text">
-            {tsOutput}
+        {tsOutputSec && (
+          <div className="space-y-1 animate-fade-in">
+            <div className="flex items-center justify-between bg-muted/30 p-2 rounded-lg border">
+              <div className="flex flex-col gap-0.5 flex-1 min-w-0">
+                <span className="text-[8px] text-muted-foreground uppercase font-bold">Seconds (s)</span>
+                <span className="text-[10px] font-bold text-foreground font-mono select-text truncate">
+                  {tsOutputSec}
+                </span>
+              </div>
+              {tsOutputSec !== 'Invalid Date' && (
+                <button
+                  onClick={() => {
+                    navigator.clipboard.writeText(tsOutputSec);
+                    toast.success('Copied seconds timestamp!');
+                  }}
+                  className="p-1 text-muted-foreground hover:text-foreground hover:bg-muted rounded-md transition-colors ml-2 shrink-0"
+                  title="Copy seconds"
+                >
+                  <Copy className="h-3 w-3" />
+                </button>
+              )}
+            </div>
+            {tsOutputMs && tsOutputMs !== 'Invalid Date' && (
+              <div className="flex items-center justify-between bg-muted/30 p-2 rounded-lg border">
+                <div className="flex flex-col gap-0.5 flex-1 min-w-0">
+                  <span className="text-[8px] text-muted-foreground uppercase font-bold">Milliseconds (ms)</span>
+                  <span className="text-[10px] font-bold text-foreground font-mono select-text truncate">
+                    {tsOutputMs}
+                  </span>
+                </div>
+                <button
+                  onClick={() => {
+                    navigator.clipboard.writeText(tsOutputMs);
+                    toast.success('Copied milliseconds timestamp!');
+                  }}
+                  className="p-1 text-muted-foreground hover:text-foreground hover:bg-muted rounded-md transition-colors ml-2 shrink-0"
+                  title="Copy milliseconds"
+                >
+                  <Copy className="h-3 w-3" />
+                </button>
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -428,6 +519,12 @@ function MiniJsonViewer() {
   const [input, setInput] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<boolean>(false);
+
+  const getJsonSizeString = (str: string): string => {
+    const bytes = new Blob([str]).size;
+    if (bytes < 1024) return `${bytes} B`;
+    return `${(bytes / 1024).toFixed(2)} KB`;
+  };
 
   const formatJson = () => {
     if (!input.trim()) {
@@ -474,20 +571,39 @@ function MiniJsonViewer() {
         onTouchStart={(e) => e.stopPropagation()}
       />
       
-      <div className="flex gap-2 justify-end">
-        <button
-          onClick={minifyJson}
-          className="px-2.5 py-1.5 bg-muted/75 hover:bg-muted text-foreground rounded-lg font-bold text-xs transition-colors shrink-0"
-        >
-          Minify
-        </button>
-        <button
-          onClick={formatJson}
-          className="px-3.5 py-1.5 bg-primary text-primary-foreground hover:opacity-90 rounded-lg font-bold text-xs transition-colors shrink-0"
-        >
-          Format
-        </button>
+      <div className="flex gap-2 justify-between items-center">
+        {input.trim() && (
+          <span className="text-[10px] text-muted-foreground font-mono">
+            Size: <span className="font-bold text-foreground">{getJsonSizeString(input)}</span>
+          </span>
+        )}
+        <div className="flex gap-2 ml-auto">
+          <button
+            onClick={minifyJson}
+            className="px-2.5 py-1.5 bg-muted/75 hover:bg-muted text-foreground rounded-lg font-bold text-xs transition-colors shrink-0"
+          >
+            Minify
+          </button>
+          <button
+            onClick={formatJson}
+            className="px-3.5 py-1.5 bg-primary text-primary-foreground hover:opacity-90 rounded-lg font-bold text-xs transition-colors shrink-0"
+          >
+            Format
+          </button>
+        </div>
       </div>
+
+      {input.trim() && (
+        <button
+          onClick={() => {
+            navigator.clipboard.writeText(input);
+            toast.success('Copied JSON content!');
+          }}
+          className="w-full py-1.5 bg-muted hover:bg-muted-foreground/10 border rounded-lg transition-colors text-foreground font-bold text-xs flex items-center justify-center gap-1.5"
+        >
+          <Copy className="h-3 w-3" /> Copy JSON
+        </button>
+      )}
 
       {error && (
         <div className="text-[10px] text-destructive bg-destructive/10 border border-destructive/20 p-2 rounded-lg font-mono leading-normal select-text max-h-20 overflow-y-auto">

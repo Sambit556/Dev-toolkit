@@ -270,7 +270,7 @@ export function StickyNotes() {
                       <div className="flex items-center gap-1.5 ml-auto">
                         <button
                           onClick={() => deleteNote(note.id)}
-                          className="text-muted-foreground/80 hover:text-destructive p-0.5"
+                          className="text-red-500 hover:text-red-600 hover:bg-red-500/10 rounded p-0.5 transition-colors"
                           title="Delete note"
                         >
                           <Trash2 className="h-3 w-3" />
@@ -421,7 +421,7 @@ export function StickyNotes() {
                   <TooltipTrigger asChild>
                     <button
                       onClick={() => deleteNote(note.id)}
-                      className="text-muted-foreground/80 hover:text-destructive p-1 rounded transition-colors"
+                      className="text-red-500 hover:text-red-600 hover:bg-red-500/10 p-1 rounded transition-colors"
                     >
                       <Trash2 className="h-3 w-3" />
                     </button>

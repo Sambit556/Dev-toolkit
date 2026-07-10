@@ -39,11 +39,11 @@ export function CommandPalette() {
     };
   }, []);
 
-  // Keyboard shortcut listener (Ctrl+K, Cmd+K, /)
+  // Keyboard shortcut listener (Ctrl+S, Cmd+S, /)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Ctrl+K or Cmd+K
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+      // Ctrl+S or Cmd+S
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
         e.preventDefault();
         setIsOpen((prev) => !prev);
       }
@@ -119,7 +119,7 @@ export function CommandPalette() {
 
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
-      <DialogContent className="max-w-xl p-0 overflow-hidden border border-primary/20 bg-background/95 backdrop-blur-md shadow-2xl rounded-xl">
+      <DialogContent hideClose className="max-w-xl p-0 overflow-hidden border border-primary/20 bg-background/95 backdrop-blur-md shadow-2xl rounded-xl">
         <div className="flex flex-col h-[400px]" onKeyDown={handleKeyDown}>
           {/* Header Input */}
           <div className="flex items-center gap-3 px-4 py-3 border-b border-border/80">
@@ -208,7 +208,7 @@ export function CommandPalette() {
                 <CornerDownLeft className="h-2.5 w-2.5" /> Select
               </span>
             </div>
-            <span>Press Win/Cmd key or Ctrl+K / '/' key anytime</span>
+            <span>Press Win/Cmd key or Ctrl+S / '/' key anytime</span>
           </div>
         </div>
       </DialogContent>

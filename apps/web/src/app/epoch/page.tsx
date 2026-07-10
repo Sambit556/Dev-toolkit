@@ -40,101 +40,103 @@ export default function EpochPage() {
       <Separator className="mb-6" />
 
       {/* Main tools */}
-      <Tabs defaultValue="ts-to-date" className="space-y-4">
-        <TabsList className="flex-wrap h-auto">
-          <TabsTrigger value="ts-to-date" className="gap-1.5">
-            <Clock className="h-3.5 w-3.5" />
-            Timestamp → Date
+      <Tabs defaultValue="ts-to-date" className="flex flex-col md:grid md:grid-cols-4 gap-6 space-y-0">
+        <TabsList className="flex flex-row md:flex-col overflow-x-auto md:overflow-x-visible overflow-y-hidden md:overflow-y-auto h-auto w-full justify-start items-stretch bg-muted p-1 gap-1 md:h-fit shrink-0 scrollbar-none flex-nowrap whitespace-nowrap md:p-1.5 md:rounded-xl">
+          <TabsTrigger value="ts-to-date" className="gap-1.5 justify-start px-3 py-2 md:py-2.5">
+            <Clock className="h-3.5 w-3.5 shrink-0" />
+            <span className="truncate">Timestamp → Date</span>
           </TabsTrigger>
-          <TabsTrigger value="date-to-ts" className="gap-1.5">
-            <Calendar className="h-3.5 w-3.5" />
-            Date → Timestamp
+          <TabsTrigger value="date-to-ts" className="gap-1.5 justify-start px-3 py-2 md:py-2.5">
+            <Calendar className="h-3.5 w-3.5 shrink-0" />
+            <span className="truncate">Date → Timestamp</span>
           </TabsTrigger>
-          <TabsTrigger value="duration" className="gap-1.5">
-            <Clock className="h-3.5 w-3.5" />
-            HH:MM:SS:ms
+          <TabsTrigger value="duration" className="gap-1.5 justify-start px-3 py-2 md:py-2.5">
+            <Clock className="h-3.5 w-3.5 shrink-0" />
+            <span className="truncate">HH:MM:SS:ms</span>
           </TabsTrigger>
-          <TabsTrigger value="timer-calc" className="gap-1.5">
-            <Calculator className="h-3.5 w-3.5" />
-            Timer Add / Subtract
+          <TabsTrigger value="timer-calc" className="gap-1.5 justify-start px-3 py-2 md:py-2.5">
+            <Calculator className="h-3.5 w-3.5 shrink-0" />
+            <span className="truncate">Timer Add / Subtract</span>
           </TabsTrigger>
-          <TabsTrigger value="start-end" className="gap-1.5">
-            <Timer className="h-3.5 w-3.5" />
-            Start / End
+          <TabsTrigger value="start-end" className="gap-1.5 justify-start px-3 py-2 md:py-2.5">
+            <Timer className="h-3.5 w-3.5 shrink-0" />
+            <span className="truncate">Start / End</span>
           </TabsTrigger>
-          <TabsTrigger value="code" className="gap-1.5">
-            <Code2 className="h-3.5 w-3.5" />
-            Code Examples
+          <TabsTrigger value="code" className="gap-1.5 justify-start px-3 py-2 md:py-2.5">
+            <Code2 className="h-3.5 w-3.5 shrink-0" />
+            <span className="truncate">Code Examples</span>
           </TabsTrigger>
-          <TabsTrigger value="prefs" className="gap-1.5">
-            <Settings className="h-3.5 w-3.5" />
-            Preferences
+          <TabsTrigger value="prefs" className="gap-1.5 justify-start px-3 py-2 md:py-2.5">
+            <Settings className="h-3.5 w-3.5 shrink-0" />
+            <span className="truncate">Preferences</span>
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="ts-to-date">
-          <div className="rounded-lg border bg-card p-4 md:p-6 shadow-sm animate-fade-in">
-            <h2 className="text-base font-semibold mb-4">Convert Timestamp to Date</h2>
-            <TimestampToDate />
-          </div>
-        </TabsContent>
+        <div className="md:col-span-3">
+          <TabsContent value="ts-to-date" className="mt-0">
+            <div className="rounded-lg border bg-card p-4 md:p-6 shadow-sm animate-fade-in">
+              <h2 className="text-base font-semibold mb-4">Convert Timestamp to Date</h2>
+              <TimestampToDate />
+            </div>
+          </TabsContent>
 
-        <TabsContent value="date-to-ts">
-          <div className="rounded-lg border bg-card p-4 md:p-6 shadow-sm animate-fade-in">
-            <h2 className="text-base font-semibold mb-4">Convert Date to Timestamp</h2>
-            <DateToTimestamp />
-          </div>
-        </TabsContent>
+          <TabsContent value="date-to-ts" className="mt-0">
+            <div className="rounded-lg border bg-card p-4 md:p-6 shadow-sm animate-fade-in">
+              <h2 className="text-base font-semibold mb-4">Convert Date to Timestamp</h2>
+              <DateToTimestamp />
+            </div>
+          </TabsContent>
 
-        <TabsContent value="duration">
-          <div className="rounded-lg border bg-card p-4 md:p-6 shadow-sm animate-fade-in">
-            <h2 className="text-base font-semibold mb-1">Duration — HH:MM:SS:mmm</h2>
-            <p className="text-sm text-muted-foreground mb-4">
-              Convert HH:MM:SS:mmm to/from milliseconds, seconds, minutes, hours, or days.
-            </p>
-            <DurationBuilder />
-          </div>
-        </TabsContent>
+          <TabsContent value="duration" className="mt-0">
+            <div className="rounded-lg border bg-card p-4 md:p-6 shadow-sm animate-fade-in">
+              <h2 className="text-base font-semibold mb-1">Duration — HH:MM:SS:mmm</h2>
+              <p className="text-sm text-muted-foreground mb-4">
+                Convert HH:MM:SS:mmm to/from milliseconds, seconds, minutes, hours, or days.
+              </p>
+              <DurationBuilder />
+            </div>
+          </TabsContent>
 
-        <TabsContent value="timer-calc">
-          <div className="rounded-lg border bg-card p-4 md:p-6 shadow-sm animate-fade-in">
-            <h2 className="text-base font-semibold mb-1">Timer Add / Subtract</h2>
-            <p className="text-sm text-muted-foreground mb-4">
-              Add multiple HH:MM:SS:mmm durations, then subtract others from the total.
-            </p>
-            <DurationArithmetic />
-          </div>
-        </TabsContent>
+          <TabsContent value="timer-calc" className="mt-0">
+            <div className="rounded-lg border bg-card p-4 md:p-6 shadow-sm animate-fade-in">
+              <h2 className="text-base font-semibold mb-1">Timer Add / Subtract</h2>
+              <p className="text-sm text-muted-foreground mb-4">
+                Add multiple HH:MM:SS:mmm durations, then subtract others from the total.
+              </p>
+              <DurationArithmetic />
+            </div>
+          </TabsContent>
 
-        <TabsContent value="start-end">
-          <div className="rounded-lg border bg-card p-4 md:p-6 shadow-sm animate-fade-in">
-            <h2 className="text-base font-semibold mb-1">Start / End Boundaries</h2>
-            <p className="text-sm text-muted-foreground mb-4">
-              Find the start and end timestamps for a day, month, or year.
-            </p>
-            <StartEndCalculator />
-          </div>
-        </TabsContent>
+          <TabsContent value="start-end" className="mt-0">
+            <div className="rounded-lg border bg-card p-4 md:p-6 shadow-sm animate-fade-in">
+              <h2 className="text-base font-semibold mb-1">Start / End Boundaries</h2>
+              <p className="text-sm text-muted-foreground mb-4">
+                Find the start and end timestamps for a day, month, or year.
+              </p>
+              <StartEndCalculator />
+            </div>
+          </TabsContent>
 
-        <TabsContent value="code">
-          <div className="rounded-lg border bg-card p-4 md:p-6 shadow-sm animate-fade-in">
-            <h2 className="text-base font-semibold mb-1">Code Examples</h2>
-            <p className="text-sm text-muted-foreground mb-4">
-              Ready-to-use code snippets for working with Unix timestamps in popular languages.
-            </p>
-            <CodeExamples />
-          </div>
-        </TabsContent>
+          <TabsContent value="code" className="mt-0">
+            <div className="rounded-lg border bg-card p-4 md:p-6 shadow-sm animate-fade-in">
+              <h2 className="text-base font-semibold mb-1">Code Examples</h2>
+              <p className="text-sm text-muted-foreground mb-4">
+                Ready-to-use code snippets for working with Unix timestamps in popular languages.
+              </p>
+              <CodeExamples />
+            </div>
+          </TabsContent>
 
-        <TabsContent value="prefs">
-          <div className="rounded-lg border bg-card p-4 md:p-6 shadow-sm animate-fade-in">
-            <h2 className="text-base font-semibold mb-1">Preferences</h2>
-            <p className="text-sm text-muted-foreground mb-4">
-              Customize default settings. Saved to your browser — no account required.
-            </p>
-            <EpochPreferences />
-          </div>
-        </TabsContent>
+          <TabsContent value="prefs" className="mt-0">
+            <div className="rounded-lg border bg-card p-4 md:p-6 shadow-sm animate-fade-in">
+              <h2 className="text-base font-semibold mb-1">Preferences</h2>
+              <p className="text-sm text-muted-foreground mb-4">
+                Customize default settings. Saved to your browser — no account required.
+              </p>
+              <EpochPreferences />
+            </div>
+          </TabsContent>
+        </div>
       </Tabs>
     </div>
   );

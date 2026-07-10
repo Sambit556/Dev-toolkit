@@ -106,7 +106,7 @@ function ThemeToggle() {
 function KeyboardShortcuts() {
   const shortcuts = [
     { keys: ['Ctrl', 'Enter'], description: 'Convert / Submit' },
-    { keys: ['Ctrl', 'K'], description: 'Open search / command palette' },
+    { keys: ['Ctrl', 'S'], description: 'Open search / command palette' },
     { keys: ['Ctrl', 'Shift', 'C'], description: 'Copy result' },
     { keys: ['Ctrl', 'Shift', 'V'], description: 'Paste input' },
   ];
@@ -556,7 +556,7 @@ export function Header() {
             size="icon-sm"
             onClick={() => window.dispatchEvent(new CustomEvent('toggle-command-palette'))}
             aria-label="Open command palette"
-            title="Search tools (Ctrl+K or /)"
+            title="Search tools (Ctrl+S or /)"
           >
             <Search className="h-4 w-4" />
           </Button>

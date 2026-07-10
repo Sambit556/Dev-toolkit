@@ -315,7 +315,7 @@ export function DurationArithmetic() {
                 size="icon-sm"
                 onClick={() => removeRow(row.id)}
                 disabled={rows.length <= 1}
-                className="shrink-0 text-muted-foreground"
+                className="shrink-0 text-red-500 hover:text-red-600 hover:bg-red-500/10"
                 title="Remove row"
               >
                 <Trash2 className="h-3.5 w-3.5" />
