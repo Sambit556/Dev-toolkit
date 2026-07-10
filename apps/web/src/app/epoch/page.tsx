@@ -1,10 +1,10 @@
 import type { Metadata } from 'next';
-import { Clock, Timer, Calendar, Code2, Settings } from 'lucide-react';
+import { Clock, Timer, Calendar, Code2, Settings, Calculator } from 'lucide-react';
 import { LiveClock } from '@/components/epoch/LiveClock';
 import { TimestampToDate } from '@/components/epoch/TimestampToDate';
 import { DateToTimestamp } from '@/components/epoch/DateToTimestamp';
 import { StartEndCalculator } from '@/components/epoch/StartEndCalculator';
-import { DurationConverter } from '@/components/epoch/DurationConverter';
+import { DurationBuilder, DurationArithmetic } from '@/components/epoch/DurationConverter';
 import { CodeExamples } from '@/components/epoch/CodeExamples';
 import { EpochPreferences } from '@/components/epoch/EpochPreferences';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -50,13 +50,17 @@ export default function EpochPage() {
             <Calendar className="h-3.5 w-3.5" />
             Date → Timestamp
           </TabsTrigger>
+          <TabsTrigger value="duration" className="gap-1.5">
+            <Clock className="h-3.5 w-3.5" />
+            HH:MM:SS:ms
+          </TabsTrigger>
+          <TabsTrigger value="timer-calc" className="gap-1.5">
+            <Calculator className="h-3.5 w-3.5" />
+            Timer Add / Subtract
+          </TabsTrigger>
           <TabsTrigger value="start-end" className="gap-1.5">
             <Timer className="h-3.5 w-3.5" />
             Start / End
-          </TabsTrigger>
-          <TabsTrigger value="duration" className="gap-1.5">
-            <Timer className="h-3.5 w-3.5" />
-            HH:MM:SS:ms
           </TabsTrigger>
           <TabsTrigger value="code" className="gap-1.5">
             <Code2 className="h-3.5 w-3.5" />
@@ -82,6 +86,26 @@ export default function EpochPage() {
           </div>
         </TabsContent>
 
+        <TabsContent value="duration">
+          <div className="rounded-lg border bg-card p-4 md:p-6 shadow-sm animate-fade-in">
+            <h2 className="text-base font-semibold mb-1">Duration — HH:MM:SS:mmm</h2>
+            <p className="text-sm text-muted-foreground mb-4">
+              Convert HH:MM:SS:mmm to/from milliseconds, seconds, minutes, hours, or days.
+            </p>
+            <DurationBuilder />
+          </div>
+        </TabsContent>
+
+        <TabsContent value="timer-calc">
+          <div className="rounded-lg border bg-card p-4 md:p-6 shadow-sm animate-fade-in">
+            <h2 className="text-base font-semibold mb-1">Timer Add / Subtract</h2>
+            <p className="text-sm text-muted-foreground mb-4">
+              Add multiple HH:MM:SS:mmm durations, then subtract others from the total.
+            </p>
+            <DurationArithmetic />
+          </div>
+        </TabsContent>
+
         <TabsContent value="start-end">
           <div className="rounded-lg border bg-card p-4 md:p-6 shadow-sm animate-fade-in">
             <h2 className="text-base font-semibold mb-1">Start / End Boundaries</h2>
@@ -89,16 +113,6 @@ export default function EpochPage() {
               Find the start and end timestamps for a day, month, or year.
             </p>
             <StartEndCalculator />
-          </div>
-        </TabsContent>
-
-        <TabsContent value="duration">
-          <div className="rounded-lg border bg-card p-4 md:p-6 shadow-sm animate-fade-in">
-            <h2 className="text-base font-semibold mb-1">Duration — HH:MM:SS:mmm</h2>
-            <p className="text-sm text-muted-foreground mb-4">
-              Convert durations to/from milliseconds, and add or subtract multiple durations at once.
-            </p>
-            <DurationConverter />
           </div>
         </TabsContent>
 

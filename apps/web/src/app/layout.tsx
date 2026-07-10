@@ -8,6 +8,8 @@ import { FloatingSupport } from '@/components/layout/FloatingSupport';
 import { Toaster } from '@/components/ui/sonner';
 import { LocalizationProvider } from '@/context/LocalizationContext';
 import { HexCanvasBg } from '@/components/layout/HexCanvasBg';
+import { StickyNotes } from '@/components/layout/StickyNotes';
+import { QuickAccess } from '@/components/layout/QuickAccess';
 
 const inter = Inter({ subsets: ['latin'], variable: '--font-inter' });
 
@@ -182,6 +184,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <main className="flex-1 relative z-10 w-full overflow-x-hidden">{children}</main>
             <Footer />
             <FloatingSupport />
+            <StickyNotes />
+            <QuickAccess />
             <Toaster richColors position="bottom-right" />
           </LocalizationProvider>
         </ThemeProvider>

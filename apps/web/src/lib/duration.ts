@@ -16,8 +16,7 @@ export function parseDurationString(input: string): number | null {
   const seconds = parseInt(ss, 10);
   const millis = parseInt(mmm, 10);
 
-  if (minutes > 59 || seconds > 59 || millis > 999) return null;
-
+  // We allow fields to exceed standard limits (e.g. minutes > 59) and roll them over
   const totalMs = (((hours * 60 + minutes) * 60 + seconds) * 1000) + millis;
   return negative ? -totalMs : totalMs;
 }
