@@ -56,6 +56,36 @@ const GRADE_COLORS: Record<SecurityGradeResult['grade'], string> = {
   F: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
 };
 
+const METHOD_BADGE_COLORS: Record<string, string> = {
+  GET: 'bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-400',
+  POST: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400',
+  PUT: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400',
+  PATCH: 'bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-400',
+  DELETE: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
+};
+const METHOD_BORDER_COLORS: Record<string, string> = {
+  GET: 'border-l-sky-500',
+  POST: 'border-l-emerald-500',
+  PUT: 'border-l-amber-500',
+  PATCH: 'border-l-violet-500',
+  DELETE: 'border-l-red-500',
+};
+function methodBadgeClass(method: string): string {
+  return METHOD_BADGE_COLORS[method.toUpperCase()] ?? 'bg-slate-100 text-slate-700 dark:bg-slate-800/60 dark:text-slate-400';
+}
+function methodBorderClass(method: string): string {
+  return METHOD_BORDER_COLORS[method.toUpperCase()] ?? 'border-l-slate-400';
+}
+
+function timeAgo(iso: string): string {
+  const sec = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
+  if (sec < 5) return 'just now';
+  if (sec < 60) return `${sec}s ago`;
+  const min = Math.floor(sec / 60);
+  if (min < 60) return `${min}m ago`;
+  return `${Math.floor(min / 60)}h ago`;
+}
+
 interface InspectResult {
   status: number;
   statusText: string;
@@ -314,6 +344,7 @@ export function HttpToolkitTool() {
   const [webhookId, setWebhookId] = useState<string | null>(null);
   const [webhookRequests, setWebhookRequests] = useState<CapturedRequest[]>([]);
   const [webhookLoading, setWebhookLoading] = useState(false);
+  const [webhookRefreshing, setWebhookRefreshing] = useState(false);
   const [webhookSearch, setWebhookSearch] = useState('');
   const [expandedRequests, setExpandedRequests] = useState<Set<string>>(new Set());
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -373,15 +404,31 @@ export function HttpToolkitTool() {
     }
   };
 
-  const fetchWebhookRequests = async (id: string) => {
+  const fetchWebhookRequests = async (id: string): Promise<number | null> => {
     try {
       const res = await fetch(`${API_BASE}/api/webhook/${id}/requests`);
-      if (!res.ok) return;
+      if (!res.ok) return null;
       const data = await res.json();
-      setWebhookRequests(data.requests || []);
+      const requests: CapturedRequest[] = data.requests || [];
+      setWebhookRequests(requests);
+      return requests.length;
     } catch {
       // Silent — a transient poll failure isn't worth surfacing to the user.
+      return null;
     }
+  };
+
+  const handleManualRefresh = async () => {
+    if (!webhookId || webhookRefreshing) return;
+    setWebhookRefreshing(true);
+    const before = webhookRequests.length;
+    const after = await fetchWebhookRequests(webhookId);
+    if (after === null) {
+      toast.error('Refresh failed');
+    } else {
+      toast.success(after > before ? `Refreshed — ${after - before} new request${after - before > 1 ? 's' : ''}` : 'Refreshed — no new requests');
+    }
+    setWebhookRefreshing(false);
   };
 
   const clearWebhook = async () => {
@@ -716,203 +763,241 @@ export function HttpToolkitTool() {
       </TabsContent>
 
       {/* --- WEBHOOK TESTER TAB --- */}
-      <TabsContent value="webhook-tester" className="space-y-4">
-        <Card>
-          <CardContent className="p-4 space-y-3">
-            {!webhookId ? (
-              <Button onClick={createWebhook} disabled={webhookLoading} className="gap-1.5">
+      <TabsContent value="webhook-tester" className="space-y-3">
+        {!webhookId ? (
+          <Card className="border-dashed">
+            <CardContent className="p-8 flex flex-col items-center justify-center gap-3 text-center">
+              <div className="h-12 w-12 rounded-2xl bg-violet-500/10 text-violet-600 dark:text-violet-400 flex items-center justify-center">
+                <Webhook className="h-6 w-6" />
+              </div>
+              <p className="text-sm text-muted-foreground max-w-sm">
+                Spin up a live URL that captures any HTTP request sent to it — perfect for testing webhooks from Stripe, GitHub, Slack, or your own app.
+              </p>
+              <Button onClick={createWebhook} disabled={webhookLoading} className="gap-1.5 mt-1">
                 {webhookLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Webhook className="h-4 w-4" />}
                 Generate a webhook URL
               </Button>
-            ) : (
-              <>
-                <Label>Your capture URL — send requests here</Label>
-                <div className="flex gap-2">
-                  <Input value={captureUrl ?? ''} readOnly className="font-mono text-xs" />
-                  <Button variant="outline" size="icon" onClick={() => handleCopy(captureUrl ?? '', 'Capture URL copied')} className="shrink-0">
-                    <Copy className="h-4 w-4" />
-                  </Button>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  <Button variant="outline" size="sm" onClick={() => webhookId && fetchWebhookRequests(webhookId)} className="gap-1.5 text-xs h-8">
-                    <RefreshCcw className="h-3.5 w-3.5" />
-                    Refresh now
-                  </Button>
-                  <Button variant="outline" size="sm" onClick={() => setMockDialogOpen(true)} className="gap-1.5 text-xs h-8">
-                    <Settings2 className="h-3.5 w-3.5" />
-                    Configure response
-                  </Button>
-                  <Button variant="outline" size="sm" onClick={clearWebhook} className="gap-1.5 text-xs h-8 text-red-500 hover:bg-red-500/10">
-                    <Trash2 className="h-3.5 w-3.5" />
-                    Clear requests
-                  </Button>
-                  <Button variant="outline" size="sm" onClick={createWebhook} className="gap-1.5 text-xs h-8 ml-auto">
-                    New URL
-                  </Button>
-                </div>
-                <p className="text-[10px] text-muted-foreground">
-                  Send any HTTP request (curl, a webhook provider, another app) to the URL above — it'll show up here within a few seconds. Expires after 1 hour of inactivity.
-                </p>
-              </>
-            )}
-          </CardContent>
-        </Card>
-
-        {webhookId && (
-          <Card>
-            <CardContent className="p-4 space-y-3">
-              <h4 className="font-bold text-xs uppercase tracking-wider text-muted-foreground">Send a test request</h4>
-              <div className="grid gap-2 sm:grid-cols-[110px_1fr]">
-                <Select value={testMethod} onValueChange={(v) => setTestMethod(v as typeof testMethod)}>
-                  <SelectTrigger className="h-9 text-xs">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="GET">GET</SelectItem>
-                    <SelectItem value="POST">POST</SelectItem>
-                    <SelectItem value="PUT">PUT</SelectItem>
-                    <SelectItem value="PATCH">PATCH</SelectItem>
-                    <SelectItem value="DELETE">DELETE</SelectItem>
-                  </SelectContent>
-                </Select>
-                <Input
-                  value={testPath}
-                  onChange={(e) => setTestPath(e.target.value)}
-                  placeholder="/optional/path?query=value"
-                  className="font-mono text-xs"
-                />
-              </div>
-              <details className="group">
-                <summary className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground cursor-pointer select-none hover:text-foreground">
-                  <Settings2 className="h-3.5 w-3.5" />
-                  Headers &amp; body
-                </summary>
-                <div className="mt-2 space-y-3 pl-1">
-                  <div className="space-y-1">
-                    <Label className="text-xs">Request headers</Label>
-                    <KeyValueEditor pairs={testHeaders} onChange={setTestHeaders} />
-                  </div>
-                  {testMethod !== 'GET' && (
-                    <div className="space-y-1">
-                      <Label className="text-xs">Request body</Label>
-                      <Textarea
-                        value={testBody}
-                        onChange={(e) => setTestBody(e.target.value)}
-                        className="font-mono text-xs min-h-[70px]"
-                      />
-                    </div>
-                  )}
-                </div>
-              </details>
-              <Button onClick={sendTestRequest} disabled={testSending} size="sm" className="gap-1.5 text-xs h-8">
-                {testSending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5" />}
-                Send
-              </Button>
-              {testError && (
-                <div className="flex items-center gap-2 p-2.5 bg-red-50/15 border border-red-500/30 text-red-500 rounded-lg text-xs font-mono">
-                  <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
-                  {testError}
-                </div>
-              )}
-              {testResult && (
-                <div className="border rounded-md p-2.5 space-y-1.5 text-xs font-mono">
-                  <Badge className={`border-0 ${statusBadgeClass(testResult.status)}`}>
-                    {testResult.status} {testResult.statusText}
-                  </Badge>
-                  <pre className="text-muted-foreground whitespace-pre-wrap break-all max-h-32 overflow-y-auto">
-                    {tryPrettyJson(testResult.body) ?? (testResult.body || '(empty)')}
-                  </pre>
-                </div>
-              )}
-              <p className="text-[10px] text-muted-foreground">
-                Sends directly from your browser to the capture URL above — the request will also show up in Captured Requests below.
-              </p>
             </CardContent>
           </Card>
-        )}
-
-        {webhookId && (
-          <Card>
-            <CardContent className="p-4 space-y-3">
-              <div className="flex items-center justify-between gap-3 flex-wrap">
-                <h4 className="font-bold text-xs uppercase tracking-wider text-muted-foreground">
-                  Captured Requests ({filteredWebhookRequests.length}/{webhookRequests.length})
-                </h4>
-                <div className="relative w-full max-w-[220px]">
-                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
-                  <Input
-                    value={webhookSearch}
-                    onChange={(e) => setWebhookSearch(e.target.value)}
-                    placeholder="Filter by method, path, body..."
-                    className="pl-8 h-8 text-xs"
-                  />
+        ) : (
+          <>
+            {/* Compact header: capture URL + stats + actions */}
+            <Card className="border-violet-500/20 bg-gradient-to-br from-violet-500/[0.04] to-transparent">
+              <CardContent className="p-4 space-y-3">
+                <div className="flex items-center gap-2.5">
+                  <div className="h-8 w-8 rounded-lg bg-violet-500/15 text-violet-600 dark:text-violet-400 flex items-center justify-center shrink-0">
+                    <Webhook className="h-4 w-4" />
+                  </div>
+                  <Input value={captureUrl ?? ''} readOnly className="font-mono text-xs h-8" />
+                  <Button variant="outline" size="icon" onClick={() => handleCopy(captureUrl ?? '', 'Capture URL copied')} className="h-8 w-8 shrink-0" title="Copy capture URL">
+                    <Copy className="h-3.5 w-3.5" />
+                  </Button>
                 </div>
-              </div>
-              {webhookRequests.length === 0 ? (
-                <p className="text-sm text-muted-foreground text-center py-8">
-                  Waiting for a request... send one to your capture URL above.
-                </p>
-              ) : filteredWebhookRequests.length === 0 ? (
-                <p className="text-sm text-muted-foreground text-center py-8">No captured requests match your filter.</p>
-              ) : (
-                <div className="border rounded-md divide-y max-h-[500px] overflow-y-auto">
-                  {filteredWebhookRequests.map((req) => {
-                    const isExpanded = expandedRequests.has(req.id);
-                    const pretty = tryPrettyJson(req.body);
-                    return (
-                      <div key={req.id}>
-                        <button
-                          onClick={() => toggleExpanded(req.id)}
-                          className="w-full flex items-center gap-2 p-2.5 text-xs font-mono hover:bg-muted/30 text-left"
-                        >
-                          {isExpanded ? <ChevronDown className="h-3.5 w-3.5 shrink-0" /> : <ChevronRight className="h-3.5 w-3.5 shrink-0" />}
-                          <Badge variant="secondary" className="text-[10px]">{req.method}</Badge>
-                          <span className="truncate">{req.path}</span>
-                          <span className="ml-auto text-muted-foreground shrink-0">{new Date(req.receivedAt).toLocaleTimeString()}</span>
-                        </button>
-                        {isExpanded && (
-                          <div className="p-3 bg-muted/20 text-xs font-mono space-y-2 border-t">
-                            <div className="flex flex-wrap gap-1.5 pb-1">
-                              <Button variant="outline" size="sm" className="h-6 text-[10px] gap-1 px-2" onClick={() => exportCurl(req)}>
-                                <Terminal className="h-3 w-3" />
-                                Copy as curl
-                              </Button>
-                              <Button variant="outline" size="sm" className="h-6 text-[10px] gap-1 px-2" onClick={() => exportJson(req)}>
-                                <Braces className="h-3 w-3" />
-                                Copy as JSON
-                              </Button>
-                              <Button variant="outline" size="sm" className="h-6 text-[10px] gap-1 px-2" onClick={() => openReplay(req.id)}>
-                                <Send className="h-3 w-3" />
-                                Replay
-                              </Button>
-                            </div>
-                            <div>
-                              <span className="font-bold">Headers</span>
-                              <div className="pl-2 text-muted-foreground">
-                                {Object.entries(req.headers).map(([k, v]) => (
-                                  <div key={k} className="break-all">{k}: {v}</div>
-                                ))}
-                              </div>
-                            </div>
-                            {Object.keys(req.query).length > 0 && (
-                              <div>
-                                <span className="font-bold">Query</span>
-                                <div className="pl-2 text-muted-foreground break-all">{JSON.stringify(req.query)}</div>
-                              </div>
-                            )}
-                            <div>
-                              <span className="font-bold">Body{req.bodyTruncated ? ' (truncated)' : ''}{pretty ? ' (JSON)' : ''}</span>
-                              <pre className="pl-2 text-muted-foreground break-all whitespace-pre-wrap">{pretty ?? (req.body || '(empty)')}</pre>
-                            </div>
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <Badge className="border-0 bg-violet-500/10 text-violet-600 dark:text-violet-400 text-[10px] gap-1">
+                    <Webhook className="h-3 w-3" />
+                    {webhookRequests.length} captured
+                  </Badge>
+                  <Badge variant="outline" className="text-[10px] gap-1 font-normal text-muted-foreground">
+                    <Clock className="h-3 w-3" />
+                    expires after 1h idle
+                  </Badge>
+                  <div className="flex gap-1.5 ml-auto">
+                    <Button variant="outline" size="icon" className="h-7 w-7" onClick={handleManualRefresh} disabled={webhookRefreshing} title="Refresh now">
+                      <RefreshCcw className={`h-3.5 w-3.5 ${webhookRefreshing ? 'animate-spin' : ''}`} />
+                    </Button>
+                    <Button variant="outline" size="icon" className="h-7 w-7" onClick={() => setMockDialogOpen(true)} title="Configure mock response">
+                      <Settings2 className="h-3.5 w-3.5" />
+                    </Button>
+                    <Button variant="outline" size="icon" className="h-7 w-7 text-red-500 hover:bg-red-500/10" onClick={clearWebhook} title="Clear captured requests">
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
+                    <Button variant="outline" size="sm" onClick={createWebhook} className="h-7 text-xs gap-1">
+                      New URL
+                    </Button>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Collapsed by default — a power-user action, kept out of the way of the captured-requests list */}
+            <Card>
+              <CardContent className="p-0">
+                <details className="group">
+                  <summary className="flex items-center gap-2 p-3.5 cursor-pointer select-none list-none [&::-webkit-details-marker]:hidden">
+                    <ChevronRight className="h-3.5 w-3.5 text-muted-foreground transition-transform group-open:rotate-90 shrink-0" />
+                    <Send className="h-3.5 w-3.5 text-sky-500 shrink-0" />
+                    <span className="font-bold text-xs uppercase tracking-wider text-muted-foreground">Send a test request</span>
+                    <span className="text-[10px] text-muted-foreground ml-auto hidden sm:inline">no curl needed</span>
+                  </summary>
+                  <div className="px-4 pb-4 space-y-3 border-t pt-3">
+                    <div className="grid gap-2 sm:grid-cols-[110px_1fr]">
+                      <Select value={testMethod} onValueChange={(v) => setTestMethod(v as typeof testMethod)}>
+                        <SelectTrigger className="h-9 text-xs">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="GET">GET</SelectItem>
+                          <SelectItem value="POST">POST</SelectItem>
+                          <SelectItem value="PUT">PUT</SelectItem>
+                          <SelectItem value="PATCH">PATCH</SelectItem>
+                          <SelectItem value="DELETE">DELETE</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <Input
+                        value={testPath}
+                        onChange={(e) => setTestPath(e.target.value)}
+                        placeholder="/optional/path?query=value"
+                        className="font-mono text-xs"
+                      />
+                    </div>
+                    <details className="group/inner">
+                      <summary className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground cursor-pointer select-none hover:text-foreground list-none [&::-webkit-details-marker]:hidden">
+                        <ChevronRight className="h-3 w-3 transition-transform group-open/inner:rotate-90" />
+                        Headers &amp; body
+                      </summary>
+                      <div className="mt-2 space-y-3 pl-1">
+                        <div className="space-y-1">
+                          <Label className="text-xs">Request headers</Label>
+                          <KeyValueEditor pairs={testHeaders} onChange={setTestHeaders} />
+                        </div>
+                        {testMethod !== 'GET' && (
+                          <div className="space-y-1">
+                            <Label className="text-xs">Request body</Label>
+                            <Textarea
+                              value={testBody}
+                              onChange={(e) => setTestBody(e.target.value)}
+                              className="font-mono text-xs min-h-[70px]"
+                            />
                           </div>
                         )}
                       </div>
-                    );
-                  })}
+                    </details>
+                    <Button onClick={sendTestRequest} disabled={testSending} size="sm" className="gap-1.5 text-xs h-8">
+                      {testSending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5" />}
+                      Send
+                    </Button>
+                    {testError && (
+                      <div className="flex items-center gap-2 p-2.5 bg-red-50/15 border border-red-500/30 text-red-500 rounded-lg text-xs font-mono">
+                        <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
+                        {testError}
+                      </div>
+                    )}
+                    {testResult && (
+                      <div className="border rounded-md p-2.5 space-y-1.5 text-xs font-mono">
+                        <Badge className={`border-0 ${statusBadgeClass(testResult.status)}`}>
+                          {testResult.status} {testResult.statusText}
+                        </Badge>
+                        <pre className="text-muted-foreground whitespace-pre-wrap break-all max-h-32 overflow-y-auto">
+                          {tryPrettyJson(testResult.body) ?? (testResult.body || '(empty)')}
+                        </pre>
+                      </div>
+                    )}
+                  </div>
+                </details>
+              </CardContent>
+            </Card>
+
+            {/* Primary content — captured requests, front and center */}
+            <Card>
+              <CardContent className="p-4 space-y-3">
+                <div className="flex items-center justify-between gap-3 flex-wrap">
+                  <Badge className="border-0 bg-violet-500/10 text-violet-600 dark:text-violet-400 text-[10px] gap-1">
+                    {filteredWebhookRequests.length}/{webhookRequests.length} requests
+                  </Badge>
+                  <div className="relative w-full max-w-[220px]">
+                    <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+                    <Input
+                      value={webhookSearch}
+                      onChange={(e) => setWebhookSearch(e.target.value)}
+                      placeholder="Filter by method, path, body..."
+                      className="pl-8 h-8 text-xs"
+                    />
+                  </div>
                 </div>
-              )}
-            </CardContent>
-          </Card>
+                {webhookRequests.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center gap-2.5 py-12 text-center">
+                    <span className="relative flex h-3 w-3">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-violet-400 opacity-75" />
+                      <span className="relative inline-flex rounded-full h-3 w-3 bg-violet-500" />
+                    </span>
+                    <p className="text-sm font-medium">Waiting for a request...</p>
+                    <p className="text-xs text-muted-foreground max-w-xs">
+                      Send one to your capture URL above, or expand "Send a test request" to fire one right here.
+                    </p>
+                  </div>
+                ) : filteredWebhookRequests.length === 0 ? (
+                  <p className="text-sm text-muted-foreground text-center py-8">No captured requests match your filter.</p>
+                ) : (
+                  <div className="border rounded-md divide-y max-h-[65vh] overflow-y-auto">
+                    {filteredWebhookRequests.map((req, idx) => {
+                      const isExpanded = expandedRequests.has(req.id);
+                      const pretty = tryPrettyJson(req.body);
+                      const isNew = idx === 0 && Date.now() - new Date(req.receivedAt).getTime() < 10_000;
+                      return (
+                        <div key={req.id} className={`border-l-4 ${methodBorderClass(req.method)}`}>
+                          <button
+                            onClick={() => toggleExpanded(req.id)}
+                            className="w-full flex items-center gap-2 p-2.5 text-xs font-mono hover:bg-muted/30 text-left"
+                          >
+                            {isExpanded ? <ChevronDown className="h-3.5 w-3.5 shrink-0" /> : <ChevronRight className="h-3.5 w-3.5 shrink-0" />}
+                            <Badge className={`border-0 text-[10px] ${methodBadgeClass(req.method)}`}>{req.method}</Badge>
+                            {isNew && (
+                              <Badge className="border-0 bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 text-[9px] px-1.5">
+                                NEW
+                              </Badge>
+                            )}
+                            <span className="truncate">{req.path}</span>
+                            <span className="ml-auto text-muted-foreground shrink-0" title={new Date(req.receivedAt).toLocaleString()}>
+                              {timeAgo(req.receivedAt)}
+                            </span>
+                          </button>
+                          {isExpanded && (
+                            <div className="p-3 bg-muted/20 text-xs font-mono space-y-2 border-t">
+                              <div className="flex flex-wrap gap-1.5 pb-1">
+                                <Button variant="outline" size="sm" className="h-6 text-[10px] gap-1 px-2" onClick={() => exportCurl(req)}>
+                                  <Terminal className="h-3 w-3" />
+                                  Copy as curl
+                                </Button>
+                                <Button variant="outline" size="sm" className="h-6 text-[10px] gap-1 px-2" onClick={() => exportJson(req)}>
+                                  <Braces className="h-3 w-3" />
+                                  Copy as JSON
+                                </Button>
+                                <Button variant="outline" size="sm" className="h-6 text-[10px] gap-1 px-2" onClick={() => openReplay(req.id)}>
+                                  <Send className="h-3 w-3" />
+                                  Replay
+                                </Button>
+                              </div>
+                              <div>
+                                <span className="font-bold text-sky-600 dark:text-sky-400">Headers</span>
+                                <div className="pl-2 text-muted-foreground">
+                                  {Object.entries(req.headers).map(([k, v]) => (
+                                    <div key={k} className="break-all">{k}: {v}</div>
+                                  ))}
+                                </div>
+                              </div>
+                              {Object.keys(req.query).length > 0 && (
+                                <div>
+                                  <span className="font-bold text-violet-600 dark:text-violet-400">Query</span>
+                                  <div className="pl-2 text-muted-foreground break-all">{JSON.stringify(req.query)}</div>
+                                </div>
+                              )}
+                              <div>
+                                <span className="font-bold text-emerald-600 dark:text-emerald-400">
+                                  Body{req.bodyTruncated ? ' (truncated)' : ''}{pretty ? ' (JSON)' : ''}
+                                </span>
+                                <pre className="pl-2 text-muted-foreground break-all whitespace-pre-wrap">{pretty ?? (req.body || '(empty)')}</pre>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </>
         )}
       </TabsContent>
 
