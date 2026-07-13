@@ -1,0 +1,33 @@
+services:
+  - type: web
+    name: devchrono-api
+    runtime: node
+    plan: free
+    buildCommand: npm install && npm run build --workspace=packages/shared && npm run build --workspace=apps/api
+    startCommand: node apps/api/dist/server.js
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: HOST
+        value: 0.0.0.0
+      - key: CORS_ORIGIN
+        sync: false
+      - key: RATE_LIMIT_WINDOW_MS
+        value: "60000"
+      - key: RATE_LIMIT_MAX_REQUESTS
+        value: "100"
+      - key: RATE_LIMIT_JSON_MAX
+        value: "30"
+      - key: RATE_LIMIT_HTTP_INSPECT_MAX
+        value: "20"
+      - key: RATE_LIMIT_WEBHOOK_MAX
+        value: "120"
+      - key: BODY_LIMIT_DEFAULT
+        value: 1mb
+      - key: BODY_LIMIT_JSON
+        value: 10mb
+      - key: LOG_LEVEL
+        value: info
+      - key: API_VERSION
+        value: v1
