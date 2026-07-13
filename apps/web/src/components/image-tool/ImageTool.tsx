@@ -516,15 +516,15 @@ export function ImageTool() {
               </div>
 
               <Tabs value={activeSubTab} onValueChange={(v: any) => setActiveSubTab(v)} className="w-full">
-                <TabsList className="grid grid-cols-3 w-full mb-3 h-8.5 p-0.5">
-                  <TabsTrigger value="compress" className="text-[10px] py-1 gap-1">
-                    <Sliders className="h-3 w-3" /> Compress & Filter
+                <TabsList className="grid grid-cols-3 w-full mb-3 h-auto gap-1 p-1">
+                  <TabsTrigger value="compress" className="flex-col h-auto py-2 gap-1 text-[10px] leading-tight whitespace-normal">
+                    <Sliders className="h-4 w-4" /> Compress
                   </TabsTrigger>
-                  <TabsTrigger value="metadata" className="text-[10px] py-1 gap-1">
-                    <Palette className="h-3 w-3" /> Metadata & Palette
+                  <TabsTrigger value="metadata" className="flex-col h-auto py-2 gap-1 text-[10px] leading-tight whitespace-normal">
+                    <Palette className="h-4 w-4" /> Metadata
                   </TabsTrigger>
-                  <TabsTrigger value="favicon" className="text-[10px] py-1 gap-1">
-                    <Star className="h-3 w-3" /> Favicon
+                  <TabsTrigger value="favicon" className="flex-col h-auto py-2 gap-1 text-[10px] leading-tight whitespace-normal">
+                    <Star className="h-4 w-4" /> Favicon
                   </TabsTrigger>
                 </TabsList>
 

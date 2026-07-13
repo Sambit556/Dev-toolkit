@@ -206,7 +206,7 @@ export const toolCategories = [
         label: 'Image Optimizer',
         icon: Sparkles,
         desc: 'Compress, scale, filter & generate favicons',
-        keywords: ['image compressor', 'image optimizer', 'resize image', 'compress image', 'image converter', 'image quality reducer', 'photo compressor', 'exif viewer', 'favicon generator', 'favicon maker', 'ico generator', 'apple touch icon generator', 'generate favicon', 'site icon creator'],
+        keywords: ['image compressor', 'image optimizer', 'resize image', 'compress image', 'image converter', 'image quality reducer', 'photo compressor', 'exif viewer', 'favicon generator', 'favicon maker', 'ico generator', 'apple touch icon generator', 'generate favicon', 'site icon creator', 'img', 'image enhancer', 'photo enhancer', 'meta', 'metadata', 'metadata viewer', 'image metadata'],
       },
       {
         href: '/countdown',
