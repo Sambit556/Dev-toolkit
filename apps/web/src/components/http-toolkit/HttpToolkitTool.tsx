@@ -245,7 +245,7 @@ export function HttpToolkitTool() {
   }, [statusSearch, statusCategory]);
 
   // --- HEADER INSPECTOR STATES ---
-  const [inspectUrl, setInspectUrl] = useState('https://example.com');
+  const [inspectUrl, setInspectUrl] = useState('');
   const [inspectUrlB, setInspectUrlB] = useState('');
   const [compareMode, setCompareMode] = useState(false);
   const [inspectMethod, setInspectMethod] = useState<'GET' | 'HEAD' | 'POST'>('GET');
