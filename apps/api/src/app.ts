@@ -65,6 +65,10 @@ const defaultLimit = process.env.BODY_LIMIT_DEFAULT || '1mb';
 const jsonLimit = process.env.BODY_LIMIT_JSON || '10mb';
 
 app.use('/api/json', express.json({ limit: jsonLimit }));
+// Webhook capture must read the exact bytes sent, for any content type —
+// mounted ahead of the JSON/urlencoded parsers below so they never touch
+// (and drain) this route's request stream first.
+app.use('/api/webhook/capture', express.raw({ type: () => true, limit: '1mb' }));
 app.use(express.json({ limit: defaultLimit }));
 app.use(express.urlencoded({ extended: false, limit: defaultLimit }));
 
