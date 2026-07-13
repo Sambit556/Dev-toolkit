@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import { toast } from 'sonner';
 
 // Morse Code mappings
@@ -278,29 +279,37 @@ export function EncoderDecoderTool() {
               </span>
 
               <div className="flex items-center gap-1.5">
-                <Button
-                  size="icon-sm"
-                  variant="ghost"
-                  onClick={() => handleCopyText(outputVal, 'Result')}
-                  title="Copy result string"
-                  disabled={!outputVal}
-                >
-                  <Copy className="h-4 w-4" />
-                </Button>
-                <Button
-                  size="icon-sm"
-                  variant="ghost"
-                  onClick={() => {
-                    const temp = inputVal;
-                    setInputVal(outputVal);
-                    setOutputVal(temp);
-                    setIsDecodeMode(!isDecodeMode);
-                  }}
-                  title="Swap Input and Output"
-                  disabled={!outputVal}
-                >
-                  <RefreshCw className="h-4 w-4" />
-                </Button>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      size="icon-sm"
+                      variant="ghost"
+                      onClick={() => handleCopyText(outputVal, 'Result')}
+                      disabled={!outputVal}
+                    >
+                      <Copy className="h-4 w-4" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Copy result string</TooltipContent>
+                </Tooltip>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      size="icon-sm"
+                      variant="ghost"
+                      onClick={() => {
+                        const temp = inputVal;
+                        setInputVal(outputVal);
+                        setOutputVal(temp);
+                        setIsDecodeMode(!isDecodeMode);
+                      }}
+                      disabled={!outputVal}
+                    >
+                      <RefreshCw className="h-4 w-4" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Swap Input and Output</TooltipContent>
+                </Tooltip>
               </div>
             </div>
 

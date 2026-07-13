@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import { toast } from 'sonner';
 import JSZip from 'jszip';
 import { buildIco } from '@/lib/ico';
@@ -706,18 +707,21 @@ export function ImageTool() {
 
                       <div className="flex items-center gap-2 flex-wrap">
                         {dominantColors.map((color, idx) => (
-                          <button
-                            key={idx}
-                            type="button"
-                            onClick={() => handleCopyColor(color)}
-                            style={{ backgroundColor: color }}
-                            className="h-8 w-8 rounded-full border border-white/20 shadow-md relative hover:scale-110 active:scale-95 transition-all group flex items-center justify-center cursor-pointer"
-                            title={`Click to copy: ${color}`}
-                          >
-                            <span className="opacity-0 group-hover:opacity-100 text-[8px] bg-slate-900/90 text-white font-mono rounded px-1 absolute -bottom-5 z-10 transition-opacity pointer-events-none">
-                              {color}
-                            </span>
-                          </button>
+                          <Tooltip key={idx}>
+                            <TooltipTrigger asChild>
+                              <button
+                                type="button"
+                                onClick={() => handleCopyColor(color)}
+                                style={{ backgroundColor: color }}
+                                className="h-8 w-8 rounded-full border border-white/20 shadow-md relative hover:scale-110 active:scale-95 transition-all group flex items-center justify-center cursor-pointer"
+                              >
+                                <span className="opacity-0 group-hover:opacity-100 text-[8px] bg-slate-900/90 text-white font-mono rounded px-1 absolute -bottom-5 z-10 transition-opacity pointer-events-none">
+                                  {color}
+                                </span>
+                              </button>
+                            </TooltipTrigger>
+                            <TooltipContent>{`Click to copy: ${color}`}</TooltipContent>
+                          </Tooltip>
                         ))}
                       </div>
                       <span className="text-[9px] text-muted-foreground block italic">Click any swatch to copy its Hex color value.</span>

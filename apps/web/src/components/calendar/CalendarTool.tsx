@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 
@@ -309,12 +310,22 @@ export function CalendarTool() {
                     className="pl-8.5 h-8 text-xs w-full sm:w-44 bg-background/40"
                   />
                 </div>
-                <Button variant="outline" size="icon-sm" onClick={handleExportIcs} title="Export to Google Calendar / Outlook (.ics)" className="h-8 w-8 border-dashed shrink-0">
-                  <Download className="h-3.5 w-3.5 text-primary" />
-                </Button>
-                <Button variant="outline" size="icon-sm" onClick={handleExportJson} title="Backup Events (.json)" className="h-8 w-8 border-dashed shrink-0">
-                  <Download className="h-3.5 w-3.5 text-emerald-600" />
-                </Button>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button variant="outline" size="icon-sm" onClick={handleExportIcs} className="h-8 w-8 border-dashed shrink-0">
+                      <Download className="h-3.5 w-3.5 text-primary" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Export to Google Calendar / Outlook (.ics)</TooltipContent>
+                </Tooltip>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button variant="outline" size="icon-sm" onClick={handleExportJson} className="h-8 w-8 border-dashed shrink-0">
+                      <Download className="h-3.5 w-3.5 text-emerald-600" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Backup Events (.json)</TooltipContent>
+                </Tooltip>
               </div>
             </div>
 

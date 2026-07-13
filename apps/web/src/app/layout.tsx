@@ -10,6 +10,7 @@ import { LocalizationProvider } from '@/context/LocalizationContext';
 import { HexCanvasBg } from '@/components/layout/HexCanvasBg';
 import { StickyNotes } from '@/components/layout/StickyNotes';
 import { QuickAccess } from '@/components/layout/QuickAccess';
+import { TooltipProvider } from '@/components/ui/tooltip';
 
 const inter = Inter({ subsets: ['latin'], variable: '--font-inter' });
 
@@ -179,14 +180,16 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           disableTransitionOnChange
         >
           <LocalizationProvider>
-            <HexCanvasBg />
-            <Header />
-            <main className="flex-1 relative z-10 w-full overflow-x-hidden">{children}</main>
-            <Footer />
-            <FloatingSupport />
-            <StickyNotes />
-            <QuickAccess />
-            <Toaster richColors position="bottom-right" />
+            <TooltipProvider delayDuration={200}>
+              <HexCanvasBg />
+              <Header />
+              <main className="flex-1 relative z-10 w-full overflow-x-hidden">{children}</main>
+              <Footer />
+              <FloatingSupport />
+              <StickyNotes />
+              <QuickAccess />
+              <Toaster richColors position="bottom-right" />
+            </TooltipProvider>
           </LocalizationProvider>
         </ThemeProvider>
       </body>

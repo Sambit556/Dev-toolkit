@@ -11,6 +11,7 @@ import { CodeEditor } from '@/components/ui/CodeEditor';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
+import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import jsyaml from 'js-yaml';
 import { marked } from 'marked';
 import DOMPurify from 'dompurify';
@@ -635,27 +636,62 @@ export function ConvertersTool() {
                   <Label htmlFor="md-in-box">Input Text</Label>
                   {mdDirection === 'md2html' && (
                     <div className="flex items-center gap-0.5">
-                      <Button variant="ghost" size="icon" className="h-6 w-6" title="Bold" onClick={() => insertMdWrap('**', '**', 'bold text')}>
-                        <Bold className="h-3.5 w-3.5" />
-                      </Button>
-                      <Button variant="ghost" size="icon" className="h-6 w-6" title="Italic" onClick={() => insertMdWrap('*', '*', 'italic text')}>
-                        <Italic className="h-3.5 w-3.5" />
-                      </Button>
-                      <Button variant="ghost" size="icon" className="h-6 w-6" title="Heading" onClick={() => insertMdLinePrefix('## ')}>
-                        <Heading2 className="h-3.5 w-3.5" />
-                      </Button>
-                      <Button variant="ghost" size="icon" className="h-6 w-6" title="Link" onClick={() => insertMdWrap('[', '](https://)', 'link text')}>
-                        <Link2 className="h-3.5 w-3.5" />
-                      </Button>
-                      <Button variant="ghost" size="icon" className="h-6 w-6" title="Inline code" onClick={() => insertMdWrap('`', '`', 'code')}>
-                        <Code className="h-3.5 w-3.5" />
-                      </Button>
-                      <Button variant="ghost" size="icon" className="h-6 w-6" title="Bullet list" onClick={() => insertMdLinePrefix('- ')}>
-                        <List className="h-3.5 w-3.5" />
-                      </Button>
-                      <Button variant="ghost" size="icon" className="h-6 w-6" title="Blockquote" onClick={() => insertMdLinePrefix('> ')}>
-                        <Quote className="h-3.5 w-3.5" />
-                      </Button>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => insertMdWrap('**', '**', 'bold text')}>
+                            <Bold className="h-3.5 w-3.5" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>Bold</TooltipContent>
+                      </Tooltip>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => insertMdWrap('*', '*', 'italic text')}>
+                            <Italic className="h-3.5 w-3.5" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>Italic</TooltipContent>
+                      </Tooltip>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => insertMdLinePrefix('## ')}>
+                            <Heading2 className="h-3.5 w-3.5" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>Heading</TooltipContent>
+                      </Tooltip>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => insertMdWrap('[', '](https://)', 'link text')}>
+                            <Link2 className="h-3.5 w-3.5" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>Link</TooltipContent>
+                      </Tooltip>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => insertMdWrap('`', '`', 'code')}>
+                            <Code className="h-3.5 w-3.5" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>Inline code</TooltipContent>
+                      </Tooltip>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => insertMdLinePrefix('- ')}>
+                            <List className="h-3.5 w-3.5" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>Bullet list</TooltipContent>
+                      </Tooltip>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => insertMdLinePrefix('> ')}>
+                            <Quote className="h-3.5 w-3.5" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>Blockquote</TooltipContent>
+                      </Tooltip>
                     </div>
                   )}
                 </div>

@@ -317,13 +317,17 @@ export function StickyNotes() {
               <StickyNote className="h-5 w-5 text-primary" />
               <h3 className="font-bold text-sm">Sticky Notes Manager</h3>
             </div>
-            <button
-              onClick={() => setIsOpen(false)}
-              className="text-muted-foreground hover:text-foreground p-1 hover:bg-muted/80 rounded-md transition-colors"
-              title="Close Sidebar"
-            >
-              <ChevronRight className="h-5 w-5" />
-            </button>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  onClick={() => setIsOpen(false)}
+                  className="text-muted-foreground hover:text-foreground p-1 hover:bg-muted/80 rounded-md transition-colors"
+                >
+                  <ChevronRight className="h-5 w-5" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent>Close Sidebar</TooltipContent>
+            </Tooltip>
           </div>
 
           <div className="py-3 flex gap-2">
@@ -371,13 +375,17 @@ export function StickyNotes() {
                       </span>
                       <span className="text-[10px] text-muted-foreground font-mono">{note.createdAt}</span>
                       <div className="flex items-center gap-1.5 ml-auto">
-                        <button
-                          onClick={() => deleteNote(note.id)}
-                          className="text-red-500 hover:text-red-600 hover:bg-red-500/10 rounded p-0.5 transition-colors"
-                          title="Delete note"
-                        >
-                          <Trash2 className="h-3 w-3" />
-                        </button>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <button
+                              onClick={() => deleteNote(note.id)}
+                              className="text-red-500 hover:text-red-600 hover:bg-red-500/10 rounded p-0.5 transition-colors"
+                            >
+                              <Trash2 className="h-3 w-3" />
+                            </button>
+                          </TooltipTrigger>
+                          <TooltipContent>Delete note</TooltipContent>
+                        </Tooltip>
                       </div>
                     </div>
                     <p className={cn("text-xs line-clamp-2 italic", colorObj.text)}>

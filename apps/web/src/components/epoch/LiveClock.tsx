@@ -5,6 +5,7 @@ import { Copy, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import { copyToClipboard } from '@/lib/utils';
 import { formatDateForDisplay } from '@/lib/epoch';
 import { usePreferencesStore } from '@/store/preferences';
@@ -69,14 +70,18 @@ export function LiveClock() {
           <div className={`h-2 w-2 rounded-full ${isRunning ? 'bg-green-500 animate-pulse' : 'bg-muted-foreground'}`} />
           <span className="text-sm font-medium">Live Unix Timestamp</span>
         </div>
-        <Button
-          variant="ghost"
-          size="icon-sm"
-          onClick={() => setIsRunning((r) => !r)}
-          title={isRunning ? 'Pause' : 'Resume'}
-        >
-          <RefreshCw className={`h-3.5 w-3.5 ${isRunning ? 'animate-spin' : ''}`} style={{ animationDuration: '3s' }} />
-        </Button>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              onClick={() => setIsRunning((r) => !r)}
+            >
+              <RefreshCw className={`h-3.5 w-3.5 ${isRunning ? 'animate-spin' : ''}`} style={{ animationDuration: '3s' }} />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>{isRunning ? 'Pause' : 'Resume'}</TooltipContent>
+        </Tooltip>
       </div>
 
       <div className="px-4 py-3 border-b bg-muted/10">

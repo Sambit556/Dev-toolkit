@@ -15,6 +15,7 @@ import type { TimestampUnit } from '@devchrono/shared';
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
+import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 
 const UNITS: { value: TimestampUnit; label: string }[] = [
   { value: 'seconds', label: 'Seconds (s)' },
@@ -154,14 +155,18 @@ export function TimestampToDate() {
           <Button onClick={convert} className="flex-1 sm:flex-none">
             Convert to Date
           </Button>
-          <Button
-            variant="outline"
-            size="icon"
-            onClick={() => { setInput(''); setResult(null); setError(null); }}
-            title="Clear (C)"
-          >
-            <RotateCcw className="h-4 w-4" />
-          </Button>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={() => { setInput(''); setResult(null); setError(null); }}
+              >
+                <RotateCcw className="h-4 w-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Clear (C)</TooltipContent>
+          </Tooltip>
           <Button
             variant="outline"
             size="sm"

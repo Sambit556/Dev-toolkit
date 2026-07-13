@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import { UNIT_CATEGORIES, convertUnit } from '@/lib/unit';
 import { toast } from 'sonner';
 
@@ -221,15 +222,19 @@ export function UnitTool() {
                         <Copy className="h-3 w-3" />
                       </Button>
                       {!isCurrent && (
-                        <Button
-                          variant="ghost"
-                          size="icon-sm"
-                          onClick={() => setToUnit(unit.value)}
-                          className="h-5 w-5 font-mono text-[9px] font-black"
-                          title="Set as Target"
-                        >
-                          TO
-                        </Button>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="icon-sm"
+                              onClick={() => setToUnit(unit.value)}
+                              className="h-5 w-5 font-mono text-[9px] font-black"
+                            >
+                              TO
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>Set as Target</TooltipContent>
+                        </Tooltip>
                       )}
                     </div>
                   </div>

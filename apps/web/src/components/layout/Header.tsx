@@ -44,6 +44,7 @@ import { useTheme } from 'next-themes';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
+import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useLocale, SUPPORTED_LANGUAGES } from '@/context/LocalizationContext';
 import {
@@ -626,15 +627,19 @@ export function Header() {
             <LanguageSwitcher />
           </div>
           <KeyboardShortcuts />
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            onClick={() => window.dispatchEvent(new CustomEvent('toggle-command-palette'))}
-            aria-label="Open command palette"
-            title="Search tools (Ctrl+S or /)"
-          >
-            <Search className="h-4 w-4" />
-          </Button>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                onClick={() => window.dispatchEvent(new CustomEvent('toggle-command-palette'))}
+                aria-label="Open command palette"
+              >
+                <Search className="h-4 w-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Search tools (Ctrl+S or /)</TooltipContent>
+          </Tooltip>
           <ThemeToggle />
           {/* Mobile menu */}
           <Button

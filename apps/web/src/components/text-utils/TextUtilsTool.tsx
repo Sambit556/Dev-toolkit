@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
+import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import { toast } from 'sonner';
 
 // Text conversion helper functions
@@ -211,15 +212,19 @@ export function TextUtilsTool() {
           <CardContent className="p-4 space-y-4">
             <div className="flex items-center justify-between pb-2 border-b">
               <Label className="font-bold text-sm">Input Text</Label>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-7 w-7 text-muted-foreground hover:text-red-500"
-                onClick={handleClear}
-                title="Clear Text"
-              >
-                <Trash2 className="h-3.5 w-3.5" />
-              </Button>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7 text-muted-foreground hover:text-red-500"
+                    onClick={handleClear}
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Clear Text</TooltipContent>
+              </Tooltip>
             </div>
             <Textarea
               className="min-h-[280px] text-xs leading-relaxed font-mono"
@@ -260,15 +265,19 @@ export function TextUtilsTool() {
                     <div key={item.key} className="space-y-1.5 border rounded-lg p-2.5 bg-muted/20 relative group">
                       <div className="flex items-center justify-between text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
                         <span>{item.label}</span>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-5 w-5 opacity-0 group-hover:opacity-100 transition-opacity absolute right-2 top-2"
-                          onClick={() => handleCopy(item.value, item.label)}
-                          title={`Copy ${item.label}`}
-                        >
-                          <Copy className="h-3 w-3" />
-                        </Button>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-5 w-5 opacity-0 group-hover:opacity-100 transition-opacity absolute right-2 top-2"
+                              onClick={() => handleCopy(item.value, item.label)}
+                            >
+                              <Copy className="h-3 w-3" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>{`Copy ${item.label}`}</TooltipContent>
+                        </Tooltip>
                       </div>
                       <div className="font-mono text-xs text-foreground truncate pr-6 select-all min-h-[16px] break-all pt-1">
                         {item.value || <span className="text-muted-foreground/30 italic">No input</span>}

@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
+import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import { toast } from 'sonner';
 
 interface FlagDef {
@@ -147,19 +148,22 @@ export function RegexTesterTool() {
 
           <div className="flex flex-wrap items-center gap-1.5 pt-1">
             {FLAGS.map((f) => (
-              <button
-                key={f.key}
-                type="button"
-                title={f.hint}
-                onClick={() => toggleFlag(f.key)}
-                className={`h-7 w-7 rounded-md border text-xs font-mono font-bold transition-colors ${
-                  activeFlags.has(f.key)
-                    ? 'bg-primary text-primary-foreground border-primary'
-                    : 'bg-background text-muted-foreground hover:bg-muted/50'
-                }`}
-              >
-                {f.label}
-              </button>
+              <Tooltip key={f.key}>
+                <TooltipTrigger asChild>
+                  <button
+                    type="button"
+                    onClick={() => toggleFlag(f.key)}
+                    className={`h-7 w-7 rounded-md border text-xs font-mono font-bold transition-colors ${
+                      activeFlags.has(f.key)
+                        ? 'bg-primary text-primary-foreground border-primary'
+                        : 'bg-background text-muted-foreground hover:bg-muted/50'
+                    }`}
+                  >
+                    {f.label}
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent>{f.hint}</TooltipContent>
+              </Tooltip>
             ))}
             <span className="text-[10px] text-muted-foreground ml-1">Toggle flags</span>
           </div>

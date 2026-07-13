@@ -32,6 +32,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import { HTTP_STATUS_CODES } from '@/lib/http-status-codes';
 import { gradeSecurityHeaders, type SecurityGradeResult } from '@/lib/security-headers';
 import { buildCurlCommand, tryPrettyJson } from '@/lib/http-toolkit-utils';
@@ -789,9 +790,14 @@ export function HttpToolkitTool() {
                     <Webhook className="h-4 w-4" />
                   </div>
                   <Input value={captureUrl ?? ''} readOnly className="font-mono text-xs h-8" />
-                  <Button variant="outline" size="icon" onClick={() => handleCopy(captureUrl ?? '', 'Capture URL copied')} className="h-8 w-8 shrink-0" title="Copy capture URL">
-                    <Copy className="h-3.5 w-3.5" />
-                  </Button>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button variant="outline" size="icon" onClick={() => handleCopy(captureUrl ?? '', 'Capture URL copied')} className="h-8 w-8 shrink-0">
+                        <Copy className="h-3.5 w-3.5" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>Copy capture URL</TooltipContent>
+                  </Tooltip>
                 </div>
                 <div className="flex flex-wrap items-center gap-1.5">
                   <Badge className="border-0 bg-violet-500/10 text-violet-600 dark:text-violet-400 text-[10px] gap-1">
@@ -803,15 +809,30 @@ export function HttpToolkitTool() {
                     expires after 1h idle
                   </Badge>
                   <div className="flex gap-1.5 ml-auto">
-                    <Button variant="outline" size="icon" className="h-7 w-7" onClick={handleManualRefresh} disabled={webhookRefreshing} title="Refresh now">
-                      <RefreshCcw className={`h-3.5 w-3.5 ${webhookRefreshing ? 'animate-spin' : ''}`} />
-                    </Button>
-                    <Button variant="outline" size="icon" className="h-7 w-7" onClick={() => setMockDialogOpen(true)} title="Configure mock response">
-                      <Settings2 className="h-3.5 w-3.5" />
-                    </Button>
-                    <Button variant="outline" size="icon" className="h-7 w-7 text-red-500 hover:bg-red-500/10" onClick={clearWebhook} title="Clear captured requests">
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </Button>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button variant="outline" size="icon" className="h-7 w-7" onClick={handleManualRefresh} disabled={webhookRefreshing}>
+                          <RefreshCcw className={`h-3.5 w-3.5 ${webhookRefreshing ? 'animate-spin' : ''}`} />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>Refresh now</TooltipContent>
+                    </Tooltip>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button variant="outline" size="icon" className="h-7 w-7" onClick={() => setMockDialogOpen(true)}>
+                          <Settings2 className="h-3.5 w-3.5" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>Configure mock response</TooltipContent>
+                    </Tooltip>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button variant="outline" size="icon" className="h-7 w-7 text-red-500 hover:bg-red-500/10" onClick={clearWebhook}>
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>Clear captured requests</TooltipContent>
+                    </Tooltip>
                     <Button variant="outline" size="sm" onClick={createWebhook} className="h-7 text-xs gap-1">
                       New URL
                     </Button>
@@ -948,9 +969,14 @@ export function HttpToolkitTool() {
                               </Badge>
                             )}
                             <span className="truncate">{req.path}</span>
-                            <span className="ml-auto text-muted-foreground shrink-0" title={new Date(req.receivedAt).toLocaleString()}>
-                              {timeAgo(req.receivedAt)}
-                            </span>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <span className="ml-auto text-muted-foreground shrink-0">
+                                  {timeAgo(req.receivedAt)}
+                                </span>
+                              </TooltipTrigger>
+                              <TooltipContent>{new Date(req.receivedAt).toLocaleString()}</TooltipContent>
+                            </Tooltip>
                           </button>
                           {isExpanded && (
                             <div className="p-3 bg-muted/20 text-xs font-mono space-y-2 border-t">

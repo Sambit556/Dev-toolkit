@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
+import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import { toast } from 'sonner';
 
 const CURRENCIES = [
@@ -233,15 +234,19 @@ export function CurrencyExchangerTool() {
 
             {/* Swap button and To currency select */}
             <div className="flex items-center gap-2">
-              <Button
-                variant="outline"
-                size="icon"
-                onClick={handleSwap}
-                className="h-9 w-9 border shrink-0 transition-transform active:rotate-180 duration-200"
-                title="Swap currencies"
-              >
-                <ArrowLeftRight className="h-3.5 w-3.5" />
-              </Button>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    onClick={handleSwap}
+                    className="h-9 w-9 border shrink-0 transition-transform active:rotate-180 duration-200"
+                  >
+                    <ArrowLeftRight className="h-3.5 w-3.5" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Swap currencies</TooltipContent>
+              </Tooltip>
 
               <div className="space-y-1.5 flex-1">
                 <Label htmlFor="to-curr">To</Label>

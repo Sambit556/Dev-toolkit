@@ -11,6 +11,7 @@ import { TimezoneSelector } from './TimezoneSelector';
 import { parseDateString } from '@/lib/epoch';
 import { copyToClipboard } from '@/lib/utils';
 import { usePreferencesStore } from '@/store/preferences';
+import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 
 interface ConversionResult {
   unixSeconds: number;
@@ -124,14 +125,18 @@ export function DateToTimestamp() {
           <Button onClick={convert} className="flex-1 sm:flex-none">
             Convert to Timestamp
           </Button>
-          <Button
-            variant="outline"
-            size="icon"
-            onClick={() => { setInput(''); setResult(null); setError(null); }}
-            title="Clear"
-          >
-            <RotateCcw className="h-4 w-4" />
-          </Button>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={() => { setInput(''); setResult(null); setError(null); }}
+              >
+                <RotateCcw className="h-4 w-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Clear</TooltipContent>
+          </Tooltip>
         </div>
       </div>
 

@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import { toast } from 'sonner';
 
 // Helper to format time: seconds -> HH:MM:SS
@@ -230,15 +231,19 @@ export function CountdownTool() {
                   <Timer className="h-4 w-4 text-primary" />
                   Timer Settings
                 </span>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-8 w-8 rounded-lg hover:bg-primary/15 hover:text-primary transition-all text-muted-foreground"
-                  onClick={() => setIsSoundEnabled(!isSoundEnabled)}
-                  title={isSoundEnabled ? 'Disable Alarm Sound' : 'Enable Alarm Sound'}
-                >
-                  {isSoundEnabled ? <Volume2 className="h-4.5 w-4.5 text-primary" /> : <VolumeX className="h-4.5 w-4.5 text-muted-foreground/50" />}
-                </Button>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 rounded-lg hover:bg-primary/15 hover:text-primary transition-all text-muted-foreground"
+                      onClick={() => setIsSoundEnabled(!isSoundEnabled)}
+                    >
+                      {isSoundEnabled ? <Volume2 className="h-4.5 w-4.5 text-primary" /> : <VolumeX className="h-4.5 w-4.5 text-muted-foreground/50" />}
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>{isSoundEnabled ? 'Disable Alarm Sound' : 'Enable Alarm Sound'}</TooltipContent>
+                </Tooltip>
               </div>
 
               {/* Time Configuration Inputs */}

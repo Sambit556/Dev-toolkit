@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
+import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import { hexToRgb, rgbToHex, rgbToHsl, hslToRgb, rgbToHsv, rgbToCmyk, getContrastRatio, getColorHarmonies } from '@/lib/color';
 import { toast } from 'sonner';
 
@@ -316,17 +317,20 @@ export function ColorTool() {
                         </span>
                         <div className="flex gap-1.5">
                           {colors.map((color) => (
-                            <div
-                              key={color}
-                              className="h-10 flex-1 rounded-md shadow-sm border border-black/10 cursor-pointer relative group overflow-hidden"
-                              style={{ backgroundColor: color }}
-                              onClick={() => setHexColor(color)}
-                              title={`Click to select: ${color}`}
-                            >
-                              <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity text-[10px] font-mono text-white font-bold">
-                                {color}
-                              </div>
-                            </div>
+                            <Tooltip key={color}>
+                              <TooltipTrigger asChild>
+                                <div
+                                  className="h-10 flex-1 rounded-md shadow-sm border border-black/10 cursor-pointer relative group overflow-hidden"
+                                  style={{ backgroundColor: color }}
+                                  onClick={() => setHexColor(color)}
+                                >
+                                  <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity text-[10px] font-mono text-white font-bold">
+                                    {color}
+                                  </div>
+                                </div>
+                              </TooltipTrigger>
+                              <TooltipContent>{`Click to select: ${color}`}</TooltipContent>
+                            </Tooltip>
                           ))}
                         </div>
                       </div>

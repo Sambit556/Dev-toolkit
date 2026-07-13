@@ -11,6 +11,7 @@ import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
+import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import bcrypt from 'bcryptjs';
 import { toast } from 'sonner';
 import { generateV4, generateV1, generateUlid, generateNanoId, generateV5, decodeUuidV1 } from '@/lib/uuid';
@@ -422,9 +423,14 @@ export function SecurityTools() {
                 <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground" onClick={() => setShowPassword(!showPassword)}>
                   {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                 </Button>
-                <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground" onClick={generatePasswd} title="Regenerate">
-                  <RefreshCw className="h-4 w-4" />
-                </Button>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground" onClick={generatePasswd}>
+                      <RefreshCw className="h-4 w-4" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Regenerate</TooltipContent>
+                </Tooltip>
                 <Button size="icon" className="h-8 w-8" onClick={() => handleCopy(generatedPass, 'Password')}>
                   <Copy className="h-4 w-4" />
                 </Button>
@@ -490,9 +496,14 @@ export function SecurityTools() {
                   <Shield className="h-4 w-4 text-primary" />
                   Token & Bulk Generator
                 </span>
-                <Button size="icon" className="h-7 w-7" onClick={() => handleCopy(generatedTokens, 'Tokens')} title="Copy All">
-                  <Copy className="h-4 w-4" />
-                </Button>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button size="icon" className="h-7 w-7" onClick={() => handleCopy(generatedTokens, 'Tokens')}>
+                      <Copy className="h-4 w-4" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Copy All</TooltipContent>
+                </Tooltip>
               </div>
 
               {/* Display Result */}

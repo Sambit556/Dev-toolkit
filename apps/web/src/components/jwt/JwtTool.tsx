@@ -10,6 +10,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
+import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import { CodeEditor } from '@/components/ui/CodeEditor';
 import { decodeJwt, verifySignature, signJwt } from '@/lib/jwt';
 import { toast } from 'sonner';
@@ -223,15 +224,19 @@ export function JwtTool() {
         <div className="flex flex-col gap-1.5 p-3 bg-red-500/5 dark:bg-red-500/10 border border-red-500/20 border-l-4 border-l-red-500 rounded-r-lg">
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-black uppercase text-red-600 dark:text-red-400 tracking-wider">Part 1: Header (Algorithm & Type)</span>
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              onClick={() => handleCopy(parts[0], 'Header segment')}
-              className="h-5 w-5 text-red-500 hover:text-red-600 hover:bg-red-500/10"
-              title="Copy header part"
-            >
-              <Copy className="h-3 w-3" />
-            </Button>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  onClick={() => handleCopy(parts[0], 'Header segment')}
+                  className="h-5 w-5 text-red-500 hover:text-red-600 hover:bg-red-500/10"
+                >
+                  <Copy className="h-3 w-3" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Copy header part</TooltipContent>
+            </Tooltip>
           </div>
           <span className="break-all text-red-600 dark:text-red-400 select-text leading-relaxed">{parts[0]}</span>
         </div>
@@ -240,15 +245,19 @@ export function JwtTool() {
           <div className="flex flex-col gap-1.5 p-3 bg-purple-500/5 dark:bg-purple-500/10 border border-purple-500/20 border-l-4 border-l-purple-500 rounded-r-lg">
             <div className="flex items-center justify-between">
               <span className="text-[10px] font-black uppercase text-purple-600 dark:text-purple-400 tracking-wider">Part 2: Payload (Claims & Data)</span>
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                onClick={() => handleCopy(parts[1], 'Payload segment')}
-                className="h-5 w-5 text-purple-500 hover:text-purple-600 hover:bg-purple-500/10"
-                title="Copy payload part"
-              >
-                <Copy className="h-3 w-3" />
-              </Button>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    onClick={() => handleCopy(parts[1], 'Payload segment')}
+                    className="h-5 w-5 text-purple-500 hover:text-purple-600 hover:bg-purple-500/10"
+                  >
+                    <Copy className="h-3 w-3" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Copy payload part</TooltipContent>
+              </Tooltip>
             </div>
             <span className="break-all text-purple-600 dark:text-purple-400 select-text leading-relaxed">{parts[1]}</span>
           </div>
@@ -258,15 +267,19 @@ export function JwtTool() {
           <div className="flex flex-col gap-1.5 p-3 bg-emerald-500/5 dark:bg-emerald-500/10 border border-emerald-500/20 border-l-4 border-l-emerald-500 rounded-r-lg">
             <div className="flex items-center justify-between">
               <span className="text-[10px] font-black uppercase text-emerald-600 dark:text-emerald-455 tracking-wider">Part 3: Signature (Verification Signature)</span>
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                onClick={() => handleCopy(parts[2], 'Signature segment')}
-                className="h-5 w-5 text-emerald-500 hover:text-emerald-600 hover:bg-emerald-500/10"
-                title="Copy signature part"
-              >
-                <Copy className="h-3 w-3" />
-              </Button>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    onClick={() => handleCopy(parts[2], 'Signature segment')}
+                    className="h-5 w-5 text-emerald-500 hover:text-emerald-600 hover:bg-emerald-500/10"
+                  >
+                    <Copy className="h-3 w-3" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Copy signature part</TooltipContent>
+              </Tooltip>
             </div>
             <span className="break-all text-emerald-600 dark:text-emerald-455 select-text leading-relaxed">{parts[2]}</span>
           </div>

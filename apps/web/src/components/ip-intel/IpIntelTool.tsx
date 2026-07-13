@@ -31,6 +31,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
+import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import { useLocale } from '@/context/LocalizationContext';
 import { toast } from 'sonner';
 
@@ -861,9 +862,14 @@ export function IpIntelTool() {
                   </div>
                   <div className="min-w-0">
                     <p className="text-[10px] text-muted-foreground font-semibold leading-none">Client IPv6</p>
-                    <p className="font-mono text-xs font-black mt-1 truncate" title={userIpv6 || 'Not detected'}>
-                      {userIpv6 || 'Not detected'}
-                    </p>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <p className="font-mono text-xs font-black mt-1 truncate">
+                          {userIpv6 || 'Not detected'}
+                        </p>
+                      </TooltipTrigger>
+                      <TooltipContent>{userIpv6 || 'Not detected'}</TooltipContent>
+                    </Tooltip>
                   </div>
                 </div>
                 {userIpv6 && (
@@ -1196,10 +1202,25 @@ export function IpIntelTool() {
                   <div key={idx} className="flex flex-col sm:flex-row items-start sm:items-center justify-between border rounded-xl p-3 bg-muted/15 text-xs gap-3">
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2 min-w-0">
-                        <span className="font-bold text-foreground truncate min-w-0" title={target.name}>{target.name}</span>
-                        <Badge variant="secondary" className="font-mono text-[9px] h-4.5 shrink-0 max-w-[160px] truncate" title={target.url}>{target.url}</Badge>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <span className="font-bold text-foreground truncate min-w-0">{target.name}</span>
+                          </TooltipTrigger>
+                          <TooltipContent>{target.name}</TooltipContent>
+                        </Tooltip>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Badge variant="secondary" className="font-mono text-[9px] h-4.5 shrink-0 max-w-[160px] truncate">{target.url}</Badge>
+                          </TooltipTrigger>
+                          <TooltipContent>{target.url}</TooltipContent>
+                        </Tooltip>
                       </div>
-                      <p className="text-[10px] text-muted-foreground mt-0.5 truncate" title={target.desc}>{target.desc}</p>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <p className="text-[10px] text-muted-foreground mt-0.5 truncate">{target.desc}</p>
+                        </TooltipTrigger>
+                        <TooltipContent>{target.desc}</TooltipContent>
+                      </Tooltip>
                     </div>
 
                     <div className="flex items-center gap-3 shrink-0 self-end sm:self-auto">

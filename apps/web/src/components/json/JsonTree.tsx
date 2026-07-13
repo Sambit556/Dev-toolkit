@@ -5,6 +5,7 @@ import { ChevronRight, ChevronDown, Copy, Check } from 'lucide-react';
 import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import { flattenJson, type FlatNode } from '@/lib/json-utils';
 import { copyToClipboard, cn } from '@/lib/utils';
 import type { JsonNodeType } from '@devchrono/shared';
@@ -34,9 +35,14 @@ function ValueDisplay({ type, value }: { type: JsonNodeType; value: unknown }) {
     const str = value as string;
     const truncated = str.length > 100 ? str.slice(0, 100) + '…' : str;
     return (
-      <span className="json-string font-mono text-sm" title={str.length > 100 ? str : undefined}>
-        &quot;{truncated}&quot;
-      </span>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <span className="json-string font-mono text-sm">
+            &quot;{truncated}&quot;
+          </span>
+        </TooltipTrigger>
+        <TooltipContent>{str.length > 100 ? str : undefined}</TooltipContent>
+      </Tooltip>
     );
   }
   return null;
@@ -46,21 +52,25 @@ function PathCopyButton({ path }: { path: string }) {
   const [copied, setCopied] = useState(false);
 
   return (
-    <Button
-      variant="ghost"
-      size="icon-sm"
-      className="h-5 w-5 opacity-0 group-hover:opacity-100 transition-opacity"
-      onClick={async (e) => {
-        e.stopPropagation();
-        await copyToClipboard(path);
-        toast.success('Path copied');
-        setCopied(true);
-        setTimeout(() => setCopied(false), 2000);
-      }}
-      title={`Copy path: ${path}`}
-    >
-      {copied ? <Check className="h-2.5 w-2.5 text-green-500" /> : <Copy className="h-2.5 w-2.5" />}
-    </Button>
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          className="h-5 w-5 opacity-0 group-hover:opacity-100 transition-opacity"
+          onClick={async (e) => {
+            e.stopPropagation();
+            await copyToClipboard(path);
+            toast.success('Path copied');
+            setCopied(true);
+            setTimeout(() => setCopied(false), 2000);
+          }}
+        >
+          {copied ? <Check className="h-2.5 w-2.5 text-green-500" /> : <Copy className="h-2.5 w-2.5" />}
+        </Button>
+      </TooltipTrigger>
+      <TooltipContent>{`Copy path: ${path}`}</TooltipContent>
+    </Tooltip>
   );
 }
 

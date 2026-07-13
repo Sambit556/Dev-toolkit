@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Plus, Minus, Trash2, Equal, ArrowLeftRight, Calculator } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import {
   parseDurationString, formatMsToDuration, autoFormatDurationDigits,
   DURATION_UNIT_MS, trimDecimal, type DurationUnitKey,
@@ -284,19 +285,25 @@ export function DurationArithmetic() {
 
           return (
             <div key={row.id} className="flex items-center gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                size="icon-sm"
-                onClick={() => toggleSign(row.id)}
-                className={cn(
-                  'shrink-0',
-                  row.sign === '+' ? 'text-green-600 border-green-600/40' : 'text-destructive border-destructive/40',
-                )}
-                title={row.sign === '+' ? 'Addition — click to switch to subtraction' : 'Subtraction — click to switch to addition'}
-              >
-                {row.sign === '+' ? <Plus className="h-3.5 w-3.5" /> : <Minus className="h-3.5 w-3.5" />}
-              </Button>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon-sm"
+                    onClick={() => toggleSign(row.id)}
+                    className={cn(
+                      'shrink-0',
+                      row.sign === '+' ? 'text-green-600 border-green-600/40' : 'text-destructive border-destructive/40',
+                    )}
+                  >
+                    {row.sign === '+' ? <Plus className="h-3.5 w-3.5" /> : <Minus className="h-3.5 w-3.5" />}
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  {row.sign === '+' ? 'Addition — click to switch to subtraction' : 'Subtraction — click to switch to addition'}
+                </TooltipContent>
+              </Tooltip>
               <Input
                 value={row.value}
                 onChange={(e) => updateRow(row.id, e.target.value)}
@@ -309,17 +316,21 @@ export function DurationArithmetic() {
               )}>
                 {badgeLabel}
               </span>
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon-sm"
-                onClick={() => removeRow(row.id)}
-                disabled={rows.length <= 1}
-                className="shrink-0 text-red-500 hover:text-red-600 hover:bg-red-500/10"
-                title="Remove row"
-              >
-                <Trash2 className="h-3.5 w-3.5" />
-              </Button>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon-sm"
+                    onClick={() => removeRow(row.id)}
+                    disabled={rows.length <= 1}
+                    className="shrink-0 text-red-500 hover:text-red-600 hover:bg-red-500/10"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Remove row</TooltipContent>
+              </Tooltip>
             </div>
           );
         })}
@@ -385,9 +396,14 @@ export function DurationArithmetic() {
               <div className="grid gap-2 grid-cols-2 sm:grid-cols-5">
                 <div className="rounded-md border p-2.5 bg-card/50">
                   <span className="text-[10px] text-muted-foreground font-semibold block">Milliseconds</span>
-                  <code className="font-mono text-xs font-bold block mt-1 truncate" title={calculatedMs.toString()}>
-                    {calculatedMs}
-                  </code>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <code className="font-mono text-xs font-bold block mt-1 truncate">
+                        {calculatedMs}
+                      </code>
+                    </TooltipTrigger>
+                    <TooltipContent>{calculatedMs.toString()}</TooltipContent>
+                  </Tooltip>
                 </div>
                 <div className="rounded-md border p-2.5 bg-card/50">
                   <span className="text-[10px] text-muted-foreground font-semibold block">Seconds</span>
