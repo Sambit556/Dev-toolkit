@@ -13,12 +13,16 @@
   },
   "scripts": {
     "build": "tsc",
-    "dev": "tsc --watch"
+    "dev": "tsc --watch",
+    "lint": "eslint ."
   },
   "dependencies": {
     "zod": "^3.22.4"
   },
   "devDependencies": {
-    "typescript": "^5.3.3"
+    "@eslint/js": "^9.39.5",
+    "eslint": "^9.39.5",
+    "typescript": "^5.3.3",
+    "typescript-eslint": "^8.46.0"
   }
 }

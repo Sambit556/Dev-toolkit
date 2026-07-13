@@ -180,7 +180,7 @@ export function LoremIpsumTool() {
           </div>
 
           <div className="flex items-center justify-between pt-2 border-t text-xs">
-            <Label htmlFor="start-lorem" className="cursor-pointer">Start with "Lorem ipsum"</Label>
+            <Label htmlFor="start-lorem" className="cursor-pointer">Start with &quot;Lorem ipsum&quot;</Label>
             <Switch
               id="start-lorem"
               checked={startWithLorem}

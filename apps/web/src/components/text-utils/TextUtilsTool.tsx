@@ -330,7 +330,7 @@ export function TextUtilsTool() {
                         return (
                           <div key={idx} className="text-xs space-y-1">
                             <div className="flex justify-between font-mono">
-                              <span className="font-semibold text-foreground">"{item.word}"</span>
+                              <span className="font-semibold text-foreground">&quot;{item.word}&quot;</span>
                               <span className="text-muted-foreground">{item.count} times ({pct}%)</span>
                             </div>
                             <div className="w-full bg-muted rounded-full h-1.5 overflow-hidden">
@@ -361,7 +361,7 @@ export function TextUtilsTool() {
                         return (
                           <div key={idx} className="text-xs space-y-1">
                             <div className="flex justify-between font-mono">
-                              <span className="font-semibold text-foreground">'{item.char}'</span>
+                              <span className="font-semibold text-foreground">&apos;{item.char}&apos;</span>
                               <span className="text-muted-foreground">{item.count} times ({pct}%)</span>
                             </div>
                             <div className="w-full bg-muted rounded-full h-1.5 overflow-hidden">

@@ -1,19 +1,7 @@
 import type { Metadata } from 'next';
-import { ArrowRightLeft, Loader2 } from 'lucide-react';
-import dynamic from 'next/dynamic';
+import { ArrowRightLeft } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
-
-const FileConverterTool = dynamic(
-  () => import('@/components/file-converter/FileConverterTool').then((m) => m.FileConverterTool),
-  {
-    ssr: false,
-    loading: () => (
-      <div className="flex items-center justify-center p-12 bg-muted/20 border border-dashed rounded-xl">
-        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-      </div>
-    ),
-  }
-);
+import { FileConverterTool } from './Lazy';
 
 export const metadata: Metadata = {
   title: 'Client-Side File Converter',

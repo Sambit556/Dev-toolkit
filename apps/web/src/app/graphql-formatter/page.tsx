@@ -1,19 +1,7 @@
 import type { Metadata } from 'next';
-import { Share2, Loader2 } from 'lucide-react';
-import dynamic from 'next/dynamic';
+import { Share2 } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
-
-const GraphqlFormatterTool = dynamic(
-  () => import('@/components/graphql-formatter/GraphqlFormatterTool').then((m) => m.GraphqlFormatterTool),
-  {
-    ssr: false,
-    loading: () => (
-      <div className="flex items-center justify-center p-12 bg-muted/20 border border-dashed rounded-xl">
-        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-      </div>
-    ),
-  }
-);
+import { GraphqlFormatterTool } from './Lazy';
 
 export const metadata: Metadata = {
   title: 'GraphQL Formatter & Validator — Beautify Queries Online',

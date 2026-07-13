@@ -1,19 +1,7 @@
 import type { Metadata } from 'next';
-import { Webhook, Loader2 } from 'lucide-react';
-import dynamic from 'next/dynamic';
+import { Webhook } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
-
-const HttpToolkitTool = dynamic(
-  () => import('@/components/http-toolkit/HttpToolkitTool').then((m) => m.HttpToolkitTool),
-  {
-    ssr: false,
-    loading: () => (
-      <div className="flex items-center justify-center p-12 bg-muted/20 border border-dashed rounded-xl">
-        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-      </div>
-    ),
-  }
-);
+import { HttpToolkitTool } from './Lazy';
 
 export const metadata: Metadata = {
   title: 'HTTP Toolkit — Status Codes, Header Inspector, Webhook Tester',
@@ -31,7 +19,7 @@ export default function HttpToolkitPage() {
           <h1 className="text-2xl font-bold">HTTP Toolkit</h1>
         </div>
         <p className="text-muted-foreground text-sm">
-          Look up HTTP status codes, inspect a URL's response headers, or spin up a live webhook capture URL to test incoming requests.
+          Look up HTTP status codes, inspect a URL&apos;s response headers, or spin up a live webhook capture URL to test incoming requests.
         </p>
       </div>
 

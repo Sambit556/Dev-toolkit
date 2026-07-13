@@ -209,7 +209,7 @@ export function CommandPalette() {
                 <CornerDownLeft className="h-2.5 w-2.5" /> Select
               </span>
             </div>
-            <span>Press Win/Cmd key or Ctrl+S / '/' key anytime</span>
+            <span>Press Win/Cmd key or Ctrl+S / &apos;/&apos; key anytime</span>
           </div>
         </div>
       </DialogContent>

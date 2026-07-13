@@ -34,7 +34,7 @@ export function DiffHistoryPanel({ open, onOpenChange, onLoad }: DiffHistoryPane
 
         {diffEntries.length === 0 ? (
           <p className="text-sm text-muted-foreground py-6 text-center">
-            No diff history yet. Click "Compare Text" to save a comparison here.
+            No diff history yet. Click &quot;Compare Text&quot; to save a comparison here.
           </p>
         ) : (
           <div className="space-y-2 max-h-96 overflow-y-auto">

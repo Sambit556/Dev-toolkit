@@ -50,15 +50,6 @@ const nextConfig = {
     ];
   },
 
-  // Webpack customizations for Monaco Editor and workspace packages
-  webpack: (config) => {
-    config.resolve.alias = {
-      ...config.resolve.alias,
-      '@devchrono/shared': path.resolve(__dirname, '../../packages/shared/src/index.ts'),
-    };
-    return config;
-  },
-
   experimental: {
     optimizePackageImports: ['lucide-react'],
   },

@@ -428,7 +428,6 @@ function MiniCalculator() {
       if (!/^[0-9.+\-*/\s]+$/.test(fullExp)) throw new Error('Unsafe evaluation');
       
       // Basic evaluator helper
-      // eslint-disable-next-line no-eval
       const result = eval(fullExp);
       setDisplay(Number(result.toFixed(6)).toString());
       setEquation('');

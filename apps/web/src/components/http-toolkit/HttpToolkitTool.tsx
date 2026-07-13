@@ -515,7 +515,6 @@ export function HttpToolkitTool() {
     return () => {
       if (pollRef.current) clearInterval(pollRef.current);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab, webhookId]);
 
   const toggleExpanded = (id: string) => {
@@ -944,7 +943,7 @@ export function HttpToolkitTool() {
                     </span>
                     <p className="text-sm font-medium">Waiting for a request...</p>
                     <p className="text-xs text-muted-foreground max-w-xs">
-                      Send one to your capture URL above, or expand "Send a test request" to fire one right here.
+                      Send one to your capture URL above, or expand &quot;Send a test request&quot; to fire one right here.
                     </p>
                   </div>
                 ) : filteredWebhookRequests.length === 0 ? (
@@ -1076,7 +1075,7 @@ export function HttpToolkitTool() {
         <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle>Replay captured request</DialogTitle>
-            <DialogDescription>Re-send this request's method, headers, and body to a target URL of your choice.</DialogDescription>
+            <DialogDescription>Re-send this request&apos;s method, headers, and body to a target URL of your choice.</DialogDescription>
           </DialogHeader>
           <div className="space-y-3">
             <div className="space-y-1">

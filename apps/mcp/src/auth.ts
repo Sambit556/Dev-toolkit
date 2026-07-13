@@ -1,6 +1,7 @@
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import { checkApiKey, config } from './config.js';
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- generic wrapper over heterogeneous MCP tool callback signatures
 type AnyToolCallback = (args: any, extra: any) => Promise<CallToolResult> | CallToolResult;
 
 /**

@@ -1,19 +1,7 @@
 import type { Metadata } from 'next';
-import { QrCode, Loader2 } from 'lucide-react';
-import dynamic from 'next/dynamic';
+import { QrCode } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
-
-const QrBarcodeTool = dynamic(
-  () => import('@/components/qr-barcode/QrBarcodeTool').then((m) => m.QrBarcodeTool),
-  {
-    ssr: false,
-    loading: () => (
-      <div className="flex items-center justify-center p-12 bg-muted/20 border border-dashed rounded-xl">
-        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-      </div>
-    ),
-  }
-);
+import { QrBarcodeTool } from './Lazy';
 
 export const metadata: Metadata = {
   title: 'QR Code & Barcode Generator — Create Custom Codes Online',
