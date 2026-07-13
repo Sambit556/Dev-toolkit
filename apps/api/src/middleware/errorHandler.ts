@@ -51,6 +51,21 @@ export function errorHandler(
     return;
   }
 
+  // The `cors` package rejects disallowed origins by calling its callback
+  // with a plain Error, which lands here — before it ever gets a chance to
+  // set Access-Control-Allow-Origin. Left as a generic 500, that reads to
+  // the browser as an opaque CORS failure with no indication of the real
+  // cause. Surface it as a 403 with the actual reason instead.
+  if (err.message.startsWith('CORS:')) {
+    logger.warn('CORS rejection', { error: err.message, requestId, method: req.method, path: req.path });
+    res.status(403).json({
+      error: 'CORS_BLOCKED',
+      message: err.message,
+      requestId,
+    });
+    return;
+  }
+
   logger.error('Unhandled error', {
     error: err.message,
     stack: err.stack,

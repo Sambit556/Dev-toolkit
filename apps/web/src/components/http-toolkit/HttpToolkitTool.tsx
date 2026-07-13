@@ -334,6 +334,14 @@ export function HttpToolkitTool() {
     error: null,
   });
 
+  const [testMethod, setTestMethod] = useState<'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'>('POST');
+  const [testPath, setTestPath] = useState('');
+  const [testHeaders, setTestHeaders] = useState<KeyValuePair[]>([{ key: 'Content-Type', value: 'application/json' }]);
+  const [testBody, setTestBody] = useState('{"hello":"world"}');
+  const [testSending, setTestSending] = useState(false);
+  const [testResult, setTestResult] = useState<{ status: number; statusText: string; body: string } | null>(null);
+  const [testError, setTestError] = useState<string | null>(null);
+
   const captureUrl = webhookId ? `${API_BASE}/api/webhook/capture/${webhookId}` : null;
 
   const filteredWebhookRequests = useMemo(() => {
@@ -355,6 +363,8 @@ export function HttpToolkitTool() {
       setMockStatus(200);
       setMockHeaders([{ key: 'Content-Type', value: 'application/json' }]);
       setMockBody('{"ok":true}');
+      setTestResult(null);
+      setTestError(null);
       toast.success('New webhook URL created');
     } catch (e) {
       toast.error((e as Error).message || 'Failed to create webhook');
@@ -420,6 +430,30 @@ export function HttpToolkitTool() {
       setReplayState((s) => ({ ...s, result: data, loading: false }));
     } catch (e) {
       setReplayState((s) => ({ ...s, error: (e as Error).message || 'Replay failed', loading: false }));
+    }
+  };
+
+  const sendTestRequest = async () => {
+    if (!webhookId || !captureUrl) return;
+    setTestSending(true);
+    setTestError(null);
+    setTestResult(null);
+    try {
+      const headersObj = Object.fromEntries(testHeaders.filter((h) => h.key.trim()).map((h) => [h.key.trim(), h.value]));
+      const suffix = testPath.trim();
+      const url = suffix ? `${captureUrl}${suffix.startsWith('/') ? '' : '/'}${suffix}` : captureUrl;
+      const res = await fetch(url, {
+        method: testMethod,
+        headers: headersObj,
+        body: testMethod !== 'GET' && testBody ? testBody : undefined,
+      });
+      const text = await res.text();
+      setTestResult({ status: res.status, statusText: res.statusText, body: text });
+      fetchWebhookRequests(webhookId);
+    } catch (e) {
+      setTestError((e as Error).message || 'Request failed');
+    } finally {
+      setTestSending(false);
     }
   };
 
@@ -723,6 +757,79 @@ export function HttpToolkitTool() {
             )}
           </CardContent>
         </Card>
+
+        {webhookId && (
+          <Card>
+            <CardContent className="p-4 space-y-3">
+              <h4 className="font-bold text-xs uppercase tracking-wider text-muted-foreground">Send a test request</h4>
+              <div className="grid gap-2 sm:grid-cols-[110px_1fr]">
+                <Select value={testMethod} onValueChange={(v) => setTestMethod(v as typeof testMethod)}>
+                  <SelectTrigger className="h-9 text-xs">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="GET">GET</SelectItem>
+                    <SelectItem value="POST">POST</SelectItem>
+                    <SelectItem value="PUT">PUT</SelectItem>
+                    <SelectItem value="PATCH">PATCH</SelectItem>
+                    <SelectItem value="DELETE">DELETE</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Input
+                  value={testPath}
+                  onChange={(e) => setTestPath(e.target.value)}
+                  placeholder="/optional/path?query=value"
+                  className="font-mono text-xs"
+                />
+              </div>
+              <details className="group">
+                <summary className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground cursor-pointer select-none hover:text-foreground">
+                  <Settings2 className="h-3.5 w-3.5" />
+                  Headers &amp; body
+                </summary>
+                <div className="mt-2 space-y-3 pl-1">
+                  <div className="space-y-1">
+                    <Label className="text-xs">Request headers</Label>
+                    <KeyValueEditor pairs={testHeaders} onChange={setTestHeaders} />
+                  </div>
+                  {testMethod !== 'GET' && (
+                    <div className="space-y-1">
+                      <Label className="text-xs">Request body</Label>
+                      <Textarea
+                        value={testBody}
+                        onChange={(e) => setTestBody(e.target.value)}
+                        className="font-mono text-xs min-h-[70px]"
+                      />
+                    </div>
+                  )}
+                </div>
+              </details>
+              <Button onClick={sendTestRequest} disabled={testSending} size="sm" className="gap-1.5 text-xs h-8">
+                {testSending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5" />}
+                Send
+              </Button>
+              {testError && (
+                <div className="flex items-center gap-2 p-2.5 bg-red-50/15 border border-red-500/30 text-red-500 rounded-lg text-xs font-mono">
+                  <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
+                  {testError}
+                </div>
+              )}
+              {testResult && (
+                <div className="border rounded-md p-2.5 space-y-1.5 text-xs font-mono">
+                  <Badge className={`border-0 ${statusBadgeClass(testResult.status)}`}>
+                    {testResult.status} {testResult.statusText}
+                  </Badge>
+                  <pre className="text-muted-foreground whitespace-pre-wrap break-all max-h-32 overflow-y-auto">
+                    {tryPrettyJson(testResult.body) ?? (testResult.body || '(empty)')}
+                  </pre>
+                </div>
+              )}
+              <p className="text-[10px] text-muted-foreground">
+                Sends directly from your browser to the capture URL above — the request will also show up in Captured Requests below.
+              </p>
+            </CardContent>
+          </Card>
+        )}
 
         {webhookId && (
           <Card>
