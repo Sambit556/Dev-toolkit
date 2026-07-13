@@ -214,6 +214,47 @@ function HeaderDiffTable({ a, b }: { a: InspectResult | null; b: InspectResult |
   );
 }
 
+type ApiStatus = 'checking' | 'online' | 'offline';
+
+function ApiStatusIndicator() {
+  const [status, setStatus] = useState<ApiStatus>('checking');
+  const healthUrl = `${API_BASE}/health`;
+
+  useEffect(() => {
+    let cancelled = false;
+    const check = () => {
+      fetch(healthUrl)
+        .then((res) => !cancelled && setStatus(res.ok ? 'online' : 'offline'))
+        .catch(() => !cancelled && setStatus('offline'));
+    };
+    check();
+    const interval = setInterval(check, 30_000);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const dotClass =
+    status === 'online' ? 'bg-green-500' : status === 'offline' ? 'bg-red-500' : 'bg-amber-500 animate-pulse';
+  const label = status === 'online' ? 'API online' : status === 'offline' ? 'API unreachable' : 'Checking API...';
+
+  return (
+    <a
+      href={healthUrl}
+      target="_blank"
+      rel="noopener noreferrer"
+      title={`Open ${healthUrl}`}
+      className="inline-flex items-center gap-1.5 text-[11px] text-muted-foreground hover:text-foreground hover:underline shrink-0"
+    >
+      <span className={`h-1.5 w-1.5 rounded-full shrink-0 ${dotClass}`} />
+      {label}
+      <ExternalLink className="h-3 w-3" />
+    </a>
+  );
+}
+
 export function HttpToolkitTool() {
   const [activeTab, setActiveTab] = useState('status-codes');
 
@@ -464,6 +505,9 @@ export function HttpToolkitTool() {
 
   return (
     <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+      <div className="flex items-center justify-end">
+        <ApiStatusIndicator />
+      </div>
       <TabsList className="grid grid-cols-3 text-xs h-auto py-1">
         <TabsTrigger value="status-codes" className="gap-2">
           <ListChecks className="h-4 w-4" />
