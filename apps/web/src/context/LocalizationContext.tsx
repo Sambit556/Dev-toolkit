@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 
 const STORAGE_KEY = 'user-lang-preference';
 const PREFERENCE_LOCK_KEY = 'user-lang-preference-locked';
@@ -403,7 +403,7 @@ export function LocalizationProvider({ children }: { children: React.ReactNode }
     }
   }, [language, loading]);
 
-  const applyLocaleSettings = (lang: string) => {
+  const applyLocaleSettings = useCallback((lang: string) => {
     setLanguage(lang);
     setDir('ltr');
 
@@ -417,9 +417,9 @@ export function LocalizationProvider({ children }: { children: React.ReactNode }
       case 'he': setLocale('he-IL'); setCurrency('ILS'); break;
       default: setLocale('en-US'); setCurrency('USD');
     }
-  };
+  }, []);
 
-  const detectLanguage = async () => {
+  const detectLanguage = useCallback(async () => {
     try {
       const savedLanguage = localStorage.getItem(STORAGE_KEY);
       const preferenceLocked = localStorage.getItem(PREFERENCE_LOCK_KEY);
@@ -478,11 +478,14 @@ export function LocalizationProvider({ children }: { children: React.ReactNode }
 
     applyLocaleSettings('en');
     setLoading(false);
-  };
+  }, [applyLocaleSettings]);
 
   useEffect(() => {
+    // detectLanguage does genuine async work (geolocation permission + network reverse-geocode
+    // fetch) to pick an initial locale; it can't run synchronously in a lazy state initializer.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     detectLanguage();
-  }, []);
+  }, [detectLanguage]);
 
   const setLanguageManual = (lang: string) => {
     if (!TRANSLATION_BUNDLES[lang]) return;

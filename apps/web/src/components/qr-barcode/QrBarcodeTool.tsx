@@ -37,8 +37,11 @@ export function QrBarcodeTool() {
   const [barcodeSvgNode, setBarcodeSvgNode] = useState<SVGSVGElement | null>(null);
 
   // --- GENERATE QR CODE ---
+  // QRCode.toDataURL is callback-based (not a pure computation); this whole effect
+  // synchronizes with that external library, so its synchronous setState calls are unavoidable.
   useEffect(() => {
     if (!qrText) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setQrImgSrc('');
       return;
     }
@@ -66,6 +69,8 @@ export function QrBarcodeTool() {
   }, [qrText, qrFgColor, qrBgColor, qrSize, qrEcc]);
 
   // --- GENERATE BARCODE ---
+  // JsBarcode imperatively renders into the mounted <svg> DOM node (barcodeSvgNode);
+  // it's a real DOM side effect, not a pure computation, so this can't be a useMemo.
   useEffect(() => {
     if (!bcText || !barcodeSvgNode) return;
 
@@ -86,6 +91,7 @@ export function QrBarcodeTool() {
         },
       });
     } catch (e: any) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setBcError(e.message || 'Error generating barcode');
     }
   }, [bcText, bcFormat, bcFgColor, bcBgColor, bcWidth, bcHeight, bcDisplayVal, barcodeSvgNode, activeTab]);
@@ -242,6 +248,7 @@ export function QrBarcodeTool() {
             <CardContent className="flex flex-col items-center gap-6">
               <div className="p-4 border rounded-2xl bg-white shadow-inner flex items-center justify-center">
                 {qrImgSrc ? (
+                  // eslint-disable-next-line @next/next/no-img-element -- client-generated QR/barcode data URL, no fixed dimensions to give next/image
                   <img
                     src={qrImgSrc}
                     alt="QR Code Preview"

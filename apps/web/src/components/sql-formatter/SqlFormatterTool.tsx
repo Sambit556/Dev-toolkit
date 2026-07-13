@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Database, Copy, Download, Wand2, Minimize2, AlertTriangle } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -30,14 +30,11 @@ export function SqlFormatterTool() {
   const [dialect, setDialect] = useState<SqlLanguage>('sql');
   const [indentSize, setIndentSize] = useState('2');
   const [keywordCase, setKeywordCase] = useState<'preserve' | 'upper' | 'lower'>('upper');
-  const [output, setOutput] = useState('');
-  const [error, setError] = useState<string | null>(null);
+  const [minify, setMinify] = useState(false);
 
-  const runFormat = (minify = false) => {
+  const { output, error } = useMemo(() => {
     if (!input.trim()) {
-      setOutput('');
-      setError(null);
-      return;
+      return { output: '', error: null as string | null };
     }
     try {
       const result = format(input, {
@@ -46,18 +43,11 @@ export function SqlFormatterTool() {
         keywordCase,
         linesBetweenQueries: minify ? 0 : 1,
       });
-      setOutput(minify ? result.replace(/\s+/g, ' ').trim() : result);
-      setError(null);
+      return { output: minify ? result.replace(/\s+/g, ' ').trim() : result, error: null as string | null };
     } catch (e) {
-      setError((e as Error).message || 'Failed to format SQL');
-      setOutput('');
+      return { output: '', error: (e as Error).message || 'Failed to format SQL' };
     }
-  };
-
-  React.useEffect(() => {
-    runFormat(false);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [input, dialect, indentSize, keywordCase]);
+  }, [input, dialect, indentSize, keywordCase, minify]);
 
   const handleCopy = () => {
     navigator.clipboard.writeText(output);
@@ -121,11 +111,11 @@ export function SqlFormatterTool() {
           </div>
 
           <div className="ml-auto flex gap-2">
-            <Button variant="outline" size="sm" onClick={() => runFormat(false)} className="h-8 gap-1.5 text-xs">
+            <Button variant="outline" size="sm" onClick={() => setMinify(false)} className="h-8 gap-1.5 text-xs">
               <Wand2 className="h-3.5 w-3.5" />
               Beautify
             </Button>
-            <Button variant="outline" size="sm" onClick={() => runFormat(true)} className="h-8 gap-1.5 text-xs">
+            <Button variant="outline" size="sm" onClick={() => setMinify(true)} className="h-8 gap-1.5 text-xs">
               <Minimize2 className="h-3.5 w-3.5" />
               Minify
             </Button>

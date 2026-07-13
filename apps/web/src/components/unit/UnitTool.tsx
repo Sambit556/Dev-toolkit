@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Ruler, Scale, Box, Thermometer, Zap, Layers, RefreshCw, Copy, ArrowLeftRight } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -28,27 +28,24 @@ const CATEGORY_ICONS: Record<string, any> = {
 export function UnitTool() {
   const [activeCategory, setActiveCategory] = useState(UNIT_CATEGORIES[0]);
   const [inputValue, setInputValue] = useState<string>('1');
-  const [fromUnit, setFromUnit] = useState<string>('');
-  const [toUnit, setToUnit] = useState<string>('');
-  const [result, setResult] = useState<number>(0);
+  const [fromUnit, setFromUnit] = useState<string>(UNIT_CATEGORIES[0].units[0]?.value ?? '');
+  const [toUnit, setToUnit] = useState<string>(UNIT_CATEGORIES[0].units[1]?.value ?? '');
 
-  // Set default units when category changes
-  useEffect(() => {
-    if (activeCategory.units.length >= 2) {
-      setFromUnit(activeCategory.units[0].value);
-      setToUnit(activeCategory.units[1].value);
+  // Switching category resets the from/to units to that category's defaults.
+  const handleCategoryChange = (cat: (typeof UNIT_CATEGORIES)[number]) => {
+    setActiveCategory(cat);
+    if (cat.units.length >= 2) {
+      setFromUnit(cat.units[0].value);
+      setToUnit(cat.units[1].value);
     }
-  }, [activeCategory]);
+  };
 
-  // Run conversion
-  useEffect(() => {
+  const result = useMemo(() => {
     const val = parseFloat(inputValue);
     if (!isNaN(val) && fromUnit && toUnit) {
-      const res = convertUnit(val, fromUnit, toUnit, activeCategory.id);
-      setResult(res);
-    } else {
-      setResult(0);
+      return convertUnit(val, fromUnit, toUnit, activeCategory.id);
     }
+    return 0;
   }, [inputValue, fromUnit, toUnit, activeCategory]);
 
   const handleSwap = () => {
@@ -84,7 +81,7 @@ export function UnitTool() {
               key={cat.id}
               variant={isActive ? 'default' : 'outline'}
               className="h-10 text-xs gap-1.5 justify-start sm:justify-center px-3"
-              onClick={() => setActiveCategory(cat)}
+              onClick={() => handleCategoryChange(cat)}
             >
               <Icon className="h-4 w-4 shrink-0" />
               <span className="truncate">{cat.name}</span>

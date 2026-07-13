@@ -29,48 +29,52 @@ export function CalendarTool() {
   });
   
   const [events, setEvents] = useState<CalendarEvent[]>([]);
+
+  // Reads localStorage, so this must run client-only: this page is statically prerendered,
+  // and a lazy useState initializer would run again (with real data) during the client's
+  // first hydration render, mismatching the server-rendered (empty) HTML for any returning user.
+  useEffect(() => {
+    const stored = localStorage.getItem('devkits-calendar-events');
+    if (stored) {
+      try {
+        // eslint-disable-next-line react-hooks/set-state-in-effect
+        setEvents(JSON.parse(stored));
+      } catch (e) {
+        console.error('Failed to parse calendar events', e);
+      }
+      return;
+    }
+    // Default sample events
+    const today = new Date().toISOString().split('T')[0];
+    const samples: CalendarEvent[] = [
+      {
+        id: '1',
+        title: 'Daily Standup Sync',
+        date: today,
+        time: '10:00',
+        category: 'meeting',
+        description: 'Sync up with engineering team on task deliveries'
+      },
+      {
+        id: '2',
+        title: 'Project Submission Deadline',
+        date: today,
+        time: '18:00',
+        category: 'deadline',
+        description: 'Final release and bundle submission'
+      }
+    ];
+    setEvents(samples);
+    localStorage.setItem('devkits-calendar-events', JSON.stringify(samples));
+  }, []);
+
   const [searchQuery, setSearchQuery] = useState<string>('');
-  
+
   // Event Form States
   const [newEventTitle, setNewEventTitle] = useState<string>('');
   const [newEventTime, setNewEventTime] = useState<string>('09:00');
   const [newEventCategory, setNewEventCategory] = useState<'meeting' | 'personal' | 'deadline' | 'task'>('task');
   const [newEventDesc, setNewEventDesc] = useState<string>('');
-
-  // Load events from LocalStorage on mount
-  useEffect(() => {
-    const stored = localStorage.getItem('devkits-calendar-events');
-    if (stored) {
-      try {
-        setEvents(JSON.parse(stored));
-      } catch (e) {
-        console.error('Failed to parse calendar events', e);
-      }
-    } else {
-      // Default sample events
-      const today = new Date().toISOString().split('T')[0];
-      const samples: CalendarEvent[] = [
-        {
-          id: '1',
-          title: 'Daily Standup Sync',
-          date: today,
-          time: '10:00',
-          category: 'meeting',
-          description: 'Sync up with engineering team on task deliveries'
-        },
-        {
-          id: '2',
-          title: 'Project Submission Deadline',
-          date: today,
-          time: '18:00',
-          category: 'deadline',
-          description: 'Final release and bundle submission'
-        }
-      ];
-      setEvents(samples);
-      localStorage.setItem('devkits-calendar-events', JSON.stringify(samples));
-    }
-  }, []);
 
   // Save events helper
   const saveEvents = (updated: CalendarEvent[]) => {

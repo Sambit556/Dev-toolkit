@@ -24,10 +24,12 @@ import {
   QrCode,
   Gamepad2,
   FileCode,
-  Scissors,
-  Combine,
   Timer,
   Calendar,
+  Regex,
+  Database,
+  Share2,
+  Webhook,
 } from 'lucide-react';
 import { useLocale } from '@/context/LocalizationContext';
 
@@ -79,6 +81,24 @@ export function Footer() {
                 <Link href="/html-preview" className="flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground transition-colors">
                   <Sparkles className="h-3.5 w-3.5 text-primary/70" />
                   HTML/CSS/JS Sandbox
+                </Link>
+              </li>
+              <li>
+                <Link href="/regex-tester" className="flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground transition-colors">
+                  <Regex className="h-3.5 w-3.5 text-primary/70" />
+                  Regex Tester
+                </Link>
+              </li>
+              <li>
+                <Link href="/sql-formatter" className="flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground transition-colors">
+                  <Database className="h-3.5 w-3.5 text-primary/70" />
+                  SQL Formatter
+                </Link>
+              </li>
+              <li>
+                <Link href="/graphql-formatter" className="flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground transition-colors">
+                  <Share2 className="h-3.5 w-3.5 text-primary/70" />
+                  GraphQL Formatter
                 </Link>
               </li>
             </ul>
@@ -211,6 +231,12 @@ export function Footer() {
                 <Link href="/pdf-tools" className="flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground transition-colors">
                   <FileCode className="h-3.5 w-3.5 text-primary/70" />
                   PDF Suite
+                </Link>
+              </li>
+              <li>
+                <Link href="/http-toolkit" className="flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground transition-colors">
+                  <Webhook className="h-3.5 w-3.5 text-primary/70" />
+                  HTTP Toolkit
                 </Link>
               </li>
               <li>

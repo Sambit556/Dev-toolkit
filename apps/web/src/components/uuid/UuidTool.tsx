@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Copy, Download, RefreshCw, Eye, EyeOff, Search, Settings2, Sparkles, HelpCircle } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -46,7 +46,7 @@ export function UuidTool() {
   const [decoderInput, setDecoderInput] = useState<string>('');
   const [decodedDetails, setDecodedDetails] = useState<ReturnType<typeof decodeUuidV1>>(null);
 
-  const handleGenerate = async () => {
+  const handleGenerate = useCallback(async () => {
     try {
       const results: string[] = [];
       const qty = Math.max(1, Math.min(1000, quantity));
@@ -92,11 +92,14 @@ export function UuidTool() {
     } catch (e: any) {
       toast.error(e.message || 'Generation failed');
     }
-  };
+  }, [version, quantity, uppercase, braces, noHyphens, nanoSize, nanoAlphabet, v5Namespace, v5CustomNamespace, v5Name]);
 
   useEffect(() => {
+    // handleGenerate does genuine async work for v5 (SHA-1 hashing) and random generation
+    // for v4/v1/ULID/NanoID; it can't be a pure useMemo.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     handleGenerate();
-  }, [version, quantity, uppercase, braces, noHyphens, nanoSize, v5Namespace, v5Name]);
+  }, [handleGenerate]);
 
   const handleCopyAll = () => {
     const text = generatedList.join('\n');

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { Type, Copy, Download, RefreshCw, FileText } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -74,9 +74,12 @@ export function LoremIpsumTool() {
   const [type, setType] = useState<string>('paragraphs');
   const [startWithLorem, setStartWithLorem] = useState<boolean>(true);
   const [wrapHtml, setWrapHtml] = useState<boolean>(false);
-  const [output, setOutput] = useState<string>('');
+  const [output, setOutput] = useState('');
 
-  const handleGenerate = () => {
+  // Math.random()-based generation must run client-only: this page is statically
+  // prerendered, so a useMemo here would bake one random draw into the static HTML
+  // and mismatch every visitor's client-side hydration.
+  const generateOutput = useCallback(() => {
     let result = '';
     const safeQty = Math.max(1, Math.min(250, qty));
 
@@ -112,17 +115,18 @@ export function LoremIpsumTool() {
         const item = generateSentence(i === 0 && startWithLorem).slice(0, -1); // remove ending period
         listItems.push(wrapHtml ? `  <li>${item}</li>` : `- ${item}`);
       }
-      result = wrapHtml 
-        ? `<ul>\n${listItems.join('\n')}\n</ul>` 
+      result = wrapHtml
+        ? `<ul>\n${listItems.join('\n')}\n</ul>`
         : listItems.join('\n');
     }
 
     setOutput(result);
-  };
+  }, [qty, type, startWithLorem, wrapHtml]);
 
   useEffect(() => {
-    handleGenerate();
-  }, [qty, type, startWithLorem, wrapHtml]);
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    generateOutput();
+  }, [generateOutput]);
 
   const handleCopy = () => {
     if (!output) return;
@@ -197,7 +201,7 @@ export function LoremIpsumTool() {
             />
           </div>
 
-          <Button onClick={handleGenerate} className="w-full gap-1.5 text-xs font-bold pt-2">
+          <Button onClick={generateOutput} className="w-full gap-1.5 text-xs font-bold pt-2">
             <RefreshCw className="h-3.5 w-3.5" />
             Regenerate
           </Button>

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Upload, Image as ImageIcon, Sliders, Check, Download, RefreshCw, Sparkles, Scale, Info, Palette, Camera, FileText, Star, Copy, Loader2 } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -160,6 +160,8 @@ export function ImageTool() {
   const [customWidth, setCustomWidth] = useState<string>('');
   const [customHeight, setCustomHeight] = useState<string>('');
   const [aspectRatio, setAspectRatio] = useState<number>(1);
+  const [naturalWidth, setNaturalWidth] = useState<number>(0);
+  const [naturalHeight, setNaturalHeight] = useState<number>(0);
   const [lockRatio, setLockRatio] = useState<boolean>(true);
 
   // Filters
@@ -285,6 +287,8 @@ export function ImageTool() {
     setCustomWidth(img.naturalWidth.toString());
     setCustomHeight(img.naturalHeight.toString());
     setAspectRatio(img.naturalWidth / img.naturalHeight);
+    setNaturalWidth(img.naturalWidth);
+    setNaturalHeight(img.naturalHeight);
     
     // Auto-detect format from file
     if (originalFile) {
@@ -296,7 +300,7 @@ export function ImageTool() {
   };
 
   // 2. Perform Processing (Resizing, Compression, Filter)
-  const processImage = () => {
+  const processImage = useCallback(() => {
     if (!originalSrc || !imgRef.current) return;
 
     const img = imgRef.current;
@@ -338,11 +342,14 @@ export function ImageTool() {
     const body = dataUrl.split(',')[1] || '';
     const bytes = Math.round((body.length * 3) / 4);
     setProcessedSize(bytes);
-  };
+  }, [originalSrc, scale, customWidth, customHeight, quality, format, brightness, contrast, saturation, blur, grayscale]);
 
   useEffect(() => {
+    // processImage reads the mounted <img> DOM node via imgRef and draws to a canvas;
+    // it depends on real DOM/Canvas APIs, not just props/state, so it can't be a pure useMemo.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     processImage();
-  }, [originalSrc, scale, customWidth, customHeight, quality, format, brightness, contrast, saturation, blur, grayscale]);
+  }, [processImage]);
 
   const handleWidthChange = (val: string) => {
     setCustomWidth(val);
@@ -684,7 +691,7 @@ export function ImageTool() {
                       </div>
                       <div>
                         <span className="text-muted-foreground block">Resolution</span>
-                        <span className="font-mono font-bold block">{imgRef.current?.naturalWidth} x {imgRef.current?.naturalHeight} px</span>
+                        <span className="font-mono font-bold block">{naturalWidth} x {naturalHeight} px</span>
                       </div>
                       <div>
                         <span className="text-muted-foreground block">Aspect Ratio</span>
@@ -855,6 +862,7 @@ export function ImageTool() {
                   {originalFile && <span>{formatSize(originalFile.size)}</span>}
                 </div>
                 <CardContent className="p-3 flex items-center justify-center bg-muted/20 min-h-[220px]">
+                  {/* eslint-disable-next-line @next/next/no-img-element -- client-side blob preview of an arbitrary user upload, no fixed dimensions to give next/image */}
                   <img
                     src={originalSrc}
                     alt="Original"
@@ -873,6 +881,7 @@ export function ImageTool() {
                 </div>
                 <CardContent className="p-3 flex items-center justify-center bg-muted/20 min-h-[220px]">
                   {processedSrc ? (
+                    // eslint-disable-next-line @next/next/no-img-element -- client-side canvas output data URL, no fixed dimensions to give next/image
                     <img
                       src={processedSrc}
                       alt="Processed"

@@ -51,20 +51,23 @@ export function QuickAccess() {
   const dockDragOffsetRef = useRef<PanelPos>({ x: 0, y: 0 });
   const dockRef = useRef<HTMLDivElement>(null);
 
-  // Load positions + pinned tools from localStorage on mount
+  // Reads localStorage, so this must run client-only: this page is statically prerendered,
+  // and lazy useState initializers would run again (with real data) during the client's
+  // first hydration render, mismatching the server-rendered (default) HTML for any returning user.
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const savedDock = localStorage.getItem('devkits-quick-dock-pos');
-      if (savedDock) {
-        try { setDockPos(JSON.parse(savedDock)); } catch {}
-      }
-      const savedPinned = localStorage.getItem(PINNED_STORAGE_KEY);
-      if (savedPinned) {
-        try {
-          const parsed = JSON.parse(savedPinned);
-          if (Array.isArray(parsed)) setPinned(parsed);
-        } catch {}
-      }
+    const savedDock = localStorage.getItem('devkits-quick-dock-pos');
+    if (savedDock) {
+      try {
+        // eslint-disable-next-line react-hooks/set-state-in-effect
+        setDockPos(JSON.parse(savedDock));
+      } catch {}
+    }
+    const savedPinned = localStorage.getItem(PINNED_STORAGE_KEY);
+    if (savedPinned) {
+      try {
+        const parsed = JSON.parse(savedPinned);
+        if (Array.isArray(parsed)) setPinned(parsed);
+      } catch {}
     }
   }, []);
 
@@ -395,6 +398,32 @@ function CopyIconButton({ onCopy, label, className }: { onCopy: () => void; labe
   );
 }
 
+// Evaluates a space-separated "num op num op num ..." chain (the only shape
+// MiniCalculator ever produces) with standard * / before + - precedence.
+function evaluateArithmetic(expression: string): number {
+  const tokens = expression.trim().split(/\s+/);
+
+  const stack: (number | string)[] = [Number(tokens[0])];
+  for (let i = 1; i < tokens.length; i += 2) {
+    const op = tokens[i];
+    const num = Number(tokens[i + 1]);
+    if (op === '*' || op === '/') {
+      const prev = stack.pop() as number;
+      stack.push(op === '*' ? prev * num : prev / num);
+    } else {
+      stack.push(op, num);
+    }
+  }
+
+  let result = stack[0] as number;
+  for (let i = 1; i < stack.length; i += 2) {
+    const op = stack[i] as string;
+    const num = stack[i + 1] as number;
+    result = op === '+' ? result + num : result - num;
+  }
+  return result;
+}
+
 /* Mini Calculator Logic */
 function MiniCalculator() {
   const [display, setDisplay] = useState('0');
@@ -426,9 +455,8 @@ function MiniCalculator() {
       const fullExp = equation + display;
       // Sanitise execution bounds (allow basic arithmetic digits/ops only)
       if (!/^[0-9.+\-*/\s]+$/.test(fullExp)) throw new Error('Unsafe evaluation');
-      
-      // Basic evaluator helper
-      const result = eval(fullExp);
+
+      const result = evaluateArithmetic(fullExp);
       setDisplay(Number(result.toFixed(6)).toString());
       setEquation('');
       setResetOnNext(true);
@@ -480,8 +508,9 @@ function MiniEpochConverter() {
   const [tsOutputSec, setTsOutputSec] = useState('');
   const [tsOutputMs, setTsOutputMs] = useState('');
 
-  // Live timer clock
+  // Live timer clock: a genuine setInterval subscription to the passage of time.
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setLiveEpoch(Math.floor(Date.now() / 1000));
     const interval = setInterval(() => {
       setLiveEpoch(Math.floor(Date.now() / 1000));

@@ -137,6 +137,7 @@ function LanguageSwitcher() {
 function ThemeToggle() {
   const { resolvedTheme, setTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- must flip only after client hydration to avoid an SSR/CSR theme mismatch
   useEffect(() => setMounted(true), []);
   const isDark = mounted && resolvedTheme === 'dark';
 
@@ -218,6 +219,9 @@ function HeaderClock() {
   const [use12Hour, setUse12Hour] = useState(false);
 
   useEffect(() => {
+    // Ticking wall-clock display: mounted-guard for SSR hydration safety, then a real
+    // setInterval subscription to the passage of time (a genuine external system).
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setMounted(true);
     const updateClock = () => {
       const now = new Date();
@@ -481,8 +485,11 @@ export function Header() {
     }
   };
 
-  // Close dropdown on navigate
+  // Close dropdown on navigate. pathname comes from the router (an external system) and
+  // navigation can originate from many places (Link clicks, browser back/forward), so
+  // there's no single handler to hook this into directly.
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     closeDropdown();
     setMobileOpen(false);
   }, [pathname]);

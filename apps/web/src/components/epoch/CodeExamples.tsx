@@ -53,7 +53,8 @@ interface CodeExamplesProps {
 }
 
 export function CodeExamples({ timestamp }: CodeExamplesProps) {
-  const ts = timestamp ?? Math.floor(Date.now() / 1000);
+  const [fallbackTs] = useState(() => Math.floor(Date.now() / 1000));
+  const ts = timestamp ?? fallbackTs;
 
   return (
     <div className="space-y-3">

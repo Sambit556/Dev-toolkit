@@ -16,6 +16,7 @@ export function RecentHistory() {
   // the server (which always sees an empty store) ever could. Deferring real
   // entries to after mount keeps the first client render matching the server.
   const [mounted, setMounted] = useState(false);
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- must flip only after client hydration; a lazy initializer would run during SSR too and defeat the guard
   useEffect(() => setMounted(true), []);
 
   if (!mounted || entries.length === 0) return null;

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { 
   Globe, 
   TrendingUp, 
@@ -137,8 +137,12 @@ export default function BlogPage() {
   const [snakeHighScore, setSnakeHighScore] = useState<number>(0);
   const [snakeStatus, setSnakeStatus] = useState<'IDLE' | 'PLAYING' | 'GAME_OVER'>('IDLE');
 
-  // Connectivity detection using native browser APIs
+  // Connectivity detection using native browser APIs. Reads navigator.onLine, so the
+  // initial sync must run client-only: this page is statically prerendered, and a lazy
+  // useState initializer would run again during the client's first hydration render,
+  // mismatching the server-rendered default for any actually-offline visitor.
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setIsOnline(navigator.onLine);
 
     const handleOnline = () => {
@@ -163,19 +167,26 @@ export default function BlogPage() {
   }, []);
 
   useEffect(() => {
-    // Initial fetch sequences
+    // Initial fetch sequences: genuine async network calls, can't be pure useMemo.
     fetchNewsFeed('hn');
     fetchMarketData();
     fetchWeatherForecast();
-    
-    // Load best score
-    if (typeof window !== 'undefined') {
-      const score = localStorage.getItem('devpulse_best_score');
-      if (score) setBestScore(parseInt(score));
-    }
   }, []);
 
-  const refreshAllData = async () => {
+  // Reads localStorage, so this must run client-only: this page is statically prerendered,
+  // and lazy useState initializers would run again (with real data) during the client's
+  // first hydration render, mismatching the server-rendered (zero) HTML for any returning user.
+  useEffect(() => {
+    const savedBestScore = localStorage.getItem('devpulse_best_score');
+    if (savedBestScore) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setBestScore(Number(savedBestScore));
+    }
+    const savedSnakeHighScore = localStorage.getItem('devpulse_snake_highscore');
+    if (savedSnakeHighScore) setSnakeHighScore(Number(savedSnakeHighScore));
+  }, []);
+
+  async function refreshAllData() {
     setIsSyncing(true);
     toast.info('Synchronizing all developer feeds...');
     try {
@@ -190,10 +201,10 @@ export default function BlogPage() {
     } finally {
       setTimeout(() => setIsSyncing(false), 800);
     }
-  };
+  }
 
   // Weather: OpenWeatherMap Integration
-  const fetchWeatherForecast = async (searchCity?: string) => {
+  async function fetchWeatherForecast(searchCity?: string) {
     setWeatherLoading(true);
     setWeatherError(null);
 
@@ -276,10 +287,10 @@ export default function BlogPage() {
     } finally {
       setWeatherLoading(false);
     }
-  };
+  }
 
   // Financial Markets: Yahoo Finance / CoinGecko Ticker APIs
-  const fetchMarketData = async () => {
+  async function fetchMarketData() {
     setMarketLoading(true);
     try {
       // 1. Fetch Crypto from CoinGecko (CORS friendly, keyless)
@@ -329,10 +340,10 @@ export default function BlogPage() {
     } finally {
       setMarketLoading(false);
     }
-  };
+  }
 
   // RSS Feed & Hacker News API parser
-  const fetchNewsFeed = async (feedType: 'hn' | 'google', customUrl?: string) => {
+  async function fetchNewsFeed(feedType: 'hn' | 'google', customUrl?: string) {
     setNewsLoading(true);
     setActiveFeed(feedType);
 
@@ -442,12 +453,12 @@ export default function BlogPage() {
     } finally {
       setNewsLoading(false);
     }
-  };
+  }
 
 
 
   // Memory Match Game logic
-  const initializeGame = () => {
+  function initializeGame() {
     const doubled = [...MEMORY_SYMBOLS, ...MEMORY_SYMBOLS];
     const shuffled = doubled
       .map((symbol, idx) => ({
@@ -463,7 +474,7 @@ export default function BlogPage() {
     setMoves(0);
     setMatches(0);
     setGameStarted(true);
-  };
+  }
 
   // Code Snake Game Logic
   const initializeSnakeGame = () => {
@@ -479,20 +490,19 @@ export default function BlogPage() {
     generateSnakeFood(initialSnake);
   };
 
-  const generateSnakeFood = (currentSnake: { x: number; y: number }[]) => {
-    const activeSnake = currentSnake.length > 0 ? currentSnake : snake;
+  const generateSnakeFood = useCallback((currentSnake: { x: number; y: number }[]) => {
     let newFood;
     let isOccupied = true;
-    
+
     while (isOccupied) {
       const rx = Math.floor(Math.random() * 15);
       const ry = Math.floor(Math.random() * 15);
       newFood = { x: rx, y: ry };
-      isOccupied = activeSnake.some(cell => cell.x === rx && cell.y === ry);
+      isOccupied = currentSnake.some(cell => cell.x === rx && cell.y === ry);
     }
-    
+
     if (newFood) setSnakeFood(newFood);
-  };
+  }, []);
 
   // Keyboard controls listener for Code Snake
   useEffect(() => {
@@ -627,16 +637,7 @@ export default function BlogPage() {
 
     const intervalId = setInterval(gameTick, 160);
     return () => clearInterval(intervalId);
-  }, [snakeDir, snakeFood, snakeStatus, arcadeTab, snakeHighScore]);
-
-  // Load high scores on mount
-  useEffect(() => {
-    const savedBestScore = localStorage.getItem('devpulse_best_score');
-    if (savedBestScore) setBestScore(Number(savedBestScore));
-    
-    const savedSnakeHighScore = localStorage.getItem('devpulse_snake_highscore');
-    if (savedSnakeHighScore) setSnakeHighScore(Number(savedSnakeHighScore));
-  }, []);
+  }, [snakeDir, snakeFood, snakeStatus, arcadeTab, snakeHighScore, generateSnakeFood]);
 
   const handleCardClick = (id: number) => {
     if (selectedCards.length === 2) return;
@@ -1294,8 +1295,9 @@ export default function BlogPage() {
                             {/* Thumbnail image if available */}
                             {item.thumbnail && !brokenImages[item.thumbnail] && (
                               <div className="relative w-full sm:w-24 h-24 sm:h-16 shrink-0 rounded-lg overflow-hidden border border-border/60 shadow-sm bg-muted/30">
-                                <img 
-                                  src={item.thumbnail} 
+                                {/* eslint-disable-next-line @next/next/no-img-element -- thumbnail host is an arbitrary external RSS/news source, not allowlistable via next/image remotePatterns */}
+                                <img
+                                  src={item.thumbnail}
                                   alt="" 
                                   onError={() => {
                                     setBrokenImages((prev) => ({ ...prev, [item.thumbnail!]: true }));

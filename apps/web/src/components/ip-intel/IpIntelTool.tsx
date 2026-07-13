@@ -160,6 +160,8 @@ const pingWithImage = (url: string): Promise<number> => {
   });
 };
 
+const DEFAULT_URL_INPUT = 'https://example.com:8080/path/to/page?search=devchrono&category=developer#section-1';
+
 export function IpIntelTool() {
   const { t } = useLocale();
   const [activeTab, setActiveTab] = useState<'ip' | 'identity' | 'ping' | 'url'>('ip');
@@ -188,14 +190,29 @@ export function IpIntelTool() {
   ]);
   const [isPingingAll, setIsPingingAll] = useState(false);
 
-  // URL Parser States
-  const [urlInput, setUrlInput] = useState<string>('https://example.com:8080/path/to/page?search=devchrono&category=developer#section-1');
-  const [urlProtocol, setUrlProtocol] = useState<string>('');
-  const [urlHost, setUrlHost] = useState<string>('');
-  const [urlPort, setUrlPort] = useState<string>('');
-  const [urlPath, setUrlPath] = useState<string>('');
-  const [urlHash, setUrlHash] = useState<string>('');
-  const [urlParams, setUrlParams] = useState<{ id: string; key: string; value: string }[]>([]);
+  // URL Parser States (initial values pre-parsed from the default URL, matching what
+  // parseUrlString would otherwise have populated via a mount-only effect)
+  const [urlInput, setUrlInput] = useState<string>(DEFAULT_URL_INPUT);
+  const [urlProtocol, setUrlProtocol] = useState<string>(() => new URL(DEFAULT_URL_INPUT).protocol);
+  const [urlHost, setUrlHost] = useState<string>(() => new URL(DEFAULT_URL_INPUT).hostname);
+  const [urlPort, setUrlPort] = useState<string>(() => {
+    const u = new URL(DEFAULT_URL_INPUT);
+    return u.port || (u.protocol === 'https:' ? '443' : '80');
+  });
+  const [urlPath, setUrlPath] = useState<string>(() => new URL(DEFAULT_URL_INPUT).pathname);
+  const [urlHash, setUrlHash] = useState<string>(() => new URL(DEFAULT_URL_INPUT).hash);
+  const [urlParams, setUrlParams] = useState<{ id: string; key: string; value: string }[]>(() => {
+    const u = new URL(DEFAULT_URL_INPUT);
+    const paramsList: { id: string; key: string; value: string }[] = [];
+    u.searchParams.forEach((value, key) => {
+      paramsList.push({
+        id: crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`,
+        key,
+        value,
+      });
+    });
+    return paramsList;
+  });
 
   const runPingTest = async (targetIdx: number, currentTargetsList?: any[]) => {
     const list = currentTargetsList || pingTargets;
@@ -330,10 +347,6 @@ export function IpIntelTool() {
     }
   };
 
-  useEffect(() => {
-    parseUrlString(urlInput);
-  }, [urlInput]);
-
   const rebuildUrl = (params: typeof urlParams) => {
     try {
       const url = new URL(urlInput);
@@ -353,7 +366,9 @@ export function IpIntelTool() {
       });
       url.search = searchParams.toString();
 
-      setUrlInput(url.toString());
+      const rebuilt = url.toString();
+      setUrlInput(rebuilt);
+      parseUrlString(rebuilt);
     } catch (e) {
       // Ignore
     }
@@ -396,7 +411,7 @@ export function IpIntelTool() {
     fetchIpv6();
   }, []);
 
-  const fetchIpv4 = async () => {
+  async function fetchIpv4() {
     try {
       const res = await fetch('https://api.ipify.org?format=json');
       if (res.ok) {
@@ -406,9 +421,9 @@ export function IpIntelTool() {
     } catch (e) {
       console.warn('IPv4 discovery failed:', e);
     }
-  };
+  }
 
-  const fetchIpv6 = async () => {
+  async function fetchIpv6() {
     try {
       const res = await fetch('https://api6.ipify.org?format=json');
       if (res.ok) {
@@ -418,9 +433,9 @@ export function IpIntelTool() {
     } catch (e) {
       console.warn('IPv6 discovery failed (host may not support IPv6 routing):', e);
     }
-  };
+  }
 
-  const fetchUserIp = async () => {
+  async function fetchUserIp() {
     setIpLoading(true);
     setIpError(null);
 
@@ -501,7 +516,7 @@ export function IpIntelTool() {
     } finally {
       setIpLoading(false);
     }
-  };
+  }
 
   const handleIpLookup = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
@@ -1336,7 +1351,7 @@ export function IpIntelTool() {
                   <Input
                     placeholder="Paste URL query parameters..."
                     value={urlInput}
-                    onChange={(e) => setUrlInput(e.target.value)}
+                    onChange={(e) => { setUrlInput(e.target.value); parseUrlString(e.target.value); }}
                     className="h-10 text-xs bg-background/50 font-mono"
                   />
                   <Button onClick={() => copyUrlToClipboard(urlInput, 'URL')} size="sm" className="h-10 font-bold shrink-0">

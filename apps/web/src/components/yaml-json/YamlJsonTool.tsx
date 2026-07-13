@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useMemo } from 'react';
 import { ArrowLeftRight, Copy, Download, RefreshCw, Braces, AlignLeft, Info } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -29,18 +29,13 @@ export function YamlJsonTool() {
       2
     )
   );
-  const [outputVal, setOutputVal] = useState<string>('');
-  const [errorVal, setErrorVal] = useState<string | null>(null);
-
   // Configuration options
   const [indentSize, setIndentSize] = useState<string>('2');
   const [sortKeys, setSortKeys] = useState<boolean>(false);
 
-  const handleConvert = () => {
+  const { outputVal, errorVal } = useMemo(() => {
     if (!inputVal.trim()) {
-      setOutputVal('');
-      setErrorVal(null);
-      return;
+      return { outputVal: '', errorVal: null as string | null };
     }
 
     try {
@@ -51,25 +46,18 @@ export function YamlJsonTool() {
           sortKeys,
           noRefs: true,
         });
-        setOutputVal(yaml);
-        setErrorVal(null);
+        return { outputVal: yaml, errorVal: null as string | null };
       } else {
         const parsed = jsyaml.load(inputVal);
         if (typeof parsed !== 'object' && parsed !== null) {
           throw new Error('YAML did not parse into an object');
         }
         const json = JSON.stringify(parsed, null, Number(indentSize));
-        setOutputVal(json);
-        setErrorVal(null);
+        return { outputVal: json, errorVal: null as string | null };
       }
     } catch (e: any) {
-      setErrorVal(e.message || 'Error occurred during parsing');
-      setOutputVal('');
+      return { outputVal: '', errorVal: (e.message || 'Error occurred during parsing') as string | null };
     }
-  };
-
-  useEffect(() => {
-    handleConvert();
   }, [inputVal, direction, indentSize, sortKeys]);
 
   const handleSwapDirection = () => {

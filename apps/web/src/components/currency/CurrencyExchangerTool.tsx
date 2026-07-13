@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { ArrowLeftRight, Copy, RefreshCw, Landmark, SlidersHorizontal, Info, TrendingUp, HelpCircle } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -10,6 +10,19 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import { toast } from 'sonner';
+
+function generateSparklinePoints(): string {
+  const points = [];
+  let startY = 40 + Math.random() * 20;
+  points.push(`M 0,${startY}`);
+  for (let i = 1; i <= 6; i++) {
+    const x = i * 25;
+    const y = Math.max(10, Math.min(80, startY + (Math.random() - 0.5) * 35));
+    points.push(`L ${x},${y}`);
+    startY = y;
+  }
+  return points.join(' ');
+}
 
 const CURRENCIES = [
   { value: 'USD', symbol: '$', label: 'USD - US Dollar' },
@@ -96,11 +109,9 @@ export function CurrencyExchangerTool() {
   const [customRates, setCustomRates] = useState<Record<string, number>>(USD_RELATIVE_RATES);
   const [lastUpdated, setLastUpdated] = useState<string>('Preloaded Local Rates');
 
-  // Sparkline state coordinates
-  const [sparklinePoints, setSparklinePoints] = useState<string>('M 0,50 L 25,60 L 50,40 L 75,55 L 100,30 L 125,45 L 150,20');
 
   // Fetch rates
-  const fetchRates = async (base: string) => {
+  const fetchRates = useCallback(async (base: string) => {
     if (isCustomMode) return;
     setLoading(true);
     try {
@@ -126,41 +137,41 @@ export function CurrencyExchangerTool() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [isCustomMode]);
 
   useEffect(() => {
+    // fetchRates does a genuine async network call (or falls back to a static table).
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchRates(fromCurrency);
-  }, [fromCurrency, isCustomMode]);
+  }, [fromCurrency, fetchRates]);
 
-  // Sync custom rates edit
-  useEffect(() => {
-    if (isCustomMode) {
+  const handleToggleCustomMode = () => {
+    const next = !isCustomMode;
+    setIsCustomMode(next);
+    if (next) {
       setRates(customRates);
       setLastUpdated('Local User Edited Rates');
     }
-  }, [isCustomMode, customRates]);
+  };
 
   // Handle manual rates input change
   const handleCustomRateChange = (cur: string, val: number) => {
     if (val < 0) return;
-    setCustomRates((prev) => ({
-      ...prev,
-      [cur]: val,
-    }));
+    const updated = { ...customRates, [cur]: val };
+    setCustomRates(updated);
+    if (isCustomMode) {
+      setRates(updated);
+      setLastUpdated('Local User Edited Rates');
+    }
   };
 
-  // Sparkline random simulator on currency changes
+  // Sparkline random simulator, recomputed whenever the pair changes. Math.random()-based
+  // generation must run client-only: this page is statically prerendered, so computing it
+  // during the initial render (SSR or client) would bake in one draw and mismatch hydration.
+  const [sparklinePoints, setSparklinePoints] = useState('M 0,50 L 25,60 L 50,40 L 75,55 L 100,30 L 125,45 L 150,20');
   useEffect(() => {
-    const points = [];
-    let startY = 40 + Math.random() * 20;
-    points.push(`M 0,${startY}`);
-    for (let i = 1; i <= 6; i++) {
-      const x = i * 25;
-      const y = Math.max(10, Math.min(80, startY + (Math.random() - 0.5) * 35));
-      points.push(`L ${x},${y}`);
-      startY = y;
-    }
-    setSparklinePoints(points.join(' '));
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setSparklinePoints(generateSparklinePoints());
   }, [fromCurrency, toCurrency]);
 
   const handleSwap = () => {
@@ -349,7 +360,7 @@ export function CurrencyExchangerTool() {
               <Button
                 variant={isCustomMode ? 'default' : 'outline'}
                 size="sm"
-                onClick={() => setIsCustomMode(!isCustomMode)}
+                onClick={handleToggleCustomMode}
                 className="h-7 text-[10px] gap-1 px-2 shrink-0"
               >
                 <SlidersHorizontal className="h-3 w-3" />

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { MapPin, User, Mail, Phone, CreditCard, Briefcase, Download, Copy, RefreshCw, Layers } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -90,123 +90,128 @@ const generateRandomDigits = (pattern: string) => {
   return pattern.replace(/X/g, () => Math.floor(Math.random() * 10).toString());
 };
 
+function generatePersona(country: 'US' | 'UK' | 'IN' | 'CA', gender: 'random' | 'male' | 'female') {
+  const data = MOCK_DATA[country];
+
+  // Gender
+  const finalGender = gender === 'random' ? (Math.random() > 0.5 ? 'male' : 'female') : gender;
+  const firstNames = finalGender === 'male' ? data.firstNamesMale : data.firstNamesFemale;
+
+  const firstName = pickRandom(firstNames);
+  const lastName = pickRandom(data.lastNames);
+  const username = `${firstName.toLowerCase()}.${lastName.toLowerCase()}${generateRandomDigits('XX')}`;
+
+  // Age & Birthday
+  const age = Math.floor(Math.random() * 50) + 20; // 20-70
+  const birthYear = new Date().getFullYear() - age;
+  const birthMonth = Math.floor(Math.random() * 12) + 1;
+  const birthDay = Math.floor(Math.random() * 28) + 1;
+  const birthday = `${birthYear}-${birthMonth.toString().padStart(2, '0')}-${birthDay.toString().padStart(2, '0')}`;
+
+  // Address
+  const streetNo = Math.floor(Math.random() * 900) + 100;
+  const street = `${streetNo} ${pickRandom(data.streets)}`;
+  const location = pickRandom(data.locations);
+
+  // CC
+  const ccType = pickRandom(CARDS);
+  let ccPattern = '4XXX XXXX XXXX XXXX'; // Visa
+  if (ccType === 'MasterCard') ccPattern = '5XXX XXXX XXXX XXXX';
+  else if (ccType === 'Amex') ccPattern = '37XX XXXXXX XXXXX';
+  else if (ccType === 'Discover') ccPattern = '6011 XXXX XXXX XXXX';
+
+  const ccNumber = generateRandomDigits(ccPattern);
+  const ccExp = `${(Math.floor(Math.random() * 12) + 1).toString().padStart(2, '0')}/${Math.floor(Math.random() * 5) + 27}`; // expiry 2027-2031
+  const ccCvv = generateRandomDigits('XXX');
+
+  return {
+    gender: finalGender.charAt(0).toUpperCase() + finalGender.slice(1),
+    name: `${firstName} ${lastName}`,
+    birthday,
+    age,
+    nationalId: `${data.idLabel}: ${generateRandomDigits(data.idFormat)}`,
+    address: {
+      street,
+      city: location.city,
+      state: location.state,
+      zip: location.zip,
+      country: country === 'US' ? 'United States' : country === 'UK' ? 'United Kingdom' : country === 'IN' ? 'India' : 'Canada',
+    },
+    email: `${username}@example.com`,
+    phone: `${data.phonePrefix} ${generateRandomDigits('XXX XXXX')}`,
+    username,
+    password: Math.random().toString(36).substring(2, 10) + generateRandomDigits('XX') + '!',
+    employment: {
+      company: pickRandom(COMPANIES),
+      occupation: pickRandom(OCCUPATIONS),
+      department: pickRandom(DEPARTMENTS),
+    },
+    finance: {
+      cardType: ccType,
+      cardNumber: ccNumber,
+      expiry: ccExp,
+      cvv: ccCvv,
+    }
+  };
+}
+
+function generateBulkList(country: 'US' | 'UK' | 'IN' | 'CA', gender: 'random' | 'male' | 'female', bulkQty: number) {
+  const list: any[] = [];
+  const count = Math.max(1, Math.min(100, bulkQty));
+
+  for (let i = 0; i < count; i++) {
+    const data = MOCK_DATA[country];
+    const finalGender = gender === 'random' ? (Math.random() > 0.5 ? 'male' : 'female') : gender;
+    const firstNames = finalGender === 'male' ? data.firstNamesMale : data.firstNamesFemale;
+    const firstName = pickRandom(firstNames);
+    const lastName = pickRandom(data.lastNames);
+    const username = `${firstName.toLowerCase()}.${lastName.toLowerCase()}${generateRandomDigits('XX')}`;
+    const location = pickRandom(data.locations);
+    const streetNo = Math.floor(Math.random() * 900) + 100;
+
+    list.push({
+      id: i + 1,
+      name: `${firstName} ${lastName}`,
+      gender: finalGender,
+      email: `${username}@example.com`,
+      phone: `${data.phonePrefix} ${generateRandomDigits('XXXXXX')}`,
+      street: `${streetNo} ${pickRandom(data.streets)}`,
+      city: location.city,
+      state: location.state,
+      zip: location.zip,
+      country: country,
+      company: pickRandom(COMPANIES),
+      occupation: pickRandom(OCCUPATIONS),
+    });
+  }
+
+  return list;
+}
+
 export function FakeAddressTool() {
   const [country, setCountry] = useState<'US' | 'UK' | 'IN' | 'CA'>('US');
   const [gender, setGender] = useState<'random' | 'male' | 'female'>('random');
   const [viewMode, setViewMode] = useState<'single' | 'bulk'>('single');
   const [bulkQty, setBulkQty] = useState<number>(10);
 
-  // Results
   const [persona, setPersona] = useState<any | null>(null);
   const [bulkResult, setBulkResult] = useState<string>('');
 
-  const generateSingle = () => {
-    const data = MOCK_DATA[country];
-    
-    // Gender
-    const finalGender = gender === 'random' ? (Math.random() > 0.5 ? 'male' : 'female') : gender;
-    const firstNames = finalGender === 'male' ? data.firstNamesMale : data.firstNamesFemale;
-    
-    const firstName = pickRandom(firstNames);
-    const lastName = pickRandom(data.lastNames);
-    const username = `${firstName.toLowerCase()}.${lastName.toLowerCase()}${generateRandomDigits('XX')}`;
-    
-    // Age & Birthday
-    const age = Math.floor(Math.random() * 50) + 20; // 20-70
-    const birthYear = new Date().getFullYear() - age;
-    const birthMonth = Math.floor(Math.random() * 12) + 1;
-    const birthDay = Math.floor(Math.random() * 28) + 1;
-    const birthday = `${birthYear}-${birthMonth.toString().padStart(2, '0')}-${birthDay.toString().padStart(2, '0')}`;
-
-    // Address
-    const streetNo = Math.floor(Math.random() * 900) + 100;
-    const street = `${streetNo} ${pickRandom(data.streets)}`;
-    const location = pickRandom(data.locations);
-
-    // CC
-    const ccType = pickRandom(CARDS);
-    let ccPattern = '4XXX XXXX XXXX XXXX'; // Visa
-    if (ccType === 'MasterCard') ccPattern = '5XXX XXXX XXXX XXXX';
-    else if (ccType === 'Amex') ccPattern = '37XX XXXXXX XXXXX';
-    else if (ccType === 'Discover') ccPattern = '6011 XXXX XXXX XXXX';
-
-    const ccNumber = generateRandomDigits(ccPattern);
-    const ccExp = `${(Math.floor(Math.random() * 12) + 1).toString().padStart(2, '0')}/${Math.floor(Math.random() * 5) + 27}`; // expiry 2027-2031
-    const ccCvv = generateRandomDigits('XXX');
-
-    const result = {
-      gender: finalGender.charAt(0).toUpperCase() + finalGender.slice(1),
-      name: `${firstName} ${lastName}`,
-      birthday,
-      age,
-      nationalId: `${data.idLabel}: ${generateRandomDigits(data.idFormat)}`,
-      address: {
-        street,
-        city: location.city,
-        state: location.state,
-        zip: location.zip,
-        country: country === 'US' ? 'United States' : country === 'UK' ? 'United Kingdom' : country === 'IN' ? 'India' : 'Canada',
-      },
-      email: `${username}@example.com`,
-      phone: `${data.phonePrefix} ${generateRandomDigits('XXX XXXX')}`,
-      username,
-      password: Math.random().toString(36).substring(2, 10) + generateRandomDigits('XX') + '!',
-      employment: {
-        company: pickRandom(COMPANIES),
-        occupation: pickRandom(OCCUPATIONS),
-        department: pickRandom(DEPARTMENTS),
-      },
-      finance: {
-        cardType: ccType,
-        cardNumber: ccNumber,
-        expiry: ccExp,
-        cvv: ccCvv,
-      }
-    };
-
-    setPersona(result);
-  };
-
-  const generateBulk = () => {
-    const list: any[] = [];
-    const count = Math.max(1, Math.min(100, bulkQty));
-
-    for (let i = 0; i < count; i++) {
-      const data = MOCK_DATA[country];
-      const finalGender = gender === 'random' ? (Math.random() > 0.5 ? 'male' : 'female') : gender;
-      const firstNames = finalGender === 'male' ? data.firstNamesMale : data.firstNamesFemale;
-      const firstName = pickRandom(firstNames);
-      const lastName = pickRandom(data.lastNames);
-      const username = `${firstName.toLowerCase()}.${lastName.toLowerCase()}${generateRandomDigits('XX')}`;
-      const location = pickRandom(data.locations);
-      const streetNo = Math.floor(Math.random() * 900) + 100;
-
-      list.push({
-        id: i + 1,
-        name: `${firstName} ${lastName}`,
-        gender: finalGender,
-        email: `${username}@example.com`,
-        phone: `${data.phonePrefix} ${generateRandomDigits('XXXXXX')}`,
-        street: `${streetNo} ${pickRandom(data.streets)}`,
-        city: location.city,
-        state: location.state,
-        zip: location.zip,
-        country: country,
-        company: pickRandom(COMPANIES),
-        occupation: pickRandom(OCCUPATIONS),
-      });
-    }
-
-    setBulkResult(JSON.stringify(list, null, 2));
-  };
-
-  useEffect(() => {
+  // Math.random()-based generation must run client-only: this page is statically
+  // prerendered, so a useMemo here would bake one random draw into the static HTML
+  // and mismatch every visitor's client-side hydration.
+  const regenerate = useCallback(() => {
     if (viewMode === 'single') {
-      generateSingle();
+      setPersona(generatePersona(country, gender));
     } else {
-      generateBulk();
+      setBulkResult(JSON.stringify(generateBulkList(country, gender, bulkQty), null, 2));
     }
   }, [country, gender, viewMode, bulkQty]);
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    regenerate();
+  }, [regenerate]);
 
   const handleCopy = (text: string, label: string) => {
     if (!text) return;
@@ -293,7 +298,7 @@ export function FakeAddressTool() {
             </div>
           )}
 
-          <Button onClick={viewMode === 'single' ? generateSingle : generateBulk} className="w-full gap-1.5 text-xs font-bold pt-1">
+          <Button onClick={regenerate} className="w-full gap-1.5 text-xs font-bold pt-1">
             <RefreshCw className="h-3.5 w-3.5" />
             Generate New
           </Button>

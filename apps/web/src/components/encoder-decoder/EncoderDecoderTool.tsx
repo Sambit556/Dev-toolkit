@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useMemo } from 'react';
 import { RefreshCw, Copy, ArrowLeftRight } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -30,38 +30,36 @@ const REVERSE_MORSE: Record<string, string> = Object.fromEntries(
 export function EncoderDecoderTool() {
   const [conversionType, setConversionType] = useState<string>('base64');
   const [inputVal, setInputVal] = useState<string>('Hello, World!');
-  const [outputVal, setOutputVal] = useState<string>('');
   const [isDecodeMode, setIsDecodeMode] = useState<boolean>(false);
   const [caesarShift, setCaesarShift] = useState<number>(3);
 
   // 1. Convert Text (Encode/Decode)
-  const processConversion = () => {
+  const outputVal = useMemo(() => {
     if (!inputVal) {
-      setOutputVal('');
-      return;
+      return '';
     }
 
     try {
       if (conversionType === 'base64') {
         if (isDecodeMode) {
-          setOutputVal(decodeURIComponent(escape(atob(inputVal))));
+          return decodeURIComponent(escape(atob(inputVal)));
         } else {
-          setOutputVal(btoa(unescape(encodeURIComponent(inputVal))));
+          return btoa(unescape(encodeURIComponent(inputVal)));
         }
       } else if (conversionType === 'url') {
         if (isDecodeMode) {
-          setOutputVal(decodeURIComponent(inputVal));
+          return decodeURIComponent(inputVal);
         } else {
-          setOutputVal(encodeURIComponent(inputVal));
+          return encodeURIComponent(inputVal);
         }
       } else if (conversionType === 'html') {
         if (isDecodeMode) {
           const doc = new DOMParser().parseFromString(inputVal, 'text/html');
-          setOutputVal(doc.documentElement.textContent || '');
+          return doc.documentElement.textContent || '';
         } else {
           const div = document.createElement('div');
           div.textContent = inputVal;
-          setOutputVal(div.innerHTML);
+          return div.innerHTML;
         }
       } else if (conversionType === 'hex') {
         if (isDecodeMode) {
@@ -70,12 +68,12 @@ export function EncoderDecoderTool() {
           for (let i = 0; i < hex.length; i += 2) {
             decoded += String.fromCharCode(parseInt(hex.substring(i, i + 2), 16));
           }
-          setOutputVal(decoded);
+          return decoded;
         } else {
           const hexArr = Array.from(inputVal).map((c) =>
             c.charCodeAt(0).toString(16).padStart(2, '0').toUpperCase()
           );
-          setOutputVal(hexArr.join(' '));
+          return hexArr.join(' ');
         }
       } else if (conversionType === 'binary') {
         if (isDecodeMode) {
@@ -87,46 +85,42 @@ export function EncoderDecoderTool() {
               decoded += String.fromCharCode(parseInt(byte, 2));
             }
           }
-          setOutputVal(decoded);
+          return decoded;
         } else {
           const binArr = Array.from(inputVal).map((c) =>
             c.charCodeAt(0).toString(2).padStart(8, '0')
           );
-          setOutputVal(binArr.join(' '));
+          return binArr.join(' ');
         }
       } else if (conversionType === 'octal') {
         if (isDecodeMode) {
           const octals = inputVal.trim().split(/\s+/);
-          const decoded = octals
+          return octals
             .map((o) => String.fromCharCode(parseInt(o, 8)))
             .join('');
-          setOutputVal(decoded);
         } else {
           const octArr = Array.from(inputVal).map((c) =>
             c.charCodeAt(0).toString(8).padStart(3, '0')
           );
-          setOutputVal(octArr.join(' '));
+          return octArr.join(' ');
         }
       } else if (conversionType === 'rot13') {
-        setOutputVal(
-          inputVal.replace(/[a-zA-Z]/g, (c) =>
-            String.fromCharCode(
-              c.charCodeAt(0) + (c.toLowerCase() < 'n' ? 13 : -13)
-            )
+        return inputVal.replace(/[a-zA-Z]/g, (c) =>
+          String.fromCharCode(
+            c.charCodeAt(0) + (c.toLowerCase() < 'n' ? 13 : -13)
           )
         );
       } else if (conversionType === 'caesar') {
         const shift = isDecodeMode ? (26 - caesarShift) % 26 : caesarShift;
-        const res = inputVal.replace(/[a-zA-Z]/g, (c) => {
+        return inputVal.replace(/[a-zA-Z]/g, (c) => {
           const code = c.charCodeAt(0);
           const base = code >= 97 ? 97 : 65; // 'a' vs 'A'
           return String.fromCharCode(((code - base + shift) % 26) + base);
         });
-        setOutputVal(res);
       } else if (conversionType === 'morse') {
         if (isDecodeMode) {
           const words = inputVal.trim().split(' / ');
-          const decoded = words
+          return words
             .map((word) =>
               word
                 .split(' ')
@@ -134,24 +128,19 @@ export function EncoderDecoderTool() {
                 .join('')
             )
             .join(' ');
-          setOutputVal(decoded);
         } else {
-          const encoded = inputVal
+          return inputVal
             .toLowerCase()
             .split('')
             .map((c) => MORSE_MAP[c] || '')
             .filter((x) => x !== '')
             .join(' ');
-          setOutputVal(encoded);
         }
       }
+      return '';
     } catch (e: any) {
-      setOutputVal(`// Conversion error: ${e.message}`);
+      return `// Conversion error: ${e.message}`;
     }
-  };
-
-  useEffect(() => {
-    processConversion();
   }, [inputVal, conversionType, isDecodeMode, caesarShift]);
 
   const handleCopyText = (text: string, label: string) => {
@@ -298,9 +287,7 @@ export function EncoderDecoderTool() {
                       size="icon-sm"
                       variant="ghost"
                       onClick={() => {
-                        const temp = inputVal;
                         setInputVal(outputVal);
-                        setOutputVal(temp);
                         setIsDecodeMode(!isDecodeMode);
                       }}
                       disabled={!outputVal}

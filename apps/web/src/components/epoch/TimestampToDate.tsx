@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useMemo } from 'react';
 import { Copy, RotateCcw, AlertCircle, Check } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
@@ -48,19 +48,16 @@ export function TimestampToDate() {
   const prefs = usePreferencesStore();
   const [input, setInput] = useState('');
   const [unit, setUnit] = useState<TimestampUnit>(prefs.defaultUnit);
-  const [autoDetected, setAutoDetected] = useState<TimestampUnit | null>(null);
   const [timezone, setTimezone] = useState(prefs.defaultTimezone);
   const [result, setResult] = useState<DateTimeResult | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   // Auto-detect unit
-  useEffect(() => {
+  const autoDetected = useMemo(() => {
     if (input && /^-?\d+$/.test(input.trim())) {
-      const detected = detectTimestampUnit(input.trim().replace(/^-/, ''));
-      setAutoDetected(detected);
-    } else {
-      setAutoDetected(null);
+      return detectTimestampUnit(input.trim().replace(/^-/, ''));
     }
+    return null;
   }, [input]);
 
   const convert = useCallback(() => {

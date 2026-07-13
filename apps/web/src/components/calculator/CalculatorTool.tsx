@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Calculator, Landmark, Coins, Calendar, ArrowRight, Download, HelpCircle, Table, Clock, Timer, Hourglass } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -40,30 +40,21 @@ export function CalculatorTool() {
   const [interestRate, setInterestRate] = useState<number>(8.5);
   const [tenure, setTenure] = useState<number>(5);
   const [tenureUnit, setTenureUnit] = useState<'years' | 'months'>('years');
-  const [emiResult, setEmiResult] = useState({
-    monthlyEmi: 0,
-    totalInterest: 0,
-    totalPayment: 0,
-    amortization: [] as any[],
-  });
 
   // --- SALARY CALCULATOR STATES ---
   const [baseSalary, setBaseSalary] = useState<number>(60000);
   const [salaryFreq, setSalaryFreq] = useState<string>('annual');
   const [hoursPerWeek, setHoursPerWeek] = useState<number>(40);
   const [taxRate, setTaxRate] = useState<number>(20);
-  const [salaryBreakdown, setSalaryBreakdown] = useState<any[]>([]);
 
   // --- AGE & DATE CALCULATOR STATES ---
   const [startDate, setStartDate] = useState<string>('1995-01-01');
   const [endDate, setEndDate] = useState<string>(new Date().toISOString().substring(0, 10));
-  const [ageResult, setAgeResult] = useState<any>(null);
 
   const [dateMathStart, setDateMathStart] = useState<string>(new Date().toISOString().substring(0, 10));
   const [dateMathOffset, setDateMathOffset] = useState<number>(30);
   const [dateMathUnit, setDateMathUnit] = useState<string>('days');
   const [dateMathOp, setDateMathOp] = useState<string>('add');
-  const [dateMathResult, setDateMathResult] = useState<string>('');
 
   // --- STANDARD/SCIENTIFIC CALCULATOR STATES ---
   const [expression, setExpression] = useState<string>('');
@@ -75,21 +66,16 @@ export function CalculatorTool() {
   const [gstAmount, setGstAmount] = useState<number>(1000);
   const [gstRate, setGstRate] = useState<number>(18);
   const [gstType, setGstType] = useState<'add' | 'remove'>('add');
-  const [gstResult, setGstResult] = useState({ net: 0, tax: 0, gross: 0 });
 
   // --- SIP CALCULATOR STATES ---
   const [sipMonthly, setSipMonthly] = useState<number>(5000);
   const [sipReturn, setSipReturn] = useState<number>(12);
   const [sipYears, setSipYears] = useState<number>(10);
-  const [sipResult, setSipResult] = useState({ invested: 0, returns: 0, total: 0 });
 
   // --- BMI CALCULATOR STATES ---
   const [bmiSystem, setBmiSystem] = useState<'metric' | 'imperial'>('metric');
   const [bmiWeight, setBmiWeight] = useState<number>(70);
   const [bmiHeight, setBmiHeight] = useState<number>(175);
-  const [bmiScore, setBmiScore] = useState<number>(0);
-  const [bmiCategory, setBmiCategory] = useState<string>('');
-  const [bmiColor, setBmiColor] = useState<string>('');
 
   const handleInput = (val: string) => {
     setExpression((prev) => prev + val);
@@ -149,15 +135,15 @@ export function CalculatorTool() {
   };
 
   // --- GST CALCULATION ---
-  useEffect(() => {
+  const gstResult = useMemo(() => {
     const amt = gstAmount;
     const rate = gstRate;
-    if (amt <= 0) return;
-    
+    if (amt <= 0) return { net: 0, tax: 0, gross: 0 };
+
     let net = 0;
     let tax = 0;
     let gross = 0;
-    
+
     if (gstType === 'add') {
       net = amt;
       tax = (amt * rate) / 100;
@@ -167,46 +153,42 @@ export function CalculatorTool() {
       net = amt / (1 + rate / 100);
       tax = gross - net;
     }
-    
-    setGstResult({ net, tax, gross });
+
+    return { net, tax, gross };
   }, [gstAmount, gstRate, gstType]);
 
   // --- SIP CALCULATION ---
-  useEffect(() => {
+  const sipResult = useMemo(() => {
     const P = sipMonthly;
     const annualRate = sipReturn;
     const years = sipYears;
-    
+
     if (P <= 0 || annualRate <= 0 || years <= 0) {
-      setSipResult({ invested: 0, returns: 0, total: 0 });
-      return;
+      return { invested: 0, returns: 0, total: 0 };
     }
-    
+
     const i = annualRate / 12 / 100;
     const n = years * 12;
-    
+
     const total = P * ((Math.pow(1 + i, n) - 1) / i) * (1 + i);
     const invested = P * n;
     const returns = total - invested;
-    
-    setSipResult({
+
+    return {
       invested: Math.round(invested),
       returns: Math.round(returns),
       total: Math.round(total)
-    });
+    };
   }, [sipMonthly, sipReturn, sipYears]);
 
   // --- BMI CALCULATION ---
-  useEffect(() => {
+  const { bmiScore, bmiCategory, bmiColor } = useMemo(() => {
     const w = bmiWeight;
     const h = bmiHeight;
     if (w <= 0 || h <= 0) {
-      setBmiScore(0);
-      setBmiCategory('');
-      setBmiColor('');
-      return;
+      return { bmiScore: 0, bmiCategory: '', bmiColor: '' };
     }
-    
+
     let score = 0;
     if (bmiSystem === 'metric') {
       const heightInMeters = h / 100;
@@ -214,10 +196,9 @@ export function CalculatorTool() {
     } else {
       score = (w * 703) / (h * h);
     }
-    
+
     score = Number(score.toFixed(1));
-    setBmiScore(score);
-    
+
     let cat = 'Normal weight';
     let color = 'text-emerald-500 border-emerald-500/30 bg-emerald-500/10';
     if (score < 18.5) {
@@ -230,12 +211,12 @@ export function CalculatorTool() {
       cat = 'Overweight';
       color = 'text-orange-500 border-orange-500/30 bg-orange-500/10';
     }
-    setBmiCategory(cat);
-    setBmiColor(color);
+
+    return { bmiScore: score, bmiCategory: cat, bmiColor: color };
   }, [bmiWeight, bmiHeight, bmiSystem]);
 
   // 1. Calculate EMI
-  useEffect(() => {
+  const emiResult = useMemo(() => {
     const P = loanAmount;
     const R = interestRate / 12 / 100; // monthly rate
     const N = tenureUnit === 'years' ? tenure * 12 : tenure; // total months
@@ -262,23 +243,22 @@ export function CalculatorTool() {
         });
       }
 
-      setEmiResult({
+      return {
         monthlyEmi: emi,
         totalInterest,
         totalPayment,
         amortization: schedule,
-      });
+      };
     } else {
-      setEmiResult({ monthlyEmi: 0, totalInterest: 0, totalPayment: 0, amortization: [] });
+      return { monthlyEmi: 0, totalInterest: 0, totalPayment: 0, amortization: [] as any[] };
     }
   }, [loanAmount, interestRate, tenure, tenureUnit]);
 
   // 2. Calculate Salary Conversions
-  useEffect(() => {
+  const salaryBreakdown = useMemo(() => {
     const grossVal = baseSalary;
     if (grossVal <= 0) {
-      setSalaryBreakdown([]);
-      return;
+      return [] as any[];
     }
 
     let annualGross = grossVal;
@@ -298,7 +278,7 @@ export function CalculatorTool() {
       { name: 'Hourly', div: hoursPerWeek * 52 },
     ];
 
-    const breakdown = frequencies.map((freq) => {
+    return frequencies.map((freq) => {
       const gross = annualGross / freq.div;
       const net = gross * taxMultiplier;
       return {
@@ -307,31 +287,27 @@ export function CalculatorTool() {
         net,
       };
     });
-
-    setSalaryBreakdown(breakdown);
   }, [baseSalary, salaryFreq, hoursPerWeek, taxRate]);
 
   // 3. Calculate Age difference
-  useEffect(() => {
+  const ageResult = useMemo(() => {
     const sDate = new Date(startDate);
     const eDate = new Date(endDate);
 
     if (isNaN(sDate.getTime()) || isNaN(eDate.getTime())) {
-      setAgeResult(null);
-      return;
+      return null;
     }
 
     const diffMs = eDate.getTime() - sDate.getTime();
     if (diffMs < 0) {
-      setAgeResult(null);
-      return;
+      return null;
     }
 
     // Advanced age breakdown
     const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
     const diffWeeks = Math.floor(diffDays / 7);
     const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
-    
+
     // Calculate Years, Months, Days accurately
     let years = eDate.getFullYear() - sDate.getFullYear();
     let months = eDate.getMonth() - sDate.getMonth();
@@ -350,7 +326,7 @@ export function CalculatorTool() {
     const totalMinutes = Math.floor(diffMs / (1000 * 60));
     const totalSeconds = Math.floor(diffMs / 1000);
 
-    setAgeResult({
+    return {
       years,
       months,
       days,
@@ -360,7 +336,7 @@ export function CalculatorTool() {
       totalMinutes,
       totalSeconds,
       totalMillis: diffMs,
-    });
+    };
   }, [startDate, endDate]);
 
   const setStartPreset = (yearsAgo: number) => {
@@ -370,11 +346,10 @@ export function CalculatorTool() {
   };
 
   // 4. Calculate Date Math (Add/Sub)
-  useEffect(() => {
+  const dateMathResult = useMemo(() => {
     const date = new Date(dateMathStart);
     if (isNaN(date.getTime())) {
-      setDateMathResult('');
-      return;
+      return '';
     }
 
     const offset = dateMathOp === 'add' ? dateMathOffset : -dateMathOffset;
@@ -389,7 +364,7 @@ export function CalculatorTool() {
       date.setFullYear(date.getFullYear() + offset);
     }
 
-    setDateMathResult(date.toDateString());
+    return date.toDateString();
   }, [dateMathStart, dateMathOffset, dateMathUnit, dateMathOp]);
 
   const handleDownloadAmortization = () => {

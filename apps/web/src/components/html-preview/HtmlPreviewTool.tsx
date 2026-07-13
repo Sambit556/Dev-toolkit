@@ -34,26 +34,13 @@ const TEMPLATES = {
   }
 };
 
-export function HtmlPreviewTool() {
-  const [activeTab, setActiveTab] = useState<'html' | 'css' | 'js'>('html');
-  const [htmlCode, setHtmlCode] = useState(TEMPLATES.counter.html);
-  const [cssCode, setCssCode] = useState(TEMPLATES.counter.css);
-  const [jsCode, setJsCode] = useState(TEMPLATES.counter.js);
-
-  const [srcDoc, setSrcDoc] = useState('');
-  const [logs, setLogs] = useState<LogEntry[]>([]);
-  const [activeTemplate, setActiveTemplate] = useState<string>('counter');
-  
-  const iframeRef = useRef<HTMLIFrameElement | null>(null);
-
-  // Compile combined document
-  const compileSandbox = () => {
-    // Inject scripts to intercept console actions and send logs to the host page
-    const runString = `
+// Builds the sandboxed iframe document, wiring up console interception to relay logs to the host page.
+function buildSrcDoc(html: string, css: string, js: string): string {
+  return `
       <!DOCTYPE html>
       <html>
         <head>
-          <style>${cssCode}</style>
+          <style>${css}</style>
           <script>
             (function() {
               const interceptLog = (type) => {
@@ -80,18 +67,31 @@ export function HtmlPreviewTool() {
           </script>
         </head>
         <body>
-          ${htmlCode}
-          <script>${jsCode}</script>
+          ${html}
+          <script>${js}</script>
         </body>
       </html>
     `;
-    setSrcDoc(runString);
-  };
+}
 
-  // Run initial compile
-  useEffect(() => {
-    compileSandbox();
-  }, []);
+export function HtmlPreviewTool() {
+  const [activeTab, setActiveTab] = useState<'html' | 'css' | 'js'>('html');
+  const [htmlCode, setHtmlCode] = useState(TEMPLATES.counter.html);
+  const [cssCode, setCssCode] = useState(TEMPLATES.counter.css);
+  const [jsCode, setJsCode] = useState(TEMPLATES.counter.js);
+
+  const [srcDoc, setSrcDoc] = useState(() =>
+    buildSrcDoc(TEMPLATES.counter.html, TEMPLATES.counter.css, TEMPLATES.counter.js)
+  );
+  const [logs, setLogs] = useState<LogEntry[]>([]);
+  const [activeTemplate, setActiveTemplate] = useState<string>('counter');
+
+  const iframeRef = useRef<HTMLIFrameElement | null>(null);
+
+  // Compile combined document (manual "Run Code" trigger)
+  const compileSandbox = () => {
+    setSrcDoc(buildSrcDoc(htmlCode, cssCode, jsCode));
+  };
 
   // Listen to message events from iframe
   useEffect(() => {
@@ -120,45 +120,9 @@ export function HtmlPreviewTool() {
       setCssCode(tmpl.css);
       setJsCode(tmpl.js);
       setLogs([]);
-      
-      // Auto-compile new template immediately so preview shows it
-      const runString = `
-        <!DOCTYPE html>
-        <html>
-          <head>
-            <style>${tmpl.css}</style>
-            <script>
-              (function() {
-                const interceptLog = (type) => {
-                  const original = console[type];
-                  console[type] = function(...args) {
-                    const val = args.map(arg => {
-                      if (typeof arg === 'object') {
-                        try { return JSON.stringify(arg); } catch (e) { return '[Object]'; }
-                      }
-                      return String(arg);
-                    }).join(' ');
-                    window.parent.postMessage({ type: 'CONSOLE_LOG', logType: type, val }, '*');
-                    original.apply(console, args);
-                  };
-                };
-                interceptLog('log');
-                interceptLog('error');
-                interceptLog('info');
 
-                window.addEventListener('error', (e) => {
-                  window.parent.postMessage({ type: 'CONSOLE_LOG', logType: 'error', val: e.message }, '*');
-                });
-              })();
-            </script>
-          </head>
-          <body>
-            ${tmpl.html}
-            <script>${tmpl.js}</script>
-          </body>
-        </html>
-      `;
-      setSrcDoc(runString);
+      // Auto-compile new template immediately so preview shows it
+      setSrcDoc(buildSrcDoc(tmpl.html, tmpl.css, tmpl.js));
       toast.success(`Loaded template: ${val}`);
     }
   };

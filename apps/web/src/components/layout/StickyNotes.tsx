@@ -45,11 +45,14 @@ export function StickyNotes() {
   const [isDraggingTrigger, setIsDraggingTrigger] = useState(false);
   const triggerDragStartRef = useRef<{ y: number; triggerY: number } | null>(null);
 
-  // Load from local storage
+  // Reads localStorage, so this must run client-only: this page is statically prerendered,
+  // and a lazy useState initializer would run again (with real data) during the client's
+  // first hydration render, mismatching the server-rendered (default) HTML for any returning user.
   useEffect(() => {
     const saved = localStorage.getItem('devkits-sticky-notes');
     if (saved) {
       try {
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         setNotes(JSON.parse(saved));
       } catch (e) {
         console.error('Failed to parse sticky notes', e);
@@ -405,7 +408,7 @@ export function StickyNotes() {
         const isDragging = activeDragId === note.id;
 
         // Calculate a stable slight rotation tilt for corkboard look based on the ID timestamp
-        const timestamp = parseInt(note.id.split('-')[1]) || Date.now();
+        const timestamp = parseInt(note.id.split('-')[1]) || 0;
         const tiltDeg = ((timestamp % 5) - 2) * 0.9; // yields -1.8deg to +1.8deg
 
         return (

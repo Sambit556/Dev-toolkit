@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Shield, Key, Eye, EyeOff, Copy, RefreshCw, Hash, CheckCircle, XCircle, Sliders } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -67,6 +67,18 @@ async function calculateHmac(message: string, key: string, algo: string): Promis
 export function SecurityTools() {
   const [activeTab, setActiveTab] = useState('password-gen');
 
+  // Reads window.location, so this must run client-only: this page is statically prerendered,
+  // and a lazy useState initializer would run again during the client's first hydration render,
+  // mismatching the server-rendered default tab for any deep link with a ?tab= query param.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const tabParam = params.get('tab');
+    if (tabParam && ['password-gen', 'uuid-gen', 'hmac-gen', 'bcrypt-gen'].includes(tabParam)) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setActiveTab(tabParam);
+    }
+  }, []);
+
   // --- PASSWORD GENERATOR STATES ---
   const [passLength, setPassLength] = useState<number>(16);
   const [includeUpper, setIncludeUpper] = useState<boolean>(true);
@@ -74,14 +86,12 @@ export function SecurityTools() {
   const [includeNumbers, setIncludeNumbers] = useState<boolean>(true);
   const [includeSymbols, setIncludeSymbols] = useState<boolean>(true);
   const [excludeSimilar, setExcludeSimilar] = useState<boolean>(false);
-  const [generatedPass, setGeneratedPass] = useState<string>('');
   const [showPassword, setShowPassword] = useState<boolean>(true);
 
   // --- SECURE TOKEN STATES ---
   const [tokenType, setTokenType] = useState<string>('hex');
   const [tokenLength, setTokenLength] = useState<number>(32);
   const [bulkCount, setBulkCount] = useState<number>(1);
-  const [generatedTokens, setGeneratedTokens] = useState<string>('');
 
   // --- HMAC STATES ---
   const [hmacMsg, setHmacMsg] = useState<string>('Developer utilities are awesome!');
@@ -116,7 +126,7 @@ export function SecurityTools() {
   const [uuidDecoderInput, setUuidDecoderInput] = useState<string>('');
   const [uuidDecodedDetails, setUuidDecodedDetails] = useState<ReturnType<typeof decodeUuidV1>>(null);
 
-  const handleUuidGenerate = async () => {
+  const handleUuidGenerate = useCallback(async () => {
     try {
       const results: string[] = [];
       const qty = Math.max(1, Math.min(1000, uuidQuantity));
@@ -158,7 +168,7 @@ export function SecurityTools() {
     } catch (e: any) {
       toast.error(e.message || 'Generation failed');
     }
-  };
+  }, [uuidVersion, uuidQuantity, uuidUppercase, uuidBraces, uuidNoHyphens, uuidNanoSize, uuidNanoAlphabet, uuidV5Namespace, uuidV5CustomNamespace, uuidV5Name]);
 
   const handleUuidCopyAll = () => {
     const text = uuidGeneratedList.join('\n');
@@ -195,18 +205,10 @@ export function SecurityTools() {
   };
 
   useEffect(() => {
+    // handleUuidGenerate does genuine async work for v5 (SHA-1 hashing); can't be a pure useMemo.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     handleUuidGenerate();
-  }, [uuidVersion, uuidQuantity, uuidUppercase, uuidBraces, uuidNoHyphens, uuidNanoSize, uuidV5Namespace, uuidV5Name]);
-
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const params = new URLSearchParams(window.location.search);
-      const tabParam = params.get('tab');
-      if (tabParam && ['password-gen', 'uuid-gen', 'hmac-gen', 'bcrypt-gen'].includes(tabParam)) {
-        setActiveTab(tabParam);
-      }
-    }
-  }, []);
+  }, [handleUuidGenerate]);
 
   // --- PASSWORD STRENGTH CALCULATION ---
   const getPasswordStrength = (pass: string) => {
@@ -236,7 +238,9 @@ export function SecurityTools() {
     return { entropy, rating, color };
   };
 
-  const generatePasswd = () => {
+  const [generatedPass, setGeneratedPass] = useState<string>('');
+
+  const generatePasswd = useCallback(() => {
     let charset = '';
     if (includeLower) charset += 'abcdefghijklmnopqrstuvwxyz';
     if (includeUpper) charset += 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
@@ -248,7 +252,7 @@ export function SecurityTools() {
     }
 
     if (!charset) {
-      toast.error('Please select at least one character set!');
+      setGeneratedPass('');
       return;
     }
 
@@ -258,14 +262,19 @@ export function SecurityTools() {
       password += charset[bytes[i] % charset.length];
     }
     setGeneratedPass(password);
-  };
-
-  useEffect(() => {
-    generatePasswd();
   }, [passLength, includeUpper, includeLower, includeNumbers, includeSymbols, excludeSimilar]);
 
+  useEffect(() => {
+    // getRandomBytes uses window.crypto, which doesn't exist during SSR prerendering;
+    // this must stay a client-only effect rather than a useMemo run during render.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    generatePasswd();
+  }, [generatePasswd]);
+
   // --- TOKEN GENERATION ---
-  const generateTokensHandler = () => {
+  const [generatedTokens, setGeneratedTokens] = useState<string>('');
+
+  const generateTokensHandler = useCallback(() => {
     let tokens: string[] = [];
     const len = Math.max(4, Math.min(1024, tokenLength));
     const count = Math.max(1, Math.min(500, bulkCount));
@@ -300,11 +309,14 @@ export function SecurityTools() {
     }
 
     setGeneratedTokens(tokens.join('\n'));
-  };
+  }, [tokenType, tokenLength, bulkCount]);
 
   useEffect(() => {
+    // getRandomBytes uses window.crypto, which doesn't exist during SSR prerendering;
+    // this must stay a client-only effect rather than a useMemo run during render.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     generateTokensHandler();
-  }, [tokenType, tokenLength, bulkCount]);
+  }, [generateTokensHandler]);
 
   // --- HMAC GENERATION ---
   useEffect(() => {

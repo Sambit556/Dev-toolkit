@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Gamepad2, Coins, Disc, Users, RefreshCw, Trophy, Plus, Trash2, Sparkles, Info } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -101,10 +101,10 @@ export function FunTools() {
     }, 1200); // match flip animation length
   };
 
-  // Synchronize initial dice values when diceCount changes
-  useEffect(() => {
-    setDiceValues(Array.from({ length: diceCount }).map(() => 1));
-  }, [diceCount]);
+  const handleDiceCountChange = (count: 1 | 2) => {
+    setDiceCount(count);
+    setDiceValues(Array.from({ length: count }).map(() => 1));
+  };
 
   // --- DICE ROLLER HANDLER ---
   const handleRollDice = () => {
@@ -207,11 +207,11 @@ export function FunTools() {
   };
 
   // --- NAME WHEEL RENDERING & LOGIC ---
-  const getNamesList = (): string[] => {
+  const getNamesList = useCallback((): string[] => {
     return wheelNames.split(',').map(n => n.trim()).filter(n => n.length > 0);
-  };
+  }, [wheelNames]);
 
-  const drawWheel = () => {
+  const drawWheel = useCallback(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
@@ -280,13 +280,13 @@ export function FunTools() {
     ctx.fillStyle = '#f1f5f9';
     ctx.arc(center - 3, center - 3, 3, 0, 2 * Math.PI);
     ctx.fill();
-  };
+  }, [getNamesList]);
 
   useEffect(() => {
     if (activeTab === 'name-wheel') {
       drawWheel();
     }
-  }, [wheelNames, activeTab]);
+  }, [activeTab, drawWheel]);
 
   const handleSpinWheel = () => {
     if (isWheelSpinning) return;
@@ -455,7 +455,7 @@ export function FunTools() {
 
               <div className="space-y-1.5">
                 <Label>Number of Dice</Label>
-                <Select value={String(diceCount)} onValueChange={(v: any) => setDiceCount(Number(v) as any)}>
+                <Select value={String(diceCount)} onValueChange={(v: any) => handleDiceCountChange(Number(v) as any)}>
                   <SelectTrigger className="h-9 text-xs">
                     <SelectValue />
                   </SelectTrigger>

@@ -66,13 +66,7 @@ export function PdfTools() {
   const sigCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const isDrawingRef = useRef<boolean>(false);
 
-  useEffect(() => {
-    if (sigRawUploadedSrc) {
-      processSignatureImage(sigRawUploadedSrc, sigRemoveBg, sigTolerance);
-    }
-  }, [sigRawUploadedSrc, sigRemoveBg, sigTolerance]);
-
-  const processSignatureImage = (rawSrc: string, removeBg: boolean, tolerance: number) => {
+  function processSignatureImage(rawSrc: string, removeBg: boolean, tolerance: number) {
     if (!removeBg) {
       setSigImageSrc(rawSrc);
       return;
@@ -108,7 +102,28 @@ export function PdfTools() {
         setSigImageSrc(rawSrc);
       }
     };
-  };
+  }
+
+  useEffect(() => {
+    // processSignatureImage draws into an off-DOM canvas via the browser Image/Canvas
+    // APIs (async onload callback); it's an imperative side effect, not a pure computation.
+    if (sigRawUploadedSrc) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      processSignatureImage(sigRawUploadedSrc, sigRemoveBg, sigTolerance);
+    }
+  }, [sigRawUploadedSrc, sigRemoveBg, sigTolerance]);
+
+  // Reads window.location, so this must run client-only: this page is statically prerendered,
+  // and a lazy useState initializer would run again during the client's first hydration render,
+  // mismatching the server-rendered default tab for any deep link with a ?tab= query param.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const tabParam = params.get('tab');
+    if (tabParam && ['merge', 'split', 'protect', 'text-to-pdf', 'signature'].includes(tabParam)) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setActiveTab(tabParam);
+    }
+  }, []);
 
   const startDrawing = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
     const canvas = sigCanvasRef.current;
@@ -462,6 +477,7 @@ export function PdfTools() {
       }
 
       const mergedPdfBytes = await mergedPdf.save();
+      // eslint-disable-next-line react-hooks/purity -- runs only inside this async click handler, not during render
       downloadPdf(mergedPdfBytes, `merged_${Date.now()}.pdf`);
       toast.success('PDFs merged successfully!');
     } catch (err) {
@@ -607,17 +623,6 @@ export function PdfTools() {
     const i = Math.floor(Math.log(bytes) / Math.log(k));
     return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
   };
-
-  // Support reading tab from query search params
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const params = new URLSearchParams(window.location.search);
-      const tabParam = params.get('tab');
-      if (tabParam && ['merge', 'split', 'protect', 'text-to-pdf', 'signature'].includes(tabParam)) {
-        setActiveTab(tabParam);
-      }
-    }
-  }, []);
 
   return (
     <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
@@ -1124,6 +1129,7 @@ export function PdfTools() {
                   <div className="border border-dashed rounded-xl p-2.5 bg-muted/15 flex flex-col items-center justify-center space-y-1.5">
                     <span className="text-[8px] font-black text-muted-foreground/60 uppercase tracking-widest block">Signature Output Preview</span>
                     <div className="bg-white border rounded p-2 max-h-24 flex items-center justify-center shadow-inner relative overflow-hidden">
+                      {/* eslint-disable-next-line @next/next/no-img-element -- client-generated signature data URL, no fixed dimensions to give next/image */}
                       <img src={sigImageSrc} alt="Signature Preview" className="max-h-20 object-contain" />
                     </div>
                   </div>
@@ -1282,6 +1288,7 @@ export function PdfTools() {
                             isDraggingSig ? "border-primary bg-primary/10 shadow-md ring-2 ring-primary/20 scale-105" : "border-slate-300"
                           )}
                         >
+                          {/* eslint-disable-next-line @next/next/no-img-element -- interactive drag/rotate/scale overlay, must render the data URL instantly during drag without next/image's loader machinery */}
                           <img
                             src={sigImageSrc}
                             alt="Signature overlay"

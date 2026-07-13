@@ -20,7 +20,6 @@ export function JsonViewerPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const [rightTab, setRightTab] = useState<'tree' | 'advanced'>('tree');
-  const [errorLine, setErrorLine] = useState<number | undefined>();
   const [historyOpen, setHistoryOpen] = useState(false);
   const addHistoryEntry = useHistoryStore((s) => s.addEntry);
   const lastHistoryEntry = useHistoryStore((s) => s.entries.find((e) => e.tool === 'json'));
@@ -43,14 +42,7 @@ export function JsonViewerPage() {
 
   const inputSize = useMemo(() => new TextEncoder().encode(input).length, [input]);
 
-  // Update error line when parse result changes
-  React.useEffect(() => {
-    if (parseResult?.error?.line) {
-      setErrorLine(parseResult.error.line);
-    } else {
-      setErrorLine(undefined);
-    }
-  }, [parseResult]);
+  const errorLine = parseResult?.error?.line ?? undefined;
 
   const saveJsonToHistory = useCallback((value: string) => {
     if (!value.trim() || value === lastHistoryEntry?.input) return;
@@ -128,7 +120,6 @@ export function JsonViewerPage() {
     setInput('');
     setSearchQuery('');
     setCollapsed(new Set());
-    setErrorLine(undefined);
     toast.info('Editor cleared');
   }, []);
 

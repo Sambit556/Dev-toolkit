@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Share2, Copy, Download, Wand2, Minimize2, AlertTriangle, CheckCircle2, ShieldCheck } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -18,62 +18,64 @@ const SAMPLE_QUERY = `query GetUser($id: ID!) {
   }
 }`;
 
+const DEFAULT_SCHEMA_SDL =
+  'type User {\n  id: ID!\n  name: String!\n  friends: [User!]!\n}\n\ntype Query {\n  user(id: ID!): User\n}';
+
+function formatGraphqlError(e: GraphQLError | Error): string {
+  if ('locations' in e && e.locations && e.locations.length > 0) {
+    const loc = e.locations[0];
+    return `Line ${loc.line}, Column ${loc.column}: ${e.message}`;
+  }
+  return e.message;
+}
+
+function computeGraphqlFormat(
+  currentInput: string,
+  currentUseSchema: boolean,
+  currentSchemaSdl: string,
+): { output: string; errors: string[] } {
+  if (!currentInput.trim()) {
+    return { output: '', errors: [] };
+  }
+  try {
+    const doc = parse(currentInput);
+    const formatted = print(doc);
+
+    if (currentUseSchema && currentSchemaSdl.trim()) {
+      try {
+        const schema = buildSchema(currentSchemaSdl);
+        const validationErrors = validate(schema, doc);
+        return { output: formatted, errors: validationErrors.map((e) => formatGraphqlError(e)) };
+      } catch (schemaErr) {
+        return { output: formatted, errors: [`Schema error: ${(schemaErr as Error).message}`] };
+      }
+    }
+    return { output: formatted, errors: [] };
+  } catch (e) {
+    return { output: '', errors: [formatGraphqlError(e as GraphQLError)] };
+  }
+}
+
 export function GraphqlFormatterTool() {
   const [input, setInput] = useState(SAMPLE_QUERY);
-  const [output, setOutput] = useState('');
-  const [errors, setErrors] = useState<string[]>([]);
   const [useSchema, setUseSchema] = useState(false);
-  const [schemaSdl, setSchemaSdl] = useState(
-    'type User {\n  id: ID!\n  name: String!\n  friends: [User!]!\n}\n\ntype Query {\n  user(id: ID!): User\n}'
+  const [schemaSdl, setSchemaSdl] = useState(DEFAULT_SCHEMA_SDL);
+  const [{ output, errors }, setFormatResult] = useState(() =>
+    computeGraphqlFormat(SAMPLE_QUERY, false, DEFAULT_SCHEMA_SDL)
   );
 
-  const runFormat = () => {
-    if (!input.trim()) {
-      setOutput('');
-      setErrors([]);
-      return;
-    }
-    try {
-      const doc = parse(input);
-      setOutput(print(doc));
-
-      if (useSchema && schemaSdl.trim()) {
-        try {
-          const schema = buildSchema(schemaSdl);
-          const validationErrors = validate(schema, doc);
-          setErrors(validationErrors.map((e) => formatGraphqlError(e)));
-        } catch (schemaErr) {
-          setErrors([`Schema error: ${(schemaErr as Error).message}`]);
-        }
-      } else {
-        setErrors([]);
-      }
-    } catch (e) {
-      setErrors([formatGraphqlError(e as GraphQLError)]);
-      setOutput('');
-    }
+  // Runs on every relevant input change (and the manual "Format" button) rather than
+  // via an effect, since it must interleave with the independent "Minify" action below.
+  const runFormat = (currentInput: string, currentUseSchema: boolean, currentSchemaSdl: string) => {
+    setFormatResult(computeGraphqlFormat(currentInput, currentUseSchema, currentSchemaSdl));
   };
-
-  const formatGraphqlError = (e: GraphQLError | Error): string => {
-    if ('locations' in e && e.locations && e.locations.length > 0) {
-      const loc = e.locations[0];
-      return `Line ${loc.line}, Column ${loc.column}: ${e.message}`;
-    }
-    return e.message;
-  };
-
-  useEffect(() => {
-    runFormat();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [input, useSchema, schemaSdl]);
 
   const handleMinify = () => {
     try {
-      setOutput(stripIgnoredCharacters(input));
-      setErrors([]);
+      setFormatResult({ output: stripIgnoredCharacters(input), errors: [] });
       toast.success('Minified');
     } catch (e) {
-      setErrors([formatGraphqlError(e as GraphQLError)]);
+      setFormatResult((prev) => ({ output: prev.output, errors: [formatGraphqlError(e as GraphQLError)] }));
     }
   };
 
@@ -99,10 +101,17 @@ export function GraphqlFormatterTool() {
         <CardContent className="p-4 flex flex-wrap items-center gap-4">
           <div className="flex items-center gap-1.5">
             <Label htmlFor="use-schema" className="cursor-pointer text-xs">Validate against schema</Label>
-            <Switch id="use-schema" checked={useSchema} onCheckedChange={setUseSchema} />
+            <Switch
+              id="use-schema"
+              checked={useSchema}
+              onCheckedChange={(checked) => {
+                setUseSchema(checked);
+                runFormat(input, checked, schemaSdl);
+              }}
+            />
           </div>
           <div className="ml-auto flex gap-2">
-            <Button variant="outline" size="sm" onClick={runFormat} className="h-8 gap-1.5 text-xs">
+            <Button variant="outline" size="sm" onClick={() => runFormat(input, useSchema, schemaSdl)} className="h-8 gap-1.5 text-xs">
               <Wand2 className="h-3.5 w-3.5" />
               Format
             </Button>
@@ -124,7 +133,10 @@ export function GraphqlFormatterTool() {
             <Textarea
               id="gql-schema"
               value={schemaSdl}
-              onChange={(e) => setSchemaSdl(e.target.value)}
+              onChange={(e) => {
+                setSchemaSdl(e.target.value);
+                runFormat(input, useSchema, e.target.value);
+              }}
               className="font-mono text-xs h-32 resize-y"
               placeholder="type Query { ... }"
             />
@@ -139,7 +151,10 @@ export function GraphqlFormatterTool() {
             <Textarea
               id="gql-in"
               value={input}
-              onChange={(e) => setInput(e.target.value)}
+              onChange={(e) => {
+                setInput(e.target.value);
+                runFormat(e.target.value, useSchema, schemaSdl);
+              }}
               className="font-mono text-xs h-80 resize-y"
               placeholder="query { field }"
             />

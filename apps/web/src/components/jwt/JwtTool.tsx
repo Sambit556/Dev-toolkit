@@ -54,7 +54,7 @@ export function JwtTool() {
   const [activeTab, setActiveTab] = useState('decode');
 
   // Real-time ticking state
-  const [timeTick, setTimeTick] = useState(Date.now());
+  const [timeTick, setTimeTick] = useState(() => Date.now());
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -98,6 +98,9 @@ export function JwtTool() {
   }, [tokenInput, secretKey]);
 
   useEffect(() => {
+    // handleDecode does genuine async crypto verification; the sync setState calls
+    // before its `await` are unavoidable for a data-fetch-style effect.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     handleDecode();
   }, [tokenInput, secretKey, handleDecode]);
 
@@ -114,6 +117,8 @@ export function JwtTool() {
   }, [encHeader, encPayload, encSecret]);
 
   useEffect(() => {
+    // handleEncode does genuine async crypto signing; can't be a pure useMemo.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     handleEncode();
   }, [encHeader, encPayload, encSecret, handleEncode]);
 

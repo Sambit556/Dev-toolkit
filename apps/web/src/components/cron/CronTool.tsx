@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Calendar, Play, FileText, CheckSquare, Sliders, Info, Copy } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -14,9 +14,6 @@ import { toast } from 'sonner';
 
 export function CronTool() {
   const [cronExpression, setCronExpression] = useState<string>('*/5 * * * *');
-  const [translation, setTranslation] = useState<string>('');
-  const [nextDates, setNextDates] = useState<string[]>([]);
-  const [parseError, setParseError] = useState<string | null>(null);
 
   // Visual Builder States
   const [minuteType, setMinuteType] = useState<string>('every'); // every, interval, specific
@@ -38,15 +35,13 @@ export function CronTool() {
   const [weekType, setWeekType] = useState<string>('every'); // every, specific
   const [specificWeeks, setSpecificWeeks] = useState<number[]>([]); // 0-6 (Sun-Sat)
 
-  // 1. Process and Parse Cron Expression
-  useEffect(() => {
+  // 1. Process and Parse Cron Expression (pure derivation of cronExpression alone)
+  const { translation, nextDates, parseError } = useMemo(() => {
     try {
       const cleanExpr = cronExpression.trim().replace(/\s+/g, ' ');
-      
+
       // Get human-readable description
       const desc = cronstrue.toString(cleanExpr, { use24HourTimeFormat: true });
-      setTranslation(desc);
-      setParseError(null);
 
       // Get next 5 occurrences
       const interval = parser.parse(cleanExpr);
@@ -54,67 +49,79 @@ export function CronTool() {
       for (let i = 0; i < 5; i++) {
         dates.push(interval.next().toString());
       }
-      setNextDates(dates);
+      return { translation: desc, nextDates: dates, parseError: null as string | null };
     } catch (e: any) {
-      setTranslation('');
-      setNextDates([]);
-      setParseError(e.message || 'Invalid cron expression');
+      return { translation: '', nextDates: [] as string[], parseError: e.message || 'Invalid cron expression' };
     }
   }, [cronExpression]);
 
-  // 2. Compile Visual Settings into Cron Expression
-  useEffect(() => {
+  // 2. Compile Visual Builder Settings into a cron expression. Builder fields are the
+  // primary source of truth for cronExpression, so this recomputes and writes it
+  // directly from each field's own onChange handler rather than via an effect.
+  type BuilderOverrides = Partial<{
+    minuteType: string; minuteInterval: string; minuteStart: string; specificMinutes: number[];
+    hourType: string; hourInterval: string; hourStart: string; specificHours: number[];
+    dayType: string; specificDays: number[];
+    monthType: string; specificMonths: number[];
+    weekType: string; specificWeeks: number[];
+  }>;
+
+  const composeCron = (overrides: BuilderOverrides = {}) => {
+    const s = {
+      minuteType, minuteInterval, minuteStart, specificMinutes,
+      hourType, hourInterval, hourStart, specificHours,
+      dayType, specificDays,
+      monthType, specificMonths,
+      weekType, specificWeeks,
+      ...overrides,
+    };
+
     let min = '*';
-    if (minuteType === 'interval') {
-      min = `${minuteStart}/${minuteInterval}`;
-    } else if (minuteType === 'specific') {
-      min = specificMinutes.length > 0 ? specificMinutes.sort((a, b) => a - b).join(',') : '*';
+    if (s.minuteType === 'interval') {
+      min = `${s.minuteStart}/${s.minuteInterval}`;
+    } else if (s.minuteType === 'specific') {
+      min = s.specificMinutes.length > 0 ? [...s.specificMinutes].sort((a, b) => a - b).join(',') : '*';
     }
 
     let hr = '*';
-    if (hourType === 'interval') {
-      hr = `${hourStart}/${hourInterval}`;
-    } else if (hourType === 'specific') {
-      hr = specificHours.length > 0 ? specificHours.sort((a, b) => a - b).join(',') : '*';
+    if (s.hourType === 'interval') {
+      hr = `${s.hourStart}/${s.hourInterval}`;
+    } else if (s.hourType === 'specific') {
+      hr = s.specificHours.length > 0 ? [...s.specificHours].sort((a, b) => a - b).join(',') : '*';
     }
 
     let day = '*';
-    if (dayType === 'specific') {
-      day = specificDays.length > 0 ? specificDays.sort((a, b) => a - b).join(',') : '*';
+    if (s.dayType === 'specific') {
+      day = s.specificDays.length > 0 ? [...s.specificDays].sort((a, b) => a - b).join(',') : '*';
     }
 
     let mon = '*';
-    if (monthType === 'specific') {
-      mon = specificMonths.length > 0 ? specificMonths.sort((a, b) => a - b).join(',') : '*';
+    if (s.monthType === 'specific') {
+      mon = s.specificMonths.length > 0 ? [...s.specificMonths].sort((a, b) => a - b).join(',') : '*';
     }
 
     let wk = '*';
-    if (weekType === 'specific') {
-      wk = specificWeeks.length > 0 ? specificWeeks.sort((a, b) => a - b).join(',') : '*';
+    if (s.weekType === 'specific') {
+      wk = s.specificWeeks.length > 0 ? [...s.specificWeeks].sort((a, b) => a - b).join(',') : '*';
     }
 
-    // Compose cron (5 fields)
-    const expr = `${min} ${hr} ${day} ${mon} ${wk}`;
-    setCronExpression(expr);
-  }, [
-    minuteType, minuteInterval, minuteStart, specificMinutes,
-    hourType, hourInterval, hourStart, specificHours,
-    dayType, specificDays,
-    monthType, specificMonths,
-    weekType, specificWeeks
-  ]);
+    return `${min} ${hr} ${day} ${mon} ${wk}`;
+  };
 
   const handleCopy = () => {
     navigator.clipboard.writeText(cronExpression);
     toast.success('Cron expression copied!');
   };
 
-  const toggleSpecific = (val: number, list: number[], setter: React.Dispatch<React.SetStateAction<number[]>>) => {
-    if (list.includes(val)) {
-      setter(list.filter((x) => x !== val));
-    } else {
-      setter([...list, val]);
-    }
+  const toggleSpecific = (
+    val: number,
+    list: number[],
+    setter: React.Dispatch<React.SetStateAction<number[]>>,
+    field: keyof BuilderOverrides,
+  ) => {
+    const newList = list.includes(val) ? list.filter((x) => x !== val) : [...list, val];
+    setter(newList);
+    setCronExpression(composeCron({ [field]: newList } as BuilderOverrides));
   };
 
   // Preset Cron Expressions
@@ -156,7 +163,7 @@ export function CronTool() {
                       type="radio"
                       name="minute-radio"
                       checked={minuteType === 'every'}
-                      onChange={() => setMinuteType('every')}
+                      onChange={() => { setMinuteType('every'); setCronExpression(composeCron({ minuteType: 'every' })); }}
                     />
                     Every minute (`*`)
                   </label>
@@ -166,7 +173,7 @@ export function CronTool() {
                       type="radio"
                       name="minute-radio"
                       checked={minuteType === 'interval'}
-                      onChange={() => setMinuteType('interval')}
+                      onChange={() => { setMinuteType('interval'); setCronExpression(composeCron({ minuteType: 'interval' })); }}
                     />
                     Every interval
                   </label>
@@ -174,7 +181,7 @@ export function CronTool() {
                   {minuteType === 'interval' && (
                     <div className="flex items-center gap-2 pl-6 text-xs mt-1">
                       <span>Every</span>
-                      <Select value={minuteInterval} onValueChange={setMinuteInterval}>
+                      <Select value={minuteInterval} onValueChange={(v) => { setMinuteInterval(v); setCronExpression(composeCron({ minuteInterval: v })); }}>
                         <SelectTrigger className="w-20"><SelectValue /></SelectTrigger>
                         <SelectContent>
                           {['2', '5', '10', '15', '20', '30'].map((m) => (
@@ -183,7 +190,7 @@ export function CronTool() {
                         </SelectContent>
                       </Select>
                       <span>starting at minute</span>
-                      <Select value={minuteStart} onValueChange={setMinuteStart}>
+                      <Select value={minuteStart} onValueChange={(v) => { setMinuteStart(v); setCronExpression(composeCron({ minuteStart: v })); }}>
                         <SelectTrigger className="w-20"><SelectValue /></SelectTrigger>
                         <SelectContent>
                           {['0', '5', '10', '15', '20', '30', '45'].map((m) => (
@@ -199,7 +206,7 @@ export function CronTool() {
                       type="radio"
                       name="minute-radio"
                       checked={minuteType === 'specific'}
-                      onChange={() => setMinuteType('specific')}
+                      onChange={() => { setMinuteType('specific'); setCronExpression(composeCron({ minuteType: 'specific' })); }}
                     />
                     Specific minutes (choose multiple)
                   </label>
@@ -212,7 +219,7 @@ export function CronTool() {
                           variant={specificMinutes.includes(i) ? 'default' : 'outline'}
                           size="icon-sm"
                           className="h-7 w-7 text-[10px]"
-                          onClick={() => toggleSpecific(i, specificMinutes, setSpecificMinutes)}
+                          onClick={() => toggleSpecific(i, specificMinutes, setSpecificMinutes, 'specificMinutes')}
                         >
                           {i}
                         </Button>
@@ -230,7 +237,7 @@ export function CronTool() {
                       type="radio"
                       name="hour-radio"
                       checked={hourType === 'every'}
-                      onChange={() => setHourType('every')}
+                      onChange={() => { setHourType('every'); setCronExpression(composeCron({ hourType: 'every' })); }}
                     />
                     Every hour (`*`)
                   </label>
@@ -240,7 +247,7 @@ export function CronTool() {
                       type="radio"
                       name="hour-radio"
                       checked={hourType === 'interval'}
-                      onChange={() => setHourType('interval')}
+                      onChange={() => { setHourType('interval'); setCronExpression(composeCron({ hourType: 'interval' })); }}
                     />
                     Every interval
                   </label>
@@ -248,7 +255,7 @@ export function CronTool() {
                   {hourType === 'interval' && (
                     <div className="flex items-center gap-2 pl-6 text-xs mt-1">
                       <span>Every</span>
-                      <Select value={hourInterval} onValueChange={setHourInterval}>
+                      <Select value={hourInterval} onValueChange={(v) => { setHourInterval(v); setCronExpression(composeCron({ hourInterval: v })); }}>
                         <SelectTrigger className="w-20"><SelectValue /></SelectTrigger>
                         <SelectContent>
                           {['2', '3', '4', '6', '8', '12'].map((h) => (
@@ -257,7 +264,7 @@ export function CronTool() {
                         </SelectContent>
                       </Select>
                       <span>starting at hour</span>
-                      <Select value={hourStart} onValueChange={setHourStart}>
+                      <Select value={hourStart} onValueChange={(v) => { setHourStart(v); setCronExpression(composeCron({ hourStart: v })); }}>
                         <SelectTrigger className="w-20"><SelectValue /></SelectTrigger>
                         <SelectContent>
                           {Array.from({ length: 24 }, (_, i) => (
@@ -273,7 +280,7 @@ export function CronTool() {
                       type="radio"
                       name="hour-radio"
                       checked={hourType === 'specific'}
-                      onChange={() => setHourType('specific')}
+                      onChange={() => { setHourType('specific'); setCronExpression(composeCron({ hourType: 'specific' })); }}
                     />
                     Specific hours
                   </label>
@@ -286,7 +293,7 @@ export function CronTool() {
                           variant={specificHours.includes(i) ? 'default' : 'outline'}
                           size="icon-sm"
                           className="h-7 w-7 text-[10px]"
-                          onClick={() => toggleSpecific(i, specificHours, setSpecificHours)}
+                          onClick={() => toggleSpecific(i, specificHours, setSpecificHours, 'specificHours')}
                         >
                           {i}
                         </Button>
@@ -304,7 +311,7 @@ export function CronTool() {
                       type="radio"
                       name="day-radio"
                       checked={dayType === 'every'}
-                      onChange={() => setDayType('every')}
+                      onChange={() => { setDayType('every'); setCronExpression(composeCron({ dayType: 'every' })); }}
                     />
                     Every day of the month (`*`)
                   </label>
@@ -314,7 +321,7 @@ export function CronTool() {
                       type="radio"
                       name="day-radio"
                       checked={dayType === 'specific'}
-                      onChange={() => setDayType('specific')}
+                      onChange={() => { setDayType('specific'); setCronExpression(composeCron({ dayType: 'specific' })); }}
                     />
                     Specific days of the month
                   </label>
@@ -327,7 +334,7 @@ export function CronTool() {
                           variant={specificDays.includes(i + 1) ? 'default' : 'outline'}
                           size="icon-sm"
                           className="h-7 w-7 text-[10px]"
-                          onClick={() => toggleSpecific(i + 1, specificDays, setSpecificDays)}
+                          onClick={() => toggleSpecific(i + 1, specificDays, setSpecificDays, 'specificDays')}
                         >
                           {i + 1}
                         </Button>
@@ -345,7 +352,7 @@ export function CronTool() {
                       type="radio"
                       name="month-radio"
                       checked={monthType === 'every'}
-                      onChange={() => setMonthType('every')}
+                      onChange={() => { setMonthType('every'); setCronExpression(composeCron({ monthType: 'every' })); }}
                     />
                     Every month (`*`)
                   </label>
@@ -355,7 +362,7 @@ export function CronTool() {
                       type="radio"
                       name="month-radio"
                       checked={monthType === 'specific'}
-                      onChange={() => setMonthType('specific')}
+                      onChange={() => { setMonthType('specific'); setCronExpression(composeCron({ monthType: 'specific' })); }}
                     />
                     Specific months
                   </label>
@@ -371,7 +378,7 @@ export function CronTool() {
                           variant={specificMonths.includes(i + 1) ? 'default' : 'outline'}
                           size="sm"
                           className="text-xs py-1"
-                          onClick={() => toggleSpecific(i + 1, specificMonths, setSpecificMonths)}
+                          onClick={() => toggleSpecific(i + 1, specificMonths, setSpecificMonths, 'specificMonths')}
                         >
                           {name}
                         </Button>
@@ -389,7 +396,7 @@ export function CronTool() {
                       type="radio"
                       name="week-radio"
                       checked={weekType === 'every'}
-                      onChange={() => setWeekType('every')}
+                      onChange={() => { setWeekType('every'); setCronExpression(composeCron({ weekType: 'every' })); }}
                     />
                     Every day of the week (`*`)
                   </label>
@@ -399,7 +406,7 @@ export function CronTool() {
                       type="radio"
                       name="week-radio"
                       checked={weekType === 'specific'}
-                      onChange={() => setWeekType('specific')}
+                      onChange={() => { setWeekType('specific'); setCronExpression(composeCron({ weekType: 'specific' })); }}
                     />
                     Specific days of the week
                   </label>
@@ -412,7 +419,7 @@ export function CronTool() {
                           variant={specificWeeks.includes(i) ? 'default' : 'outline'}
                           size="sm"
                           className="text-xs"
-                          onClick={() => toggleSpecific(i, specificWeeks, setSpecificWeeks)}
+                          onClick={() => toggleSpecific(i, specificWeeks, setSpecificWeeks, 'specificWeeks')}
                         >
                           {name}
                         </Button>

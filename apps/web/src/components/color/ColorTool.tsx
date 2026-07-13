@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Palette, Copy, RefreshCw, Layers, ShieldCheck, Check, X, ShieldAlert, Lock, Unlock } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -12,19 +12,40 @@ import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip
 import { hexToRgb, rgbToHex, rgbToHsl, hslToRgb, rgbToHsv, rgbToCmyk, getContrastRatio, getColorHarmonies } from '@/lib/color';
 import { toast } from 'sonner';
 
+const DEFAULT_COLORS = {
+  rgb: { r: 59, g: 130, b: 246, a: 1 },
+  hsl: { h: 217, s: 91, l: 60, a: 1 },
+  hsv: { h: 217, s: 76, v: 96 },
+  cmyk: { c: 76, m: 47, y: 0, k: 4 },
+};
+const DEFAULT_CONTRAST_RATIO = 4.5;
+
 export function ColorTool() {
   const [hexColor, setHexColor] = useState<string>('#3B82F6');
-  
-  // RGB, HSL, HSV, CMYK states
-  const [rgb, setRgb] = useState({ r: 59, g: 130, b: 246, a: 1 });
-  const [hsl, setHsl] = useState({ h: 217, s: 91, l: 60, a: 1 });
-  const [hsv, setHsv] = useState({ h: 217, s: 76, v: 96 });
-  const [cmyk, setCmyk] = useState({ c: 76, m: 47, y: 0, k: 4 });
+
+  // RGB, HSL, HSV, CMYK are pure derivations of hexColor. Falls back to a fixed
+  // default while the hex field is mid-edit and momentarily invalid (e.g. "#3B").
+  const { rgb, hsl, hsv, cmyk } = useMemo(() => {
+    const parsed = hexToRgb(hexColor);
+    if (!parsed) {
+      return DEFAULT_COLORS;
+    }
+    const activeRgb = { r: parsed.r, g: parsed.g, b: parsed.b, a: parsed.a ?? 1 };
+    const activeHslRaw = rgbToHsl(activeRgb);
+    const activeHsl = { h: activeHslRaw.h, s: activeHslRaw.s, l: activeHslRaw.l, a: activeHslRaw.a ?? 1 };
+    const activeHsv = rgbToHsv(activeRgb);
+    const activeCmyk = rgbToCmyk(activeRgb);
+    return { rgb: activeRgb, hsl: activeHsl, hsv: activeHsv, cmyk: activeCmyk };
+  }, [hexColor]);
 
   // Contrast states
   const [fgColor, setFgColor] = useState<string>('#FFFFFF');
   const [bgColor, setBgColor] = useState<string>('#3B82F6');
-  const [contrastRatio, setContrastRatio] = useState<number>(4.5);
+  const contrastRatio = useMemo(() => {
+    const rgbFg = hexToRgb(fgColor);
+    const rgbBg = hexToRgb(bgColor);
+    return rgbFg && rgbBg ? getContrastRatio(rgbFg, rgbBg) : DEFAULT_CONTRAST_RATIO;
+  }, [fgColor, bgColor]);
 
   // Palette Generator state
   const [palette, setPalette] = useState<{ hex: string; locked: boolean }[]>([
@@ -66,48 +87,18 @@ export function ColorTool() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
-  // Sync conversions from hexColor
-  useEffect(() => {
-    const parsed = hexToRgb(hexColor);
-    if (parsed) {
-      const activeRgb = { r: parsed.r, g: parsed.g, b: parsed.b, a: parsed.a ?? 1 };
-      setRgb(activeRgb);
-
-      const activeHsl = rgbToHsl(activeRgb);
-      setHsl({ h: activeHsl.h, s: activeHsl.s, l: activeHsl.l, a: activeHsl.a ?? 1 });
-
-      const activeHsv = rgbToHsv(activeRgb);
-      setHsv(activeHsv);
-
-      const activeCmyk = rgbToCmyk(activeRgb);
-      setCmyk(activeCmyk);
-    }
-  }, [hexColor]);
-
-  // Sync contrast calculations
-  useEffect(() => {
-    const rgbFg = hexToRgb(fgColor);
-    const rgbBg = hexToRgb(bgColor);
-    if (rgbFg && rgbBg) {
-      const ratio = getContrastRatio(rgbFg, rgbBg);
-      setContrastRatio(ratio);
-    }
-  }, [fgColor, bgColor]);
-
   const handleHexInput = (val: string) => {
     setHexColor(val);
   };
 
   const handleRgbSlider = (key: 'r' | 'g' | 'b', val: number) => {
     const nextRgb = { ...rgb, [key]: val };
-    setRgb(nextRgb);
     const nextHex = rgbToHex(nextRgb);
     setHexColor(nextHex);
   };
 
   const handleHslSlider = (key: 'h' | 's' | 'l', val: number) => {
     const nextHsl = { ...hsl, [key]: val };
-    setHsl(nextHsl);
     const nextRgb = hslToRgb(nextHsl);
     const nextHex = rgbToHex(nextRgb);
     setHexColor(nextHex);

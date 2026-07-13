@@ -67,11 +67,6 @@ export function CommandPalette() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
-  // Reset selected index when search changes
-  useEffect(() => {
-    setSelectedIndex(0);
-  }, [search]);
-
   // Filter tools based on search query
   const filteredTools = ALL_TOOLS.filter((tool) => {
     const q = search.toLowerCase().trim();
@@ -106,6 +101,7 @@ export function CommandPalette() {
     router.push(href);
     setIsOpen(false);
     setSearch('');
+    setSelectedIndex(0);
   };
 
   // Scroll active item into view
@@ -128,14 +124,14 @@ export function CommandPalette() {
             <input
               type="text"
               value={search}
-              onChange={(e) => setSearch(e.target.value)}
+              onChange={(e) => { setSearch(e.target.value); setSelectedIndex(0); }}
               placeholder="Search features (e.g. JSON, Epoch, Base64...)"
               className="flex-1 bg-transparent border-0 outline-none text-sm placeholder:text-muted-foreground/75 text-foreground"
               autoFocus
             />
             {search && (
               <button
-                onClick={() => setSearch('')}
+                onClick={() => { setSearch(''); setSelectedIndex(0); }}
                 className="text-muted-foreground hover:text-foreground"
               >
                 <X className="h-3.5 w-3.5" />

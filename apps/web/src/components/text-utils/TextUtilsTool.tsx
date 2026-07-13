@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Type, Copy, Trash2, AlignLeft, BarChart3, Clock, Play } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -70,52 +70,24 @@ export function TextUtilsTool() {
   const [activeTab, setActiveTab] = useState('case-converter');
   const [inputText, setInputText] = useState('The quick brown fox jumps over the lazy dog.');
 
-  // Word Counter Stats State
-  const [stats, setStats] = useState({
-    chars: 0,
-    charsNoSpaces: 0,
-    words: 0,
-    sentences: 0,
-    lines: 0,
-    paragraphs: 0,
-    readingTime: 0,
-    speakingTime: 0,
-  });
-
-  const [wordFreq, setWordFreq] = useState<{ word: string; count: number }[]>([]);
-  const [charFreq, setCharFreq] = useState<{ char: string; count: number }[]>([]);
-
-  // Dynamic Case Outputs
-  const [caseOutputs, setCaseOutputs] = useState({
-    camel: '',
-    pascal: '',
-    snake: '',
-    kebab: '',
-    constant: '',
-    upper: '',
-    lower: '',
-    title: '',
-    sentence: '',
-    alternating: '',
-  });
-
-  useEffect(() => {
+  const { caseOutputs, stats, wordFreq, charFreq } = useMemo(() => {
     if (!inputText) {
-      setCaseOutputs({
-        camel: '', pascal: '', snake: '', kebab: '', constant: '',
-        upper: '', lower: '', title: '', sentence: '', alternating: '',
-      });
-      setStats({
-        chars: 0, charsNoSpaces: 0, words: 0, sentences: 0, lines: 0, paragraphs: 0,
-        readingTime: 0, speakingTime: 0,
-      });
-      setWordFreq([]);
-      setCharFreq([]);
-      return;
+      return {
+        caseOutputs: {
+          camel: '', pascal: '', snake: '', kebab: '', constant: '',
+          upper: '', lower: '', title: '', sentence: '', alternating: '',
+        },
+        stats: {
+          chars: 0, charsNoSpaces: 0, words: 0, sentences: 0, lines: 0, paragraphs: 0,
+          readingTime: 0, speakingTime: 0,
+        },
+        wordFreq: [] as { word: string; count: number }[],
+        charFreq: [] as { char: string; count: number }[],
+      };
     }
 
     // Convert cases
-    setCaseOutputs({
+    const caseOutputs = {
       camel: toCamelCase(inputText),
       pascal: toPascalCase(inputText),
       snake: toSnakeCase(inputText),
@@ -126,7 +98,7 @@ export function TextUtilsTool() {
       title: toTitleCase(inputText),
       sentence: toSentenceCase(inputText),
       alternating: toAlternatingCase(inputText),
-    });
+    };
 
     // Calculate metrics
     const chars = inputText.length;
@@ -140,7 +112,7 @@ export function TextUtilsTool() {
     const readingTime = Math.ceil(words / 200); // 200 words per minute average
     const speakingTime = Math.ceil(words / 130); // 130 words per minute average
 
-    setStats({
+    const stats = {
       chars,
       charsNoSpaces,
       words,
@@ -149,7 +121,7 @@ export function TextUtilsTool() {
       paragraphs,
       readingTime,
       speakingTime,
-    });
+    };
 
     // Word frequency (top 5)
     const freqMap: Record<string, number> = {};
@@ -157,11 +129,10 @@ export function TextUtilsTool() {
       const clean = w.toLowerCase().replace(/[^a-zA-Z0-9]/g, '');
       if (clean) freqMap[clean] = (freqMap[clean] || 0) + 1;
     });
-    const sortedWords = Object.entries(freqMap)
+    const wordFreq = Object.entries(freqMap)
       .map(([word, count]) => ({ word, count }))
       .sort((a, b) => b.count - a.count)
       .slice(0, 5);
-    setWordFreq(sortedWords);
 
     // Char frequency (top 5)
     const charMap: Record<string, number> = {};
@@ -170,11 +141,12 @@ export function TextUtilsTool() {
         charMap[c] = (charMap[c] || 0) + 1;
       }
     });
-    const sortedChars = Object.entries(charMap)
+    const charFreq = Object.entries(charMap)
       .map(([char, count]) => ({ char, count }))
       .sort((a, b) => b.count - a.count)
       .slice(0, 5);
-    setCharFreq(sortedChars);
+
+    return { caseOutputs, stats, wordFreq, charFreq };
   }, [inputText]);
 
   const handleCopy = (text: string, label: string) => {

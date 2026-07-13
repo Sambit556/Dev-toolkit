@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { ArrowLeftRight, Copy, Download, HelpCircle, FileSpreadsheet, Code2, Eye, FileText, Bold, Italic, Link2, List, Heading2, Code, Quote } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -20,31 +20,35 @@ import { toast } from 'sonner';
 export function ConvertersTool() {
   const [activeTab, setActiveTab] = useState('csv-json');
 
+  // Reads window.location, so this must run client-only: this page is statically prerendered,
+  // and a lazy useState initializer would run again during the client's first hydration render,
+  // mismatching the server-rendered default tab for any deep link with a ?tab= query param.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const tabParam = params.get('tab');
+    if (tabParam && ['csv-json', 'xml-json', 'yaml-json', 'md-html'].includes(tabParam)) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setActiveTab(tabParam);
+    }
+  }, []);
+
   // --- CSV / JSON STATES ---
   const [csvDirection, setCsvDirection] = useState<'csv2json' | 'json2csv'>('csv2json');
   const [csvInput, setCsvInput] = useState<string>(
     'id,name,role,email\n1,John Doe,Developer,john@example.com\n2,Jane Smith,Manager,jane@example.com'
   );
-  const [csvOutput, setCsvOutput] = useState<string>('');
-  const [csvTableData, setCsvTableData] = useState<any[]>([]);
-  const [csvKeys, setCsvKeys] = useState<string[]>([]);
-  const [csvError, setCsvError] = useState<string | null>(null);
 
   // --- XML / JSON STATES ---
   const [xmlDirection, setXmlDirection] = useState<'xml2json' | 'json2xml'>('xml2json');
   const [xmlInput, setXmlInput] = useState<string>(
     '<user id="1">\n  <name>John Doe</name>\n  <role>Developer</role>\n  <email>john@example.com</email>\n</user>'
   );
-  const [xmlOutput, setXmlOutput] = useState<string>('');
-  const [xmlError, setXmlError] = useState<string | null>(null);
 
   // --- MARKDOWN / HTML STATES ---
   const [mdDirection, setMdDirection] = useState<'md2html' | 'html2md'>('md2html');
   const [mdInput, setMdInput] = useState<string>(
     '# Hello World\n\nThis is a standard **markdown** text.\n\n- Point one\n- Point two\n\n```javascript\nconsole.log("Syntax highlighting is cool!");\n```'
   );
-  const [mdOutput, setMdOutput] = useState<string>('');
-  const [htmlPreview, setHtmlPreview] = useState<string>('');
   const mdTextareaRef = useRef<HTMLTextAreaElement | null>(null);
 
   // --- YAML / JSON STATES ---
@@ -65,29 +69,21 @@ export function ConvertersTool() {
       2
     )
   );
-  const [yamlOutput, setYamlOutput] = useState<string>('');
-  const [yamlError, setYamlError] = useState<string | null>(null);
   const [yamlIndentSize, setYamlIndentSize] = useState<string>('2');
   const [yamlSortKeys, setYamlSortKeys] = useState<boolean>(false);
 
   // 1. Process CSV ↔ JSON
-  const handleCsvConversion = () => {
+  const { csvOutput, csvTableData, csvKeys, csvError } = useMemo(() => {
+    const empty = { csvOutput: '', csvTableData: [] as any[], csvKeys: [] as string[], csvError: null as string | null };
     if (!csvInput.trim()) {
-      setCsvOutput('');
-      setCsvTableData([]);
-      setCsvKeys([]);
-      setCsvError(null);
-      return;
+      return empty;
     }
 
     try {
       if (csvDirection === 'csv2json') {
         const lines = csvInput.split('\n').map((l) => l.trim()).filter((l) => l.length > 0);
         if (lines.length === 0) {
-          setCsvOutput('');
-          setCsvTableData([]);
-          setCsvKeys([]);
-          return;
+          return empty;
         }
 
         // Delimiter auto-detect
@@ -97,7 +93,6 @@ export function ConvertersTool() {
         else if (header.includes(';')) delimiter = ';';
 
         const keys = header.split(delimiter).map((k) => k.replace(/^["']|["']$/g, '').trim());
-        setCsvKeys(keys);
 
         const data: any[] = [];
         for (let i = 1; i < lines.length; i++) {
@@ -109,21 +104,16 @@ export function ConvertersTool() {
           data.push(obj);
         }
 
-        setCsvTableData(data);
-        setCsvOutput(JSON.stringify(data, null, 2));
-        setCsvError(null);
+        return { csvOutput: JSON.stringify(data, null, 2), csvTableData: data, csvKeys: keys, csvError: null as string | null };
       } else {
         // JSON to CSV
         const parsed = JSON.parse(csvInput);
         const dataArr = Array.isArray(parsed) ? parsed : [parsed];
         if (dataArr.length === 0) {
-          setCsvOutput('');
-          return;
+          return empty;
         }
 
         const keys = Object.keys(dataArr[0]);
-        setCsvKeys(keys);
-        setCsvTableData(dataArr);
 
         const headerLine = keys.join(',');
         const contentLines = dataArr.map((obj) =>
@@ -133,27 +123,17 @@ export function ConvertersTool() {
           }).join(',')
         );
 
-        setCsvOutput([headerLine, ...contentLines].join('\n'));
-        setCsvError(null);
+        return { csvOutput: [headerLine, ...contentLines].join('\n'), csvTableData: dataArr, csvKeys: keys, csvError: null as string | null };
       }
     } catch (e: any) {
-      setCsvError(e.message || 'Error parsing CSV/JSON data');
-      setCsvOutput('');
-      setCsvTableData([]);
-      setCsvKeys([]);
+      return { csvOutput: '', csvTableData: [] as any[], csvKeys: [] as string[], csvError: e.message || 'Error parsing CSV/JSON data' };
     }
-  };
-
-  useEffect(() => {
-    handleCsvConversion();
   }, [csvInput, csvDirection]);
 
   // 2. Process XML ↔ JSON
-  const handleXmlConversion = () => {
+  const { xmlOutput, xmlError } = useMemo(() => {
     if (!xmlInput.trim()) {
-      setXmlOutput('');
-      setXmlError(null);
-      return;
+      return { xmlOutput: '', xmlError: null as string | null };
     }
 
     try {
@@ -210,8 +190,7 @@ export function ConvertersTool() {
         };
 
         const json = parseNode(xmlDoc.documentElement);
-        setXmlOutput(JSON.stringify(json, null, 2));
-        setXmlError(null);
+        return { xmlOutput: JSON.stringify(json, null, 2), xmlError: null as string | null };
       } else {
         // JSON to XML (Simple)
         const parsed = JSON.parse(xmlInput);
@@ -265,32 +244,23 @@ export function ConvertersTool() {
           }
         });
 
-        setXmlOutput(formatted.trim());
-        setXmlError(null);
+        return { xmlOutput: formatted.trim(), xmlError: null as string | null };
       }
     } catch (e: any) {
-      setXmlError(e.message || 'Error occurred parsing XML/JSON');
-      setXmlOutput('');
+      return { xmlOutput: '', xmlError: e.message || 'Error occurred parsing XML/JSON' };
     }
-  };
-
-  useEffect(() => {
-    handleXmlConversion();
   }, [xmlInput, xmlDirection]);
 
   // 3. Process Markdown ↔ HTML
-  const handleMdConversion = () => {
+  const { mdOutput, htmlPreview } = useMemo(() => {
     if (!mdInput.trim()) {
-      setMdOutput('');
-      setHtmlPreview('');
-      return;
+      return { mdOutput: '', htmlPreview: '' };
     }
 
     try {
       if (mdDirection === 'md2html') {
         const html = marked.parse(mdInput) as string;
-        setMdOutput(html);
-        setHtmlPreview(DOMPurify.sanitize(html));
+        return { mdOutput: html, htmlPreview: DOMPurify.sanitize(html) };
       } else {
         // Simple regex-based HTML to MD fallback
         let md = mdInput
@@ -307,27 +277,20 @@ export function ConvertersTool() {
           .replace(/<pre><code>([\s\S]*?)<\/code><\/pre>/g, '```\n$1\n```')
           .replace(/<code.*?>([\s\S]*?)<\/code>/g, '`$1`')
           .replace(/<br\s*\/?>/g, '\n');
-        
+
         // Strip other HTML tags
         md = md.replace(/<[^>]*>/g, '');
-        setMdOutput(md.trim());
-        setHtmlPreview(DOMPurify.sanitize(mdInput));
+        return { mdOutput: md.trim(), htmlPreview: DOMPurify.sanitize(mdInput) };
       }
     } catch (e: any) {
-      setMdOutput(`// MD conversion error: ${e.message}`);
+      return { mdOutput: `// MD conversion error: ${e.message}`, htmlPreview: '' };
     }
-  };
-
-  useEffect(() => {
-    handleMdConversion();
   }, [mdInput, mdDirection]);
 
   // 4. Process YAML ↔ JSON
-  const handleYamlConversion = () => {
+  const { yamlOutput, yamlError } = useMemo(() => {
     if (!yamlInput.trim()) {
-      setYamlOutput('');
-      setYamlError(null);
-      return;
+      return { yamlOutput: '', yamlError: null as string | null };
     }
 
     try {
@@ -338,25 +301,18 @@ export function ConvertersTool() {
           sortKeys: yamlSortKeys,
           noRefs: true,
         });
-        setYamlOutput(yaml);
-        setYamlError(null);
+        return { yamlOutput: yaml, yamlError: null as string | null };
       } else {
         const parsed = jsyaml.load(yamlInput);
         if (typeof parsed !== 'object' && parsed !== null) {
           throw new Error('YAML did not parse into an object');
         }
         const json = JSON.stringify(parsed, null, Number(yamlIndentSize));
-        setYamlOutput(json);
-        setYamlError(null);
+        return { yamlOutput: json, yamlError: null as string | null };
       }
     } catch (e: any) {
-      setYamlError(e.message || 'Error occurred during parsing');
-      setYamlOutput('');
+      return { yamlOutput: '', yamlError: e.message || 'Error occurred during parsing' };
     }
-  };
-
-  useEffect(() => {
-    handleYamlConversion();
   }, [yamlInput, yamlDirection, yamlIndentSize, yamlSortKeys]);
 
   const insertMdWrap = (prefix: string, suffix: string = prefix, placeholder = 'text') => {
@@ -403,16 +359,6 @@ export function ConvertersTool() {
     URL.revokeObjectURL(url);
     toast.success('Downloaded successfully!');
   };
-
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const params = new URLSearchParams(window.location.search);
-      const tabParam = params.get('tab');
-      if (tabParam && ['csv-json', 'xml-json', 'yaml-json', 'md-html'].includes(tabParam)) {
-        setActiveTab(tabParam);
-      }
-    }
-  }, []);
 
   return (
     <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
