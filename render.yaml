@@ -3,7 +3,12 @@ services:
     name: devchrono-api
     runtime: node
     plan: free
-    buildCommand: npm install && npm run build --workspace=packages/shared && npm run build --workspace=apps/api
+    # --include=dev overrides npm's default of omitting devDependencies
+    # (typescript, @types/*) whenever NODE_ENV=production is set, which it
+    # is below — Render exposes that env var during the build step too, not
+    # just at runtime, so a plain `npm install` here silently drops the
+    # packages the TypeScript build needs.
+    buildCommand: npm install --include=dev && npm run build --workspace=packages/shared && npm run build --workspace=apps/api
     startCommand: node apps/api/dist/server.js
     healthCheckPath: /health
     envVars:
