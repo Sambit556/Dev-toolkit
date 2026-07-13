@@ -291,7 +291,10 @@ function HeaderClock() {
 type ConnectionStatus = 'online' | 'offline' | 'checking';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
-const API_HEALTH_URL = `${API_BASE}/health`;
+// /api/status, not /health — some browser extensions pattern-match "health"
+// in a URL and silently block it (ERR_BLOCKED_BY_CLIENT) even when the API
+// itself is fine. Same handler, different path avoids that false negative.
+const API_HEALTH_URL = `${API_BASE}/api/status`;
 
 function HeaderStatus() {
   // Start as 'checking' until the first API health check resolves

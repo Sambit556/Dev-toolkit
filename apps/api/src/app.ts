@@ -86,6 +86,12 @@ app.use('/docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
 
 // Routes
 app.use('/health', healthRouter);
+// Same handler, second path — kept for the browser-side status widget. Some
+// privacy/ad-block extensions pattern-match "health" in a URL and silently
+// drop the request (ERR_BLOCKED_BY_CLIENT) even though the API and CORS are
+// both fine; /api/status sidesteps that without touching Render's own
+// healthCheckPath, which must stay pointed at /health.
+app.use('/api/status', healthRouter);
 app.use('/api/time', timeRouter);
 app.use('/api/json', jsonRouter);
 app.use('/api/http-inspect', httpInspectRouter);
