@@ -290,28 +290,47 @@ function HeaderClock() {
 
 type ConnectionStatus = 'online' | 'offline' | 'checking';
 
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+const API_HEALTH_URL = `${API_BASE}/health`;
+
 function HeaderStatus() {
-  // Start as 'checking' until component mounts and reads navigator.onLine
+  // Start as 'checking' until the first API health check resolves
   const [status, setStatus] = useState<ConnectionStatus>('checking');
 
   useEffect(() => {
-    // Read actual browser network state on mount
-    setStatus(navigator.onLine ? 'online' : 'offline');
+    let cancelled = false;
 
-    const handleOnline = () => setStatus('online');
-    const handleOffline = () => setStatus('offline');
+    const checkApiHealth = () => {
+      // No point hitting the API if the device itself has no network.
+      if (!navigator.onLine) {
+        setStatus('offline');
+        return;
+      }
+      fetch(API_HEALTH_URL)
+        .then((res) => !cancelled && setStatus(res.ok ? 'online' : 'offline'))
+        .catch(() => !cancelled && setStatus('offline'));
+    };
 
-    window.addEventListener('online', handleOnline);
-    window.addEventListener('offline', handleOffline);
+    checkApiHealth();
+    const interval = setInterval(checkApiHealth, 30_000);
+
+    window.addEventListener('online', checkApiHealth);
+    window.addEventListener('offline', checkApiHealth);
 
     return () => {
-      window.removeEventListener('online', handleOnline);
-      window.removeEventListener('offline', handleOffline);
+      cancelled = true;
+      clearInterval(interval);
+      window.removeEventListener('online', checkApiHealth);
+      window.removeEventListener('offline', checkApiHealth);
     };
   }, []);
 
   return (
-    <div className={cn(
+    <a
+      href={API_HEALTH_URL}
+      target="_blank"
+      rel="noopener noreferrer"
+      className={cn(
       "hidden md:flex items-center gap-1.5 font-mono text-[9px] font-black uppercase tracking-widest px-2.5 py-1.5 rounded-lg border shadow-sm transition-all",
       status === 'online' && "bg-emerald-500/10 text-emerald-600 border-emerald-500/20",
       status === 'offline' && "bg-red-500/10 text-red-600 border-red-500/20",
@@ -342,7 +361,7 @@ function HeaderStatus() {
         {status === 'offline' && 'Offline'}
         {status === 'checking' && 'Checking'}
       </span>
-    </div>
+    </a>
   );
 }
 
