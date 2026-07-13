@@ -78,6 +78,10 @@ const TOOL_COLORS: Record<string, string> = {
   '/ip-intel': 'cyan',
   '/fun-tools': 'red',
   '/pdf-tools': 'fuchsia',
+  '/regex-tester': 'red',
+  '/sql-formatter': 'sky',
+  '/graphql-formatter': 'violet',
+  '/http-toolkit': 'emerald',
 };
 
 const COLOR_MAPS: Record<string, string> = {

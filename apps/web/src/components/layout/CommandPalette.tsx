@@ -79,7 +79,8 @@ export function CommandPalette() {
     return (
       tool.label.toLowerCase().includes(q) ||
       tool.desc.toLowerCase().includes(q) ||
-      tool.categoryName.toLowerCase().includes(q)
+      tool.categoryName.toLowerCase().includes(q) ||
+      (tool as { keywords?: string[] }).keywords?.some((k) => k.toLowerCase().includes(q))
     );
   });
 

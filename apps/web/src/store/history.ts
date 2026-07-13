@@ -5,7 +5,7 @@ import { persist } from 'zustand/middleware';
 
 export interface HistoryEntry {
   id: string;
-  tool: 'epoch' | 'json';
+  tool: 'epoch' | 'json' | 'diff';
   input: string;
   output: string;
   timestamp: number;

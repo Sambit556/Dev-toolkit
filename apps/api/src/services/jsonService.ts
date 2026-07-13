@@ -3,6 +3,7 @@ import type {
   JsonFormatResponse,
   JsonMinifyResponse,
 } from '@devchrono/shared';
+import { AppError } from '../middleware/errorHandler';
 
 interface JsonParseError {
   message: string;
@@ -97,7 +98,7 @@ export function minifyJson(jsonStr: string): JsonMinifyResponse {
   const { value, error } = parseJsonSafe(jsonStr);
 
   if (error) {
-    throw new Error(error.message);
+    throw new AppError(400, error.message, 'INVALID_JSON');
   }
 
   const minified = JSON.stringify(value);

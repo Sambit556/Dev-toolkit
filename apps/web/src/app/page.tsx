@@ -28,6 +28,10 @@ import {
   QrCode,
   FileText,
   Lock,
+  Regex,
+  Database,
+  Share2,
+  Webhook,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -47,6 +51,7 @@ const TOOLS = [
     category: 'converters',
     badge: 'Epoch',
     color: 'blue',
+    keywords: ['epoch converter', 'unix timestamp converter', 'unix time', 'timestamp to date', 'date to timestamp', 'epoch time', 'unix epoch', 'convert timestamp', 'current unix time', 'epochconverter'],
   },
   {
     href: '/json',
@@ -58,6 +63,7 @@ const TOOLS = [
     category: 'formatters',
     badge: 'JSON',
     color: 'green',
+    keywords: ['json formatter', 'json beautifier', 'json prettifier', 'json validator', 'format json', 'beautify json', 'minify json', 'parse json', 'json parser', 'json editor', 'json tree view', 'json lint', 'jsonlint'],
   },
   {
     href: '/jwt',
@@ -69,6 +75,7 @@ const TOOLS = [
     category: 'formatters',
     badge: 'JWT',
     color: 'red',
+    keywords: ['jwt decoder', 'jwt encoder', 'json web token', 'decode jwt', 'jwt parser', 'bearer token decoder', 'jwt debugger', 'token decoder', 'jwt payload', 'auth token viewer', 'jwt verify'],
   },
 
   {
@@ -81,6 +88,7 @@ const TOOLS = [
     category: 'generators',
     badge: 'Scheduler',
     color: 'indigo',
+    keywords: ['cron generator', 'cron expression builder', 'crontab generator', 'cron job creator', 'cron syntax helper', 'visual cron builder', 'schedule generator', 'cron parser', 'cron humanizer', 'crontab syntax'],
   },
   {
     href: '/unit-converter',
@@ -92,6 +100,7 @@ const TOOLS = [
     category: 'utilities',
     badge: 'Converter',
     color: 'orange',
+    keywords: ['unit converter', 'length converter', 'weight converter', 'area converter', 'metric converter', 'convert units', 'measurement converter', 'imperial to metric'],
   },
   {
     href: '/color-picker',
@@ -103,6 +112,7 @@ const TOOLS = [
     category: 'utilities',
     badge: 'Design',
     color: 'pink',
+    keywords: ['color picker', 'hex color picker', 'rgb to hex', 'color contrast checker', 'random color generator', 'color palette generator', 'color converter', 'hsl color picker', 'accessibility contrast checker'],
   },
   {
     href: '/encoder-decoder',
@@ -114,6 +124,7 @@ const TOOLS = [
     category: 'converters',
     badge: 'Encode',
     color: 'emerald',
+    keywords: ['base64 encode', 'base64 decode', 'b64', 'url encode', 'url decode', 'hex encode', 'hex decode', 'html entity encode', 'encode text', 'decode string', 'text encoder', 'text decoder', 'percent encoding', 'rot13'],
   },
   {
     href: '/calculator',
@@ -125,6 +136,7 @@ const TOOLS = [
     category: 'utilities',
     badge: 'Finance',
     color: 'sky',
+    keywords: ['emi calculator', 'loan calculator', 'salary calculator', 'gst calculator', 'sip calculator', 'bmi calculator', 'finance calculator', 'tax calculator', 'interest calculator'],
   },
 
   {
@@ -132,11 +144,12 @@ const TOOLS = [
     icon: Sparkles,
     title: 'Image Compressor & Enhancer',
     description:
-      'Compress JPEG/PNG/WebP images, scale dimensions by custom ratios, and adjust enhancement filters locally.',
-    features: ['Quality adjustments', 'Percentage scale', 'Canvas filters', 'Before/After comparison'],
+      'Compress JPEG/PNG/WebP images, scale dimensions by custom ratios, adjust enhancement filters, and generate a full favicon package locally.',
+    features: ['Quality adjustments', 'Percentage scale', 'Canvas filters', 'Favicon & app icon generator'],
     category: 'utilities',
     badge: 'Media',
     color: 'amber',
+    keywords: ['image compressor', 'image optimizer', 'resize image', 'compress image', 'image converter', 'image quality reducer', 'photo compressor', 'exif viewer', 'favicon generator', 'favicon maker', 'ico generator', 'apple touch icon generator', 'generate favicon', 'site icon creator'],
   },
   {
     href: '/converters',
@@ -144,10 +157,11 @@ const TOOLS = [
     title: 'Structured Data Format Converter',
     description:
       'Translate between CSV spreadsheets, XML configs, YAML schemas, and Markdown documents client-side in real time.',
-    features: ['CSV ↔ JSON dynamic grid', 'XML ↔ JSON nested trees', 'YAML ↔ JSON configurations', 'Markdown ↔ HTML previews'],
+    features: ['CSV ↔ JSON dynamic grid', 'XML ↔ JSON nested trees', 'YAML ↔ JSON configurations', 'Live Markdown editor & preview'],
     category: 'converters',
     badge: 'Converter',
     color: 'teal',
+    keywords: ['csv to json', 'json to csv', 'xml to json', 'json to xml', 'yaml to json', 'json to yaml', 'markdown to html', 'markdown editor', 'markdown previewer', 'md to html', 'html to markdown', 'data format converter', 'csv parser', 'xml parser', 'yaml parser', 'live markdown preview'],
   },
   {
     href: '/currency',
@@ -159,6 +173,7 @@ const TOOLS = [
     category: 'utilities',
     badge: 'Currency',
     color: 'blue',
+    keywords: ['currency converter', 'exchange rate calculator', 'forex converter', 'money converter', 'currency exchange rates', 'convert currency offline'],
   },
   {
     href: '/ip-intel',
@@ -169,7 +184,8 @@ const TOOLS = [
     features: ['Auto client IP fetch', 'Detailed geolocation & ISP', 'Disposable email flags', 'E.164 phone check'],
     category: 'utilities',
     badge: 'Network',
-    color: 'cyan',
+    color: 'blue',
+    keywords: ['ip lookup', 'my ip address', 'geo ip lookup', 'ip address finder', 'what is my ip', 'ip validator', 'http ping', 'ping tool'],
   },
   {
     href: '/speed-test',
@@ -181,6 +197,7 @@ const TOOLS = [
     category: 'utilities',
     badge: 'Telemetry',
     color: 'pink',
+    keywords: ['internet speed test', 'download speed test', 'upload speed test', 'ping test', 'jitter test', 'bandwidth test', 'network speed checker'],
   },
   {
     href: '/file-converter',
@@ -192,6 +209,7 @@ const TOOLS = [
     category: 'converters',
     badge: 'Converter',
     color: 'teal',
+    keywords: ['file converter', 'convert files', 'file format converter', 'document converter', 'image to base64', 'file to text converter', 'client-side file conversion', 'batch file convert'],
   },
   {
     href: '/text-utils',
@@ -203,6 +221,7 @@ const TOOLS = [
     category: 'converters',
     badge: 'Text',
     color: 'pink',
+    keywords: ['case converter', 'uppercase lowercase converter', 'camel case', 'snake case', 'kebab case', 'title case', 'text analytics', 'word counter', 'character counter', 'text case converter', 'capitalize text', 'text statistics'],
   },
   {
     href: '/diff-checker',
@@ -214,6 +233,7 @@ const TOOLS = [
     category: 'formatters',
     badge: 'Format',
     color: 'emerald',
+    keywords: ['diff checker', 'text diff', 'compare text', 'code diff', 'file diff', 'diff tool', 'text comparison', 'side by side diff', 'unified diff', 'compare code', 'what changed between two files'],
   },
   {
     href: '/countdown',
@@ -225,6 +245,7 @@ const TOOLS = [
     category: 'utilities',
     badge: 'Clock',
     color: 'sky',
+    keywords: ['countdown timer', 'stopwatch', 'timer app', 'lap timer', 'event countdown', 'online timer', 'visual countdown'],
   },
   {
     href: '/lorem-ipsum',
@@ -236,6 +257,7 @@ const TOOLS = [
     category: 'generators',
     badge: 'Text',
     color: 'violet',
+    keywords: ['lorem ipsum generator', 'placeholder text generator', 'dummy text generator', 'filler text', 'sample text generator', 'lorem ipsum dolor', 'fake paragraph generator'],
   },
   {
     href: '/security-tools',
@@ -247,6 +269,7 @@ const TOOLS = [
     category: 'generators',
     badge: 'Security',
     color: 'amber',
+    keywords: ['password generator', 'random password generator', 'secure key generator', 'hmac generator', 'bcrypt hash', 'uuid generator', 'guid generator', 'unique id generator', 'random id', 'uuid v4', 'identifier generator', 'unique identifier', 'token generator', 'secret key generator', 'hash generator'],
   },
   {
     href: '/qr-barcode',
@@ -258,6 +281,7 @@ const TOOLS = [
     category: 'generators',
     badge: 'Marketing',
     color: 'blue',
+    keywords: ['qr code generator', 'barcode generator', 'qr generator', 'create qr code', 'generate barcode', 'qr code maker', 'barcode maker', 'scan code generator'],
   },
   {
     href: '/pdf-tools',
@@ -269,6 +293,7 @@ const TOOLS = [
     category: 'utilities',
     badge: 'PDF',
     color: 'purple',
+    keywords: ['merge pdf', 'split pdf', 'password protect pdf', 'pdf tools', 'combine pdf', 'pdf merger', 'pdf splitter', 'encrypt pdf', 'compress pdf'],
   },
   {
     href: '/html-preview',
@@ -280,6 +305,7 @@ const TOOLS = [
     category: 'formatters',
     badge: 'Sandbox',
     color: 'indigo',
+    keywords: ['html preview', 'css preview', 'js playground', 'live html editor', 'code sandbox', 'html css js editor', 'codepen alternative', 'html renderer', 'frontend playground', 'live code preview'],
   },
   {
     href: '/fake-address',
@@ -291,6 +317,7 @@ const TOOLS = [
     category: 'generators',
     badge: 'Testing',
     color: 'orange',
+    keywords: ['fake data generator', 'mock data generator', 'fake address generator', 'fake name generator', 'test data generator', 'dummy profile generator', 'random person generator', 'fake identity generator'],
   },
   {
     href: '/fun-tools',
@@ -302,6 +329,55 @@ const TOOLS = [
     category: 'utilities',
     badge: 'Play',
     color: 'red',
+    keywords: ['coin flip', 'dice roller', 'random name picker', 'decision maker', 'random wheel', 'spin wheel'],
+  },
+  {
+    href: '/regex-tester',
+    icon: Regex,
+    title: 'Regex Tester & Builder',
+    description:
+      'Build and debug regular expressions with live match highlighting, capture group details, and a replace-mode preview — all client-side.',
+    features: ['Live match highlighting', 'Capture group inspector', 'Replace mode preview', 'Common pattern library'],
+    category: 'formatters',
+    badge: 'Regex',
+    color: 'red',
+    keywords: ['regex tester', 'regex builder', 'regular expression tester', 'regex validator', 'regex debugger', 'pattern matcher', 'regex101 alternative', 'test regex', 'regex match highlighter', 'regex replace tool', 'regexp tester', 'regex cheat sheet'],
+  },
+  {
+    href: '/sql-formatter',
+    icon: Database,
+    title: 'SQL Formatter & Beautifier',
+    description:
+      'Beautify or minify SQL queries across MySQL, PostgreSQL, SQLite, T-SQL, PL/SQL, BigQuery, and more.',
+    features: ['10+ SQL dialects', 'Keyword case options', 'Beautify & minify', 'Copy & download'],
+    category: 'formatters',
+    badge: 'SQL',
+    color: 'sky',
+    keywords: ['sql formatter', 'sql beautifier', 'sql prettifier', 'format sql', 'beautify sql', 'sql minifier', 'query formatter', 'mysql formatter', 'postgresql formatter', 'sql linter', 'sql pretty print', 'sequel formatter'],
+  },
+  {
+    href: '/graphql-formatter',
+    icon: Share2,
+    title: 'GraphQL Formatter & Validator',
+    description:
+      'Pretty-print or minify GraphQL queries and schemas, with syntax validation and optional schema checking.',
+    features: ['Format & pretty-print', 'Syntax validation', 'Optional schema validation', 'Minify queries'],
+    category: 'formatters',
+    badge: 'GraphQL',
+    color: 'violet',
+    keywords: ['graphql formatter', 'graphql validator', 'graphql beautifier', 'format graphql query', 'graphql linter', 'gql formatter', 'graphql schema validator', 'prettify graphql', 'graphql syntax checker'],
+  },
+  {
+    href: '/http-toolkit',
+    icon: Webhook,
+    title: 'HTTP Toolkit',
+    description:
+      "Look up HTTP status codes, inspect a URL's response headers server-side, or generate a live webhook capture URL to test incoming requests.",
+    features: ['Searchable status code reference', 'Server-side header inspector', 'Live webhook capture URL', 'SSRF-guarded requests'],
+    category: 'utilities',
+    badge: 'HTTP',
+    color: 'emerald',
+    keywords: ['http status codes', 'status code reference', 'http header inspector', 'webhook tester', 'webhook.site alternative', 'http response viewer', 'header checker', 'webhook testing tool', 'http status lookup', 'api status codes', 'rest api status codes', 'check response headers'],
   },
 ];
 
@@ -352,11 +428,13 @@ export default function HomePage() {
   const [activeCat, setActiveCat] = useState('all');
 
   const filteredTools = TOOLS.filter((tool) => {
+    const q = search.toLowerCase();
     const matchesSearch =
-      tool.title.toLowerCase().includes(search.toLowerCase()) ||
-      tool.description.toLowerCase().includes(search.toLowerCase()) ||
-      tool.badge.toLowerCase().includes(search.toLowerCase()) ||
-      tool.features.some((f) => f.toLowerCase().includes(search.toLowerCase()));
+      tool.title.toLowerCase().includes(q) ||
+      tool.description.toLowerCase().includes(q) ||
+      tool.badge.toLowerCase().includes(q) ||
+      tool.features.some((f) => f.toLowerCase().includes(q)) ||
+      tool.keywords.some((k) => k.toLowerCase().includes(q));
 
     const matchesCategory = activeCat === 'all' || tool.category === activeCat;
 
@@ -388,7 +466,7 @@ export default function HomePage() {
       <section className="container py-10 max-w-6xl mx-auto space-y-6">
         <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
           <h2 className="text-xl font-bold tracking-tight">{t('tools')}</h2>
-          
+
           <div className="flex flex-col sm:flex-row w-full md:w-auto gap-2.5 items-center">
             {/* Search Bar */}
             <div className="relative w-full sm:w-64">

@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useRef, useEffect } from 'react';
-import { Upload, Image as ImageIcon, Sliders, Check, Download, RefreshCw, Sparkles, Scale, Info, Palette, Camera, FileText } from 'lucide-react';
+import { Upload, Image as ImageIcon, Sliders, Check, Download, RefreshCw, Sparkles, Scale, Info, Palette, Camera, FileText, Star, Copy, Loader2 } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -9,6 +9,24 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
+import JSZip from 'jszip';
+import { buildIco } from '@/lib/ico';
+
+const FAVICON_SIZES = [16, 32, 48, 64, 180, 192, 512] as const;
+
+async function resizeToPngBytes(img: HTMLImageElement, size: number): Promise<Uint8Array> {
+  const canvas = document.createElement('canvas');
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) throw new Error('Canvas context unavailable');
+  ctx.clearRect(0, 0, size, size);
+  ctx.drawImage(img, 0, 0, size, size);
+  const blob = await new Promise<Blob>((resolve, reject) => {
+    canvas.toBlob((b) => (b ? resolve(b) : reject(new Error('Canvas export failed'))), 'image/png');
+  });
+  return new Uint8Array(await blob.arrayBuffer());
+}
 
 function parseExif(arrayBuffer: ArrayBuffer): Record<string, any> | null {
   try {
@@ -151,10 +169,14 @@ export function ImageTool() {
   const [grayscale, setGrayscale] = useState<number>(0);
 
   // Sub-tabs & Metadata states
-  const [activeSubTab, setActiveSubTab] = useState<'compress' | 'metadata'>('compress');
+  const [activeSubTab, setActiveSubTab] = useState<'compress' | 'metadata' | 'favicon'>('compress');
   const [exifData, setExifData] = useState<Record<string, any> | null>(null);
   const [dominantColors, setDominantColors] = useState<string[]>([]);
   const [copiedColor, setCopiedColor] = useState<string | null>(null);
+
+  // Favicon generator states
+  const [faviconGenerating, setFaviconGenerating] = useState(false);
+  const [faviconHtmlSnippet, setFaviconHtmlSnippet] = useState<string>('');
 
   const imgRef = useRef<HTMLImageElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -365,6 +387,72 @@ export function ImageTool() {
     toast.success('Filters reset!');
   };
 
+  const handleGenerateFavicons = async () => {
+    if (!imgRef.current) return;
+    setFaviconGenerating(true);
+    try {
+      const img = imgRef.current;
+      const pngBySize = new Map<number, Uint8Array>();
+      for (const size of FAVICON_SIZES) {
+        pngBySize.set(size, await resizeToPngBytes(img, size));
+      }
+
+      const ico = buildIco(
+        [16, 32, 48].map((size) => ({ width: size, height: size, pngData: pngBySize.get(size)! }))
+      );
+
+      const htmlSnippet = [
+        '<link rel="icon" type="image/x-icon" href="/favicon.ico" />',
+        '<link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />',
+        '<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />',
+        '<link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />',
+        '<link rel="manifest" href="/site.webmanifest" />',
+      ].join('\n');
+
+      const zip = new JSZip();
+      zip.file('favicon.ico', ico);
+      zip.file('favicon-16x16.png', pngBySize.get(16)!);
+      zip.file('favicon-32x32.png', pngBySize.get(32)!);
+      zip.file('apple-touch-icon.png', pngBySize.get(180)!);
+      zip.file('android-chrome-192x192.png', pngBySize.get(192)!);
+      zip.file('android-chrome-512x512.png', pngBySize.get(512)!);
+      zip.file(
+        'site.webmanifest',
+        JSON.stringify(
+          {
+            name: '',
+            icons: [
+              { src: '/android-chrome-192x192.png', sizes: '192x192', type: 'image/png' },
+              { src: '/android-chrome-512x512.png', sizes: '512x512', type: 'image/png' },
+            ],
+            theme_color: '#ffffff',
+            background_color: '#ffffff',
+            display: 'standalone',
+          },
+          null,
+          2
+        )
+      );
+      zip.file('head-snippet.html', htmlSnippet);
+
+      const zipBlob = await zip.generateAsync({ type: 'blob' });
+      const url = URL.createObjectURL(zipBlob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = 'favicon-package.zip';
+      link.click();
+      URL.revokeObjectURL(url);
+
+      setFaviconHtmlSnippet(htmlSnippet);
+      toast.success('Favicon package downloaded!');
+    } catch (e) {
+      console.error(e);
+      toast.error('Failed to generate favicons');
+    } finally {
+      setFaviconGenerating(false);
+    }
+  };
+
   const formatSize = (bytes: number): string => {
     if (bytes === 0) return '0 B';
     const k = 1024;
@@ -428,12 +516,15 @@ export function ImageTool() {
               </div>
 
               <Tabs value={activeSubTab} onValueChange={(v: any) => setActiveSubTab(v)} className="w-full">
-                <TabsList className="grid grid-cols-2 w-full mb-3 h-8.5 p-0.5">
+                <TabsList className="grid grid-cols-3 w-full mb-3 h-8.5 p-0.5">
                   <TabsTrigger value="compress" className="text-[10px] py-1 gap-1">
                     <Sliders className="h-3 w-3" /> Compress & Filter
                   </TabsTrigger>
                   <TabsTrigger value="metadata" className="text-[10px] py-1 gap-1">
                     <Palette className="h-3 w-3" /> Metadata & Palette
+                  </TabsTrigger>
+                  <TabsTrigger value="favicon" className="text-[10px] py-1 gap-1">
+                    <Star className="h-3 w-3" /> Favicon
                   </TabsTrigger>
                 </TabsList>
 
@@ -697,6 +788,54 @@ export function ImageTool() {
                       </div>
                     )}
                   </div>
+                </TabsContent>
+
+                {/* --- FAVICON GENERATOR CONTENT --- */}
+                <TabsContent value="favicon" className="m-0 space-y-4">
+                  <div className="space-y-2.5">
+                    <div className="flex items-center gap-1.5 border-b pb-1.5">
+                      <Star className="h-4 w-4 text-primary" />
+                      <span className="font-bold text-[10px] uppercase text-muted-foreground">Favicon Package Generator</span>
+                    </div>
+                    <p className="text-[10px] text-muted-foreground leading-relaxed">
+                      Generates a full favicon set from the source image above: a multi-resolution <code>.ico</code> (16/32/48px),
+                      standalone PNGs (16, 32, 64, 180 Apple touch, 192 & 512 Android Chrome), a <code>site.webmanifest</code>,
+                      and an HTML snippet — packaged as a downloadable ZIP.
+                    </p>
+
+                    <div className="flex flex-wrap gap-1.5 pt-1">
+                      {FAVICON_SIZES.map((s) => (
+                        <span key={s} className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-muted/60 border">{s}×{s}</span>
+                      ))}
+                    </div>
+
+                    <Button onClick={handleGenerateFavicons} disabled={faviconGenerating} size="sm" className="w-full text-xs gap-1.5 mt-2">
+                      {faviconGenerating ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}
+                      Generate & Download ZIP
+                    </Button>
+                  </div>
+
+                  {faviconHtmlSnippet && (
+                    <div className="space-y-1.5 pt-2 border-t">
+                      <div className="flex items-center justify-between">
+                        <span className="font-bold text-[10px] uppercase text-muted-foreground">HTML &lt;head&gt; snippet</span>
+                        <Button
+                          variant="ghost"
+                          size="icon-sm"
+                          className="h-5 w-5"
+                          onClick={() => {
+                            navigator.clipboard.writeText(faviconHtmlSnippet);
+                            toast.success('Snippet copied!');
+                          }}
+                        >
+                          <Copy className="h-3 w-3" />
+                        </Button>
+                      </div>
+                      <pre className="text-[9px] font-mono p-2 bg-muted/30 border rounded-md overflow-x-auto whitespace-pre-wrap break-all">
+                        {faviconHtmlSnippet}
+                      </pre>
+                    </div>
+                  )}
                 </TabsContent>
               </Tabs>
             </CardContent>

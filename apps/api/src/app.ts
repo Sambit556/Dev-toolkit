@@ -11,6 +11,8 @@ import { errorHandler, notFoundHandler } from './middleware/errorHandler';
 import healthRouter from './routes/health';
 import timeRouter from './routes/time';
 import jsonRouter from './routes/json';
+import httpInspectRouter from './routes/httpInspect';
+import webhookRouter from './routes/webhook';
 import { swaggerSpec } from './swagger';
 import { logger } from './utils/logger';
 
@@ -50,7 +52,7 @@ app.use(
       }
     },
     credentials: true,
-    methods: ['GET', 'POST', 'OPTIONS'],
+    methods: ['GET', 'POST', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'X-Request-ID'],
   }),
 );
@@ -82,6 +84,8 @@ app.use('/docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
 app.use('/health', healthRouter);
 app.use('/api/time', timeRouter);
 app.use('/api/json', jsonRouter);
+app.use('/api/http-inspect', httpInspectRouter);
+app.use('/api/webhook', webhookRouter);
 
 // OpenAPI JSON spec
 app.get('/openapi.json', (_req, res) => res.json(swaggerSpec));

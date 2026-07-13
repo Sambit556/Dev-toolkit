@@ -1,8 +1,8 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import dynamic from 'next/dynamic';
-import { GitCompare, ArrowLeftRight, Trash2, SlidersHorizontal, Upload, FileCode } from 'lucide-react';
+import { GitCompare, ArrowLeftRight, Trash2, SlidersHorizontal, Upload, FileCode, History as HistoryIcon } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -11,6 +11,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useTheme } from 'next-themes';
 import { toast } from 'sonner';
+import { useHistoryStore } from '@/store/history';
+import { DiffHistoryPanel } from './DiffHistoryPanel';
 
 // Dynamically import Monaco Diff Editor to bypass SSR
 const MonacoDiffEditor = dynamic(
@@ -65,6 +67,28 @@ export function DiffCheckerTool() {
   const [sideBySide, setSideBySide] = useState(true);
   const [ignoreWhitespace, setIgnoreWhitespace] = useState(false);
   const [lang, setLang] = useState('json');
+  const [historyOpen, setHistoryOpen] = useState(false);
+
+  const addHistoryEntry = useHistoryStore((s) => s.addEntry);
+  const lastHistoryEntry = useHistoryStore((s) => s.entries.find((e) => e.tool === 'diff'));
+
+  const saveDiffToHistory = useCallback(() => {
+    if (!originalText.trim() && !modifiedText.trim()) return;
+    if (originalText === lastHistoryEntry?.input && modifiedText === lastHistoryEntry?.output) return;
+    const origLines = originalText.split('\n').length;
+    const modLines = modifiedText.split('\n').length;
+    addHistoryEntry({
+      tool: 'diff',
+      input: originalText,
+      output: modifiedText,
+      label: `${lang.toUpperCase()} · ${origLines} → ${modLines} lines`,
+    });
+  }, [originalText, modifiedText, lang, lastHistoryEntry, addHistoryEntry]);
+
+  const handleCompare = () => {
+    if (!showDiff) saveDiffToHistory();
+    setShowDiff((prev) => !prev);
+  };
 
   const handleSwap = () => {
     const temp = originalText;
@@ -145,6 +169,10 @@ export function DiffCheckerTool() {
           </div>
 
           <div className="flex gap-2">
+            <Button variant="outline" size="sm" onClick={() => setHistoryOpen(true)} className="h-8 gap-1.5 text-xs">
+              <HistoryIcon className="h-3.5 w-3.5" />
+              History
+            </Button>
             <Button variant="outline" size="sm" onClick={handleSwap} className="h-8 gap-1.5 text-xs">
               <ArrowLeftRight className="h-3.5 w-3.5" />
               Swap
@@ -153,9 +181,9 @@ export function DiffCheckerTool() {
               <Trash2 className="h-3.5 w-3.5" />
               Clear
             </Button>
-            <Button 
-              size="sm" 
-              onClick={() => setShowDiff(!showDiff)} 
+            <Button
+              size="sm"
+              onClick={handleCompare}
               className="h-8 gap-1.5 text-xs font-bold"
             >
               <GitCompare className="h-3.5 w-3.5" />
@@ -258,6 +286,17 @@ export function DiffCheckerTool() {
           </CardContent>
         </Card>
       )}
+
+      <DiffHistoryPanel
+        open={historyOpen}
+        onOpenChange={setHistoryOpen}
+        onLoad={(original, modified) => {
+          setOriginalText(original);
+          setModifiedText(modified);
+          setShowDiff(false);
+          toast.success('Loaded from history');
+        }}
+      />
     </div>
   );
 }

@@ -1,0 +1,43 @@
+{
+  "name": "@devchrono/mcp",
+  "version": "1.0.0",
+  "private": true,
+  "description": "DevKits MCP server — exposes deterministic dev-tool operations (JSON formatting, epoch conversion, etc.) to MCP clients like Claude Desktop",
+  "type": "module",
+  "main": "dist/index.js",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "start": "node dist/index.js",
+    "build": "tsc",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "@pdfsmaller/pdf-encrypt-lite": "^1.0.2",
+    "bcryptjs": "^3.0.3",
+    "cron-parser": "^5.6.1",
+    "cronstrue": "^3.24.0",
+    "diff": "^5.2.0",
+    "fast-xml-parser": "^4.5.0",
+    "graphql": "^16.9.0",
+    "js-yaml": "^4.3.0",
+    "jspdf": "^4.2.1",
+    "marked": "^18.0.5",
+    "pdf-lib": "^1.17.1",
+    "qrcode": "^1.5.4",
+    "sql-formatter": "^15.4.9",
+    "zod": "^3.22.4"
+  },
+  "devDependencies": {
+    "@types/bcryptjs": "^2.4.6",
+    "@types/diff": "^5.2.3",
+    "@types/js-yaml": "^4.0.9",
+    "@types/node": "^20.11.0",
+    "@types/qrcode": "^1.5.6",
+    "tsx": "^4.19.2",
+    "typescript": "^5.3.3"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

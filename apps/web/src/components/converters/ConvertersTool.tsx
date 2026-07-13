@@ -1,7 +1,7 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import { ArrowLeftRight, Copy, Download, HelpCircle, FileSpreadsheet, Code2, Eye, FileText } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { ArrowLeftRight, Copy, Download, HelpCircle, FileSpreadsheet, Code2, Eye, FileText, Bold, Italic, Link2, List, Heading2, Code, Quote } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -13,6 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Switch } from '@/components/ui/switch';
 import jsyaml from 'js-yaml';
 import { marked } from 'marked';
+import DOMPurify from 'dompurify';
 import { toast } from 'sonner';
 
 export function ConvertersTool() {
@@ -43,6 +44,7 @@ export function ConvertersTool() {
   );
   const [mdOutput, setMdOutput] = useState<string>('');
   const [htmlPreview, setHtmlPreview] = useState<string>('');
+  const mdTextareaRef = useRef<HTMLTextAreaElement | null>(null);
 
   // --- YAML / JSON STATES ---
   const [yamlDirection, setYamlDirection] = useState<'json2yaml' | 'yaml2json'>('json2yaml');
@@ -287,7 +289,7 @@ export function ConvertersTool() {
       if (mdDirection === 'md2html') {
         const html = marked.parse(mdInput) as string;
         setMdOutput(html);
-        setHtmlPreview(html);
+        setHtmlPreview(DOMPurify.sanitize(html));
       } else {
         // Simple regex-based HTML to MD fallback
         let md = mdInput
@@ -308,7 +310,7 @@ export function ConvertersTool() {
         // Strip other HTML tags
         md = md.replace(/<[^>]*>/g, '');
         setMdOutput(md.trim());
-        setHtmlPreview(mdInput);
+        setHtmlPreview(DOMPurify.sanitize(mdInput));
       }
     } catch (e: any) {
       setMdOutput(`// MD conversion error: ${e.message}`);
@@ -355,6 +357,35 @@ export function ConvertersTool() {
   useEffect(() => {
     handleYamlConversion();
   }, [yamlInput, yamlDirection, yamlIndentSize, yamlSortKeys]);
+
+  const insertMdWrap = (prefix: string, suffix: string = prefix, placeholder = 'text') => {
+    const ta = mdTextareaRef.current;
+    if (!ta) return;
+    const start = ta.selectionStart;
+    const end = ta.selectionEnd;
+    const selected = mdInput.slice(start, end) || placeholder;
+    const newValue = mdInput.slice(0, start) + prefix + selected + suffix + mdInput.slice(end);
+    setMdInput(newValue);
+    requestAnimationFrame(() => {
+      ta.focus();
+      const cursorPos = start + prefix.length + selected.length + suffix.length;
+      ta.setSelectionRange(cursorPos, cursorPos);
+    });
+  };
+
+  const insertMdLinePrefix = (prefix: string) => {
+    const ta = mdTextareaRef.current;
+    if (!ta) return;
+    const start = ta.selectionStart;
+    const lineStart = mdInput.lastIndexOf('\n', start - 1) + 1;
+    const newValue = mdInput.slice(0, lineStart) + prefix + mdInput.slice(lineStart);
+    setMdInput(newValue);
+    requestAnimationFrame(() => {
+      ta.focus();
+      const cursorPos = start + prefix.length;
+      ta.setSelectionRange(cursorPos, cursorPos);
+    });
+  };
 
   const handleCopyText = (text: string, label: string) => {
     navigator.clipboard.writeText(text);
@@ -600,9 +631,37 @@ export function ConvertersTool() {
               </div>
 
               <div className="space-y-1.5">
-                <Label htmlFor="md-in-box">Input Text</Label>
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="md-in-box">Input Text</Label>
+                  {mdDirection === 'md2html' && (
+                    <div className="flex items-center gap-0.5">
+                      <Button variant="ghost" size="icon" className="h-6 w-6" title="Bold" onClick={() => insertMdWrap('**', '**', 'bold text')}>
+                        <Bold className="h-3.5 w-3.5" />
+                      </Button>
+                      <Button variant="ghost" size="icon" className="h-6 w-6" title="Italic" onClick={() => insertMdWrap('*', '*', 'italic text')}>
+                        <Italic className="h-3.5 w-3.5" />
+                      </Button>
+                      <Button variant="ghost" size="icon" className="h-6 w-6" title="Heading" onClick={() => insertMdLinePrefix('## ')}>
+                        <Heading2 className="h-3.5 w-3.5" />
+                      </Button>
+                      <Button variant="ghost" size="icon" className="h-6 w-6" title="Link" onClick={() => insertMdWrap('[', '](https://)', 'link text')}>
+                        <Link2 className="h-3.5 w-3.5" />
+                      </Button>
+                      <Button variant="ghost" size="icon" className="h-6 w-6" title="Inline code" onClick={() => insertMdWrap('`', '`', 'code')}>
+                        <Code className="h-3.5 w-3.5" />
+                      </Button>
+                      <Button variant="ghost" size="icon" className="h-6 w-6" title="Bullet list" onClick={() => insertMdLinePrefix('- ')}>
+                        <List className="h-3.5 w-3.5" />
+                      </Button>
+                      <Button variant="ghost" size="icon" className="h-6 w-6" title="Blockquote" onClick={() => insertMdLinePrefix('> ')}>
+                        <Quote className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+                  )}
+                </div>
                 <Textarea
                   id="md-in-box"
+                  ref={mdTextareaRef}
                   value={mdInput}
                   onChange={(e) => setMdInput(e.target.value)}
                   className="font-mono text-xs h-80 resize-y"

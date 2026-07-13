@@ -1,9 +1,13 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Calculator, Clock, Braces, X, Play, RotateCcw, Copy, Check, GripHorizontal } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { Calculator, Clock, Braces, X, Play, RotateCcw, Copy, Check, GripHorizontal, Settings2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
+import { toolCategories } from '@/lib/tools';
+import { QuickAccessManager } from './QuickAccessManager';
+import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/components/ui/tooltip';
 
 type ActiveTool = 'calc' | 'epoch' | 'json' | null;
 
@@ -12,14 +16,32 @@ interface PanelPos {
   y: number;
 }
 
+// The 3 tools below have a built-in embedded mini panel (see MiniCalculator/
+// MiniEpochConverter/MiniJsonViewer). Any other pinned tool just navigates to
+// its full page instead — building a mini widget for all ~30 platform tools
+// is out of scope for this quick-launch dock.
+const WIDGET_HREFS: Record<string, Exclude<ActiveTool, null>> = {
+  '/calculator': 'calc',
+  '/epoch': 'epoch',
+  '/json': 'json',
+};
+
+const DEFAULT_PINNED = ['/calculator', '/epoch', '/json'];
+const PINNED_STORAGE_KEY = 'devkits-quick-tools';
+
+const ALL_TOOLS = toolCategories.flatMap((cat) => cat.items.map((item) => ({ ...item, categoryName: cat.name })));
+
 export function QuickAccess() {
+  const router = useRouter();
   const [activeTool, setActiveTool] = useState<ActiveTool>(null);
-  
+  const [pinned, setPinned] = useState<string[]>(DEFAULT_PINNED);
+  const [manageOpen, setManageOpen] = useState(false);
+
   // Floating panel positions
   const [calcPos, setCalcPos] = useState<PanelPos>({ x: 80, y: 150 });
   const [epochPos, setEpochPos] = useState<PanelPos>({ x: 80, y: 150 });
   const [jsonPos, setJsonPos] = useState<PanelPos>({ x: 80, y: 150 });
-  
+
   const [dragOffset, setDragOffset] = useState<PanelPos>({ x: 0, y: 0 });
   const [draggingTool, setDraggingTool] = useState<ActiveTool>(null);
 
@@ -29,15 +51,39 @@ export function QuickAccess() {
   const dockDragOffsetRef = useRef<PanelPos>({ x: 0, y: 0 });
   const dockRef = useRef<HTMLDivElement>(null);
 
-  // Load positions from localStorage on mount
+  // Load positions + pinned tools from localStorage on mount
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const savedDock = localStorage.getItem('devkits-quick-dock-pos');
       if (savedDock) {
         try { setDockPos(JSON.parse(savedDock)); } catch {}
       }
+      const savedPinned = localStorage.getItem(PINNED_STORAGE_KEY);
+      if (savedPinned) {
+        try {
+          const parsed = JSON.parse(savedPinned);
+          if (Array.isArray(parsed)) setPinned(parsed);
+        } catch {}
+      }
     }
   }, []);
+
+  const togglePinned = (href: string) => {
+    setPinned((prev) => {
+      const next = prev.includes(href) ? prev.filter((h) => h !== href) : [...prev, href];
+      localStorage.setItem(PINNED_STORAGE_KEY, JSON.stringify(next));
+      return next;
+    });
+  };
+
+  const handleLaunch = (href: string) => {
+    const widgetKey = WIDGET_HREFS[href];
+    if (widgetKey) {
+      toggleTool(widgetKey);
+    } else {
+      router.push(href);
+    }
+  };
 
   const handleDockMouseDown = (e: React.MouseEvent, dockEl: HTMLElement) => {
     setIsDraggingDock(true);
@@ -158,66 +204,79 @@ export function QuickAccess() {
   };
 
   return (
-    <>
+    <TooltipProvider delayDuration={200}>
       {/* Floating Vertical Launch Dock (Draggable toolbar) */}
-      <div 
-        ref={dockRef}
-        style={{
-          position: 'fixed',
-          left: `${dockPos.x}px`,
-          top: `${dockPos.y}px`,
-          zIndex: 40
-        }}
-        className="flex flex-col gap-3.5 bg-background/70 dark:bg-slate-900/80 backdrop-blur-md border border-border/80 p-2 rounded-2xl shadow-2xl animate-fade-in select-none"
-      >
-        <div 
-          onMouseDown={(e) => handleDockMouseDown(e, dockRef.current!)}
-          onTouchStart={(e) => handleDockTouchStart(e, dockRef.current!)}
-          className="cursor-move flex flex-col items-center gap-1 border-b pb-2 px-1 hover:text-primary transition-colors text-muted-foreground/80"
-          title="Drag to reposition toolbar"
+      <div
+          ref={dockRef}
+          style={{
+            position: 'fixed',
+            left: `${dockPos.x}px`,
+            top: `${dockPos.y}px`,
+            zIndex: 40
+          }}
+          className="flex flex-col gap-3.5 bg-background/70 dark:bg-slate-900/80 backdrop-blur-md border border-border/80 p-2 rounded-2xl shadow-2xl animate-fade-in select-none"
         >
-          <GripHorizontal className="h-3.5 w-3.5" />
-          <div className="text-[8px] uppercase tracking-widest font-black text-center">
-            Quick
-          </div>
-        </div>
-        <button
-          onClick={() => toggleTool('calc')}
-          className={cn(
-            "h-10 w-10 flex items-center justify-center rounded-xl transition-all shadow-sm active:scale-95",
-            activeTool === 'calc'
-              ? "bg-primary text-primary-foreground scale-105"
-              : "bg-muted/50 hover:bg-muted text-muted-foreground hover:text-foreground"
-          )}
-          title="Calculator"
-        >
-          <Calculator className="h-4.5 w-4.5" />
-        </button>
-        <button
-          onClick={() => toggleTool('epoch')}
-          className={cn(
-            "h-10 w-10 flex items-center justify-center rounded-xl transition-all shadow-sm active:scale-95",
-            activeTool === 'epoch'
-              ? "bg-primary text-primary-foreground scale-105"
-              : "bg-muted/50 hover:bg-muted text-muted-foreground hover:text-foreground"
-          )}
-          title="Epoch Converter"
-        >
-          <Clock className="h-4.5 w-4.5" />
-        </button>
-        <button
-          onClick={() => toggleTool('json')}
-          className={cn(
-            "h-10 w-10 flex items-center justify-center rounded-xl transition-all shadow-sm active:scale-95",
-            activeTool === 'json'
-              ? "bg-primary text-primary-foreground scale-105"
-              : "bg-muted/50 hover:bg-muted text-muted-foreground hover:text-foreground"
-          )}
-          title="JSON Viewer"
-        >
-          <Braces className="h-4.5 w-4.5" />
-        </button>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <div
+                onMouseDown={(e) => handleDockMouseDown(e, dockRef.current!)}
+                onTouchStart={(e) => handleDockTouchStart(e, dockRef.current!)}
+                className="cursor-move flex flex-col items-center gap-1 border-b pb-2 px-1 hover:text-primary transition-colors text-muted-foreground/80"
+              >
+                <GripHorizontal className="h-3.5 w-3.5" />
+                <div className="text-[8px] uppercase tracking-widest font-black text-center">
+                  Quick
+                </div>
+              </div>
+            </TooltipTrigger>
+            <TooltipContent side="right">Drag to reposition toolbar</TooltipContent>
+          </Tooltip>
+
+          {pinned.map((href) => {
+            const tool = ALL_TOOLS.find((t) => t.href === href);
+            if (!tool) return null;
+            const Icon = tool.icon;
+            const widgetKey = WIDGET_HREFS[href];
+            const isActive = widgetKey !== undefined && activeTool === widgetKey;
+            return (
+              <Tooltip key={href}>
+                <TooltipTrigger asChild>
+                  <button
+                    onClick={() => handleLaunch(href)}
+                    className={cn(
+                      "h-10 w-10 flex items-center justify-center rounded-xl transition-all shadow-sm active:scale-95",
+                      isActive
+                        ? "bg-primary text-primary-foreground scale-105"
+                        : "bg-muted/50 hover:bg-muted text-muted-foreground hover:text-foreground"
+                    )}
+                  >
+                    <Icon className="h-4.5 w-4.5" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="right">{tool.label}</TooltipContent>
+              </Tooltip>
+            );
+          })}
+
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                onClick={() => setManageOpen(true)}
+                className="h-10 w-10 flex items-center justify-center rounded-xl transition-all shadow-sm active:scale-95 bg-muted/30 hover:bg-muted text-muted-foreground hover:text-foreground border border-dashed border-border/80"
+              >
+                <Settings2 className="h-4 w-4" />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="right">Manage Quick Access tools</TooltipContent>
+          </Tooltip>
       </div>
+
+      <QuickAccessManager
+        open={manageOpen}
+        onOpenChange={setManageOpen}
+        pinned={pinned}
+        onTogglePinned={togglePinned}
+      />
 
       {/* Floating Mini Panels */}
       {activeTool === 'calc' && (
@@ -279,7 +338,7 @@ export function QuickAccess() {
           <MiniJsonViewer />
         </div>
       )}
-    </>
+    </TooltipProvider>
   );
 }
 
@@ -316,6 +375,23 @@ function MiniPanelHeader({ title, icon, onClose, onMouseDown, onTouchStart }: Mi
         <X className="h-3.5 w-3.5" />
       </button>
     </div>
+  );
+}
+
+/* Small copy-to-clipboard icon button used throughout the mini panels, with a styled tooltip instead of a native title attribute */
+function CopyIconButton({ onCopy, label, className }: { onCopy: () => void; label: string; className?: string }) {
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <button
+          onClick={onCopy}
+          className={cn('p-1 text-muted-foreground hover:text-foreground hover:bg-muted rounded-md transition-colors ml-2 shrink-0', className)}
+        >
+          <Copy className="h-3.5 w-3.5" />
+        </button>
+      </TooltipTrigger>
+      <TooltipContent side="top">{label}</TooltipContent>
+    </Tooltip>
   );
 }
 
@@ -455,16 +531,13 @@ function MiniEpochConverter() {
         <span className="text-[10px] text-muted-foreground">Live Unix Epoch Time</span>
         <div className="flex items-center justify-between">
           <span className="font-mono text-base font-extrabold text-primary select-text">{liveEpoch}</span>
-          <button
-            onClick={() => {
+          <CopyIconButton
+            onCopy={() => {
               navigator.clipboard.writeText(liveEpoch.toString());
               toast.success('Copied live timestamp!');
             }}
-            className="p-1 text-muted-foreground hover:text-foreground hover:bg-muted rounded-md transition-colors ml-2 shrink-0"
-            title="Copy Live Timestamp"
-          >
-            <Copy className="h-3.5 w-3.5" />
-          </button>
+            label="Copy Live Timestamp"
+          />
         </div>
       </div>
 
@@ -493,16 +566,13 @@ function MiniEpochConverter() {
                 </span>
               </div>
               {dateOutputLocal !== 'Invalid Timestamp' && (
-                <button
-                  onClick={() => {
+                <CopyIconButton
+                  onCopy={() => {
                     navigator.clipboard.writeText(dateOutputLocal);
                     toast.success('Copied local date!');
                   }}
-                  className="p-1 text-muted-foreground hover:text-foreground hover:bg-muted rounded-md transition-colors ml-2 shrink-0"
-                  title="Copy local date"
-                >
-                  <Copy className="h-3 w-3" />
-                </button>
+                  label="Copy local date"
+                />
               )}
             </div>
             {dateOutputUtc && dateOutputUtc !== 'Invalid Timestamp' && (
@@ -513,16 +583,13 @@ function MiniEpochConverter() {
                     {dateOutputUtc}
                   </span>
                 </div>
-                <button
-                  onClick={() => {
+                <CopyIconButton
+                  onCopy={() => {
                     navigator.clipboard.writeText(dateOutputUtc);
                     toast.success('Copied UTC date!');
                   }}
-                  className="p-1 text-muted-foreground hover:text-foreground hover:bg-muted rounded-md transition-colors ml-2 shrink-0"
-                  title="Copy UTC date"
-                >
-                  <Copy className="h-3 w-3" />
-                </button>
+                  label="Copy UTC date"
+                />
               </div>
             )}
           </div>
@@ -554,16 +621,13 @@ function MiniEpochConverter() {
                 </span>
               </div>
               {tsOutputSec !== 'Invalid Date' && (
-                <button
-                  onClick={() => {
+                <CopyIconButton
+                  onCopy={() => {
                     navigator.clipboard.writeText(tsOutputSec);
                     toast.success('Copied seconds timestamp!');
                   }}
-                  className="p-1 text-muted-foreground hover:text-foreground hover:bg-muted rounded-md transition-colors ml-2 shrink-0"
-                  title="Copy seconds"
-                >
-                  <Copy className="h-3 w-3" />
-                </button>
+                  label="Copy seconds"
+                />
               )}
             </div>
             {tsOutputMs && tsOutputMs !== 'Invalid Date' && (
@@ -574,16 +638,13 @@ function MiniEpochConverter() {
                     {tsOutputMs}
                   </span>
                 </div>
-                <button
-                  onClick={() => {
+                <CopyIconButton
+                  onCopy={() => {
                     navigator.clipboard.writeText(tsOutputMs);
                     toast.success('Copied milliseconds timestamp!');
                   }}
-                  className="p-1 text-muted-foreground hover:text-foreground hover:bg-muted rounded-md transition-colors ml-2 shrink-0"
-                  title="Copy milliseconds"
-                >
-                  <Copy className="h-3 w-3" />
-                </button>
+                  label="Copy milliseconds"
+                />
               </div>
             )}
           </div>
