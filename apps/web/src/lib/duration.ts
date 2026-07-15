@@ -1,4 +1,9 @@
-/** Parses "HH:MM:SS" or "HH:MM:SS:mmm" into total milliseconds. Returns null if malformed. */
+/**
+ * Parses "HH:MM:SS:mmm" into total milliseconds, and also accepts the
+ * shorter "HH:MM" and "HH:MM:SS" forms (missing trailing fields default to
+ * 0) so a quick "1:30" isn't rejected while the user is still typing.
+ * Returns null if malformed.
+ */
 export function parseDurationString(input: string): number | null {
   const trimmed = input.trim();
   if (!trimmed) return null;
@@ -7,10 +12,10 @@ export function parseDurationString(input: string): number | null {
   const body = negative ? trimmed.slice(1) : trimmed;
 
   const parts = body.split(':');
-  if (parts.length !== 3 && parts.length !== 4) return null;
+  if (parts.length < 2 || parts.length > 4) return null;
   if (!parts.every((p) => /^\d+$/.test(p))) return null;
 
-  const [hh, mm, ss, mmm = '0'] = parts;
+  const [hh, mm = '0', ss = '0', mmm = '0'] = parts;
   const hours = parseInt(hh, 10);
   const minutes = parseInt(mm, 10);
   const seconds = parseInt(ss, 10);

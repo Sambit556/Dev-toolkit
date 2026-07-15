@@ -154,16 +154,16 @@ export function JsonToolbar({
         <Separator orientation="vertical" className="h-6 mx-0.5" />
 
         {/* Search */}
-        <div className="flex items-center gap-1 flex-1 min-w-[140px] max-w-[220px]">
+        <div className="flex items-center gap-1.5 flex-1 min-w-[160px] max-w-[240px] h-7 px-2 rounded-md border border-input bg-background focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-1">
           <Search className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
           <Input
             value={searchQuery}
             onChange={(e) => onSearchChange(e.target.value)}
             placeholder="Search key/value..."
-            className="h-7 text-xs border-0 bg-transparent focus-visible:ring-0 px-0"
+            className="h-full text-xs border-0 bg-transparent shadow-none focus-visible:ring-0 focus-visible:ring-offset-0 px-0"
           />
           {searchQuery && (
-            <Button variant="ghost" size="icon-sm" className="h-5 w-5" onClick={() => onSearchChange('')}>
+            <Button variant="ghost" size="icon-sm" className="h-5 w-5 shrink-0" onClick={() => onSearchChange('')}>
               <X className="h-3 w-3" />
             </Button>
           )}

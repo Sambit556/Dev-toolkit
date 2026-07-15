@@ -6,6 +6,13 @@ import type { Monaco, OnMount } from '@monaco-editor/react';
 import { useTheme } from 'next-themes';
 import { Loader2 } from 'lucide-react';
 
+// The fold gutter chevrons render via the "codicon" icon font (private-use-
+// area glyphs). Turbopack can't resolve a *dynamic* import() of a raw .css
+// file ("not an ecmascript client_module"), so unlike the JS-only imports
+// below this has to be a static import — without it the icon element exists
+// but its glyph falls back to "tofu" (a boxed "?") since no font supplies it.
+import 'monaco-editor/esm/vs/base/browser/ui/codicons/codicon/codicon.css';
+
 const MonacoEditor = dynamic(
   () =>
     import('@monaco-editor/react').then(async (mod) => {
@@ -18,8 +25,16 @@ const MonacoEditor = dynamic(
       // languages plus full CSS/HTML/TypeScript language services we never use,
       // which is what made the very first compile of this route take ~30s in
       // dev and bloated the shipped bundle. This editor only ever needs JSON.
+      //
+      // `editor.api` is just the class/type surface — it does NOT register
+      // the standard editor contributions (folding, find, etc.); those only
+      // come bundled if you import the full `editor.main` barrel. Since we're
+      // avoiding that barrel, the folding contribution has to be imported on
+      // its own for the gutter fold/unfold chevrons to exist at all (without
+      // it, `folding: true` is a no-op — no icons ever render, code or not).
       const [monaco] = await Promise.all([
         import('monaco-editor/esm/vs/editor/editor.api'),
+        import('monaco-editor/esm/vs/editor/contrib/folding/browser/folding'),
         import('monaco-editor/esm/vs/language/json/monaco.contribution'),
       ]);
       mod.loader.config({ monaco });
@@ -132,6 +147,12 @@ export function JsonEditor({ value, onChange, onError, errorLine, readOnly = fal
           wordWrap: 'on',
           scrollBeyondLastLine: false,
           folding: true,
+          // Default 'mouseover' only draws the fold chevrons when the mouse
+          // is right over that gutter line, which reads as "collapsing
+          // isn't supported" since there's no visible affordance until you
+          // happen to hover exactly there. 'always' keeps them visible.
+          showFoldingControls: 'always',
+          foldingHighlight: true,
           glyphMargin: true,
           renderWhitespace: 'selection',
           tabSize: 2,

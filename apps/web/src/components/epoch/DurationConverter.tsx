@@ -4,7 +4,11 @@ import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Plus, Minus, Trash2, Equal, ArrowLeftRight, Calculator } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import {
+  Plus, Minus, Trash2, Equal, ArrowLeftRight, Calculator,
+  Wand2, Clock, CalendarDays, CalendarClock, Hash, HelpCircle,
+} from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import {
@@ -132,6 +136,12 @@ function parseDateString(str: string): Date | null {
   const year = parseInt(dateMatches[2], 10);
 
   if (isNaN(day) || isNaN(month) || isNaN(year)) return null;
+  // Reject out-of-range day/month up front — otherwise the Date constructor
+  // silently rolls invalid values into a *different*, wrong valid date (e.g.
+  // month 14 becomes March of next year) instead of signaling "not a date",
+  // which would stop parseMixedValue from ever trying another interpretation
+  // (like MM/DD/YYYY via the native fallback) for an ambiguous input.
+  if (month < 0 || month > 11 || day < 1 || day > 31) return null;
 
   let hours = 0, minutes = 0, seconds = 0, ms = 0;
 
@@ -144,7 +154,7 @@ function parseDateString(str: string): Date | null {
   }
 
   const date = new Date(year, month, day, hours, minutes, seconds, ms);
-  if (isNaN(date.getTime())) return null;
+  if (date.getFullYear() !== year || date.getMonth() !== month || date.getDate() !== day) return null;
   return date;
 }
 
@@ -162,47 +172,163 @@ function formatDateString(date: Date, showTime = true): string {
   return `${d}:${m}:${y} ${hh}:${mm}:${ss}:${mmm}`;
 }
 
-// Parses standard dates, durations, or pure millisecond numbers
+// Parses standard dates, durations, or pure millisecond numbers. Tries the
+// most specific / least ambiguous interpretations first:
+//   1. A bare integer is always raw milliseconds (never a date or duration —
+//      checked first so nothing below can reinterpret e.g. "1000" as a year).
+//   2. HH:MM[:SS[:mmm]] duration.
+//   3. DD:MM:YYYY / DD-MM-YYYY / DD/MM/YYYY (+ optional time), this app's
+//      documented convention.
+//   4. Fallback to the browser's own date parser, which covers everything
+//      else people might reasonably type — ISO 8601, "Jul 15 2026",
+//      MM/DD/YYYY, RFC 2822, etc. — without us hand-rolling every format.
 function parseMixedValue(input: string): { type: 'date' | 'duration'; ms: number } | null {
   const clean = input.trim();
   if (!clean) return null;
 
-  // DD:MM:YYYY (with separators - / : and a 4 digit year)
-  const dateRegex = /^\d{1,2}[-/: ]\d{1,2}[-/: ]\d{4}/;
-  if (dateRegex.test(clean)) {
-    const date = parseDateString(clean);
-    if (date !== null) {
-      return { type: 'date', ms: date.getTime() };
-    }
+  if (/^-?\d+$/.test(clean)) {
+    return { type: 'duration', ms: parseInt(clean, 10) };
   }
 
-  // Duration parser HH:MM:SS:mmm
   const durationMs = parseDurationString(clean);
   if (durationMs !== null) {
     return { type: 'duration', ms: durationMs };
   }
 
-  // Raw milliseconds number
-  if (/^-?\d+$/.test(clean)) {
-    return { type: 'duration', ms: parseInt(clean, 10) };
+  const date = parseDateString(clean);
+  if (date !== null) {
+    return { type: 'date', ms: date.getTime() };
+  }
+
+  const native = new Date(clean);
+  if (!isNaN(native.getTime())) {
+    return { type: 'date', ms: native.getTime() };
   }
 
   return null;
+}
+
+// "Mixed" (auto-detect) is the flexible default that tries every format in
+// turn — great for free-form input, but genuinely ambiguous for date+time
+// (is "07/05" July 5th or May 7th? is that a date or a duration?). Committing
+// to one specific type removes that ambiguity entirely: every row's input
+// then auto-formats itself into exactly that type's shape as you type (the
+// same way plain digits already auto-gain colons), so there's nothing left
+// to guess. This is one setting for the whole calculator, not per row — every
+// row is being added/subtracted together, so they all need to agree on what
+// they mean anyway.
+type InputMode = 'mixed' | 'duration' | 'date' | 'datetime' | 'ms';
+
+const INPUT_MODE_OPTIONS: {
+  value: InputMode;
+  label: string;
+  icon: React.ComponentType<{ className?: string }>;
+  placeholder: string;
+}[] = [
+  { value: 'mixed', label: 'Mixed (Auto)', icon: Wand2, placeholder: 'e.g. 1:30, 15/07/2026, or 2026-07-15 14:12:00' },
+  { value: 'duration', label: 'Duration', icon: Clock, placeholder: 'e.g. 1:30 or 01:30:00:500' },
+  { value: 'date', label: 'Date', icon: CalendarDays, placeholder: 'e.g. 16:07:2026, 2026-07-16, or 16/07/2026' },
+  { value: 'datetime', label: 'Date + Time', icon: CalendarClock, placeholder: 'e.g. 16:07:2026 14:30:00, or 2026-07-16 14:30:00' },
+  { value: 'ms', label: 'Raw ms', icon: Hash, placeholder: 'e.g. 5000' },
+];
+
+// Strips everything but digits (and a leading "-" if allowed), then re-groups
+// them into the given chunk sizes with the given separators — e.g. groups
+// [2,2,4] with seps [':',':'] turns "15072026" into "15:07:2026" as each
+// digit is typed, the same way duration input auto-gains its colons.
+function maskDigits(raw: string, groups: number[], seps: string[], allowNegative: boolean): string {
+  const negative = allowNegative && raw.trim().startsWith('-');
+  const maxDigits = groups.reduce((a, b) => a + b, 0);
+  const digits = raw.replace(/\D/g, '').slice(0, maxDigits);
+  const chunks: string[] = [];
+  let idx = 0;
+  for (const size of groups) {
+    const chunk = digits.slice(idx, idx + size);
+    if (!chunk) break;
+    chunks.push(chunk);
+    idx += size;
+  }
+  const formatted = chunks.map((c, i) => (i === 0 ? c : seps[i - 1] + c)).join('');
+  return negative ? `-${formatted}` : formatted;
+}
+
+// 'date' and 'datetime' deliberately have no mask here: unlike a duration
+// (always biggest-to-smallest unit, one universal convention), a bare digit
+// run for a date is genuinely ambiguous — day-first, month-first, and
+// year-first are all common — so guessing one and auto-inserting a
+// separator risks corrupting whatever the user actually intends (e.g.
+// typing "2026-07-16" character by character used to become "20:26-07-16",
+// because the day-first mask jumped in and split after just 2 digits,
+// before the user's own "-" ever arrived). Those two modes just accept
+// whatever's typed verbatim and lean on `parseRowValue`'s flexible parsing.
+function formatByMode(mode: InputMode, raw: string): string {
+  switch (mode) {
+    case 'duration':
+      return maskDigits(raw, [2, 2, 2, 3], [':', ':', ':'], true);
+    case 'ms': {
+      const negative = raw.trim().startsWith('-');
+      const digits = raw.replace(/\D/g, '');
+      return negative ? `-${digits}` : digits;
+    }
+    default:
+      return raw;
+  }
 }
 
 interface DurationRow {
   id: string;
   sign: '+' | '-';
   value: string;
+  // Once true, auto-formatting stops touching this row's value entirely.
+  // It flips on the moment the user types a separator themselves (":", "-",
+  // a space) instead of a plain digit — without it, auto-format's next
+  // keystroke would strip that manually-typed character right back out and
+  // re-derive its own from the digit sequence (e.g. typing "1", ":", "3",
+  // "0" one key at a time would silently become "13:0" instead of "1:30").
+  manualFormat: boolean;
 }
 
 let rowCounter = 0;
-const newRow = (sign: '+' | '-'): DurationRow => ({ id: `row-${++rowCounter}`, sign, value: '' });
+const newRow = (sign: '+' | '-'): DurationRow => ({ id: `row-${++rowCounter}`, sign, value: '', manualFormat: false });
+
+// Parses a row's text according to the calculator's current input mode.
+// 'date' and 'datetime' both accept much more than the DD:MM:YYYY auto-format
+// mask produces: typing digits with no separators gets that guided mask, but
+// typing your own separators (which switches the row to manual mode — see
+// `manualFormat`) should work for *any* common layout — "2026-07-16" (ISO),
+// "2026/07/16", "16/07/2026" (DD/MM/YYYY), "07/16/2026" (MM/DD/YYYY), and so
+// on. `parseDateString` only understands day-first (this app's own
+// convention), so anything it rejects falls back to the browser's native
+// date parser, which is what correctly resolves ISO and MM/DD/YYYY layouts.
+function parseRowValue(row: DurationRow, mode: InputMode): { type: 'date' | 'duration'; ms: number } | null {
+  const clean = row.value.trim();
+  if (!clean) return null;
+
+  if (mode === 'mixed') return parseMixedValue(clean);
+
+  if (mode === 'duration') {
+    const ms = parseDurationString(clean);
+    return ms !== null ? { type: 'duration', ms } : null;
+  }
+
+  if (mode === 'ms') {
+    return /^-?\d+$/.test(clean) ? { type: 'duration', ms: parseInt(clean, 10) } : null;
+  }
+
+  const date = parseDateString(clean);
+  if (date) return { type: 'date', ms: date.getTime() };
+
+  const native = new Date(clean);
+  return !isNaN(native.getTime()) ? { type: 'date', ms: native.getTime() } : null;
+}
 
 export function DurationArithmetic() {
   const [rows, setRows] = useState<DurationRow[]>([newRow('+'), newRow('+'), newRow('-')]);
   const [invalidIds, setInvalidIds] = useState<Set<string>>(new Set());
   const [hasSubtraction, setHasSubtraction] = useState(false);
+  // One input mode for the whole calculator — every row is being added or
+  // subtracted together, so they all need to agree on what they mean anyway.
+  const [inputMode, setInputMode] = useState<InputMode>('mixed');
 
   // Math engine states
   const [calculatedMs, setCalculatedMs] = useState<number | null>(null);
@@ -210,13 +336,58 @@ export function DurationArithmetic() {
 
   const addRow = (sign: '+' | '-') => setRows((prev) => [...prev, newRow(sign)]);
   const removeRow = (id: string) => setRows((prev) => prev.filter((r) => r.id !== id));
-  
+
   const updateRow = (id: string, rawValue: string) => {
-    // Skip autoformat if input contains date dividers or space or year-like lengths
-    const shouldFormat = !/[\s-/]/.test(rawValue) && rawValue.replace(/\D/g, '').length <= 9;
     setRows((prev) =>
-      prev.map((r) => (r.id === id ? { ...r, value: shouldFormat ? autoFormatDurationDigits(rawValue) : rawValue } : r))
+      prev.map((r) => {
+        if (r.id !== id) return r;
+
+        // An emptied field gets a clean slate — auto-format engages again
+        // next time, even if manual mode was on before.
+        if (!rawValue.trim()) return { ...r, value: rawValue, manualFormat: false };
+
+        // Raw ms has nothing to auto-insert (no separators at all), so it
+        // just always strips non-digits — no manual-mode concept needed.
+        if (inputMode === 'ms') return { ...r, value: formatByMode('ms', rawValue) };
+
+        // Date / Date+Time have no digit mask at all (see `formatByMode`) —
+        // whatever's typed is accepted verbatim, in any layout.
+        if (inputMode === 'date' || inputMode === 'datetime') return { ...r, value: rawValue };
+
+        // A paste/fill (length changed by more than one character) is
+        // presumed to already be exactly what the user wants, so it's
+        // respected as-is — and, like a manually-typed separator, switches
+        // this row into manual mode so a later keystroke doesn't reformat
+        // over it (see the field comment on `manualFormat`).
+        const isBulkChange = Math.abs(rawValue.length - r.value.length) > 1;
+        if (isBulkChange) return { ...r, value: rawValue, manualFormat: true };
+
+        if (r.manualFormat) return { ...r, value: rawValue };
+
+        // A genuine single-keystroke edit: only keep auto-formatting while
+        // the newest character is a plain digit. The moment it isn't (the
+        // user typed their own ":", "-", or space, or deleted a character),
+        // this row switches to manual mode from here on.
+        const addedChar = rawValue.length > r.value.length ? rawValue.slice(-1) : '';
+        const isDigitAppend = rawValue.length === r.value.length + 1 && /\d/.test(addedChar);
+        if (!isDigitAppend) {
+          return { ...r, value: rawValue, manualFormat: rawValue.length > r.value.length };
+        }
+
+        const formatted = inputMode === 'mixed' ? autoFormatDurationDigits(rawValue) : formatByMode(inputMode, rawValue);
+        return { ...r, value: formatted };
+      })
     );
+  };
+
+  // Switching the input mode resets every row's value — text typed under one
+  // mask (or free-form "Mixed" text) isn't guaranteed to make sense under a
+  // different one, so starting fresh avoids stale, confusing leftovers.
+  const changeInputMode = (mode: InputMode) => {
+    setInputMode(mode);
+    setRows((prev) => prev.map((r) => ({ ...r, value: '', manualFormat: false })));
+    setInvalidIds(new Set());
+    setCalculatedMs(null);
   };
 
   const toggleSign = (id: string) =>
@@ -231,7 +402,7 @@ export function DurationArithmetic() {
 
     for (const row of rows) {
       if (!row.value.trim()) continue;
-      const parsed = parseMixedValue(row.value);
+      const parsed = parseRowValue(row, inputMode);
       if (parsed === null) {
         invalid.add(row.id);
         continue;
@@ -267,21 +438,52 @@ export function DurationArithmetic() {
     setResultType(accType);
   };
 
+  const currentMode = INPUT_MODE_OPTIONS.find((o) => o.value === inputMode)!;
+
   return (
     <div className="rounded-lg border overflow-hidden">
-      <div className="flex items-center gap-2 px-4 py-2.5 bg-muted/30 border-b">
+      <div className="flex items-center gap-2 px-4 py-2.5 bg-muted/30 border-b flex-wrap">
         <Calculator className="h-4 w-4 text-muted-foreground" />
-        <span className="text-sm font-semibold">Add / Subtract (Mixed Arithmetic)</span>
+        <span className="text-sm font-semibold">Add / Subtract</span>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <HelpCircle className="h-3.5 w-3.5 text-muted-foreground/70 cursor-help" />
+          </TooltipTrigger>
+          <TooltipContent className="max-w-xs text-xs">
+            Leave this on &quot;Mixed (Auto)&quot; and type anything — a duration, a date, a date+time,
+            or raw milliseconds — it&apos;s detected for you. &quot;Duration&quot; fills in its own colons
+            as you type digits. &quot;Date&quot; / &quot;Date + Time&quot; accept any layout you type —
+            ISO (2026-07-16), DD/MM/YYYY, MM/DD/YYYY, and more. Every row uses the same type.
+          </TooltipContent>
+        </Tooltip>
+
+        <div className="ml-auto flex items-center gap-1.5">
+          <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wide">Input Type</span>
+          <Select value={inputMode} onValueChange={(v) => changeInputMode(v as InputMode)}>
+            <SelectTrigger className="h-7 w-40 text-[11px] gap-1 px-2">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {INPUT_MODE_OPTIONS.map((opt) => (
+                <SelectItem key={opt.value} value={opt.value} className="text-xs">
+                  <span className="flex items-center gap-1.5">
+                    <opt.icon className="h-3.5 w-3.5" />
+                    {opt.label}
+                  </span>
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
       </div>
       <div className="p-4 space-y-3">
-      <p className="text-sm text-muted-foreground">
-        Perform additions & subtractions on mixed Durations (HH:MM:SS:mmm) and Date/Times (DD:MM:YYYY HH:MM:SS:mmm)
-      </p>
-
       <div className="space-y-2">
         {rows.map((row) => {
-          const parsed = parseMixedValue(row.value);
-          const badgeLabel = parsed ? (parsed.type === 'date' ? 'Date' : 'Duration') : 'Empty';
+          const parsed = parseRowValue(row, inputMode);
+          const isInvalid = invalidIds.has(row.id);
+          const badgeLabel = inputMode === 'mixed'
+            ? (parsed ? (parsed.type === 'date' ? 'Date' : 'Duration') : (row.value.trim() ? 'Invalid' : 'Empty'))
+            : (row.value.trim() ? (parsed ? 'Valid' : 'Invalid') : null);
 
           return (
             <div key={row.id} className="flex items-center gap-2">
@@ -307,15 +509,20 @@ export function DurationArithmetic() {
               <Input
                 value={row.value}
                 onChange={(e) => updateRow(row.id, e.target.value)}
-                placeholder="e.g. 01:30:00 or 10:07:2026 14:12:00"
-                className={cn('font-mono text-sm flex-1', invalidIds.has(row.id) && 'border-destructive')}
+                placeholder={currentMode.placeholder}
+                className={cn('font-mono text-sm flex-1', isInvalid && 'border-destructive')}
               />
-              <span className={cn(
-                "text-[9px] font-bold px-1.5 py-0.5 rounded border shadow-sm select-none shrink-0 w-16 text-center font-mono",
-                parsed ? (parsed.type === 'date' ? "bg-blue-500/10 text-blue-600 border-blue-500/20" : "bg-emerald-500/10 text-emerald-600 border-emerald-500/20") : "bg-muted text-muted-foreground border-border"
-              )}>
-                {badgeLabel}
-              </span>
+              {badgeLabel && (
+                <span className={cn(
+                  'text-[9px] font-bold px-1.5 py-0.5 rounded border shadow-sm select-none shrink-0 w-16 text-center font-mono',
+                  badgeLabel === 'Date' ? 'bg-blue-500/10 text-blue-600 border-blue-500/20'
+                    : badgeLabel === 'Duration' || badgeLabel === 'Valid' ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20'
+                    : badgeLabel === 'Invalid' ? 'bg-destructive/10 text-destructive border-destructive/20'
+                    : 'bg-muted text-muted-foreground border-border',
+                )}>
+                  {badgeLabel}
+                </span>
+              )}
               <Tooltip>
                 <TooltipTrigger asChild>
                   <Button
@@ -350,7 +557,8 @@ export function DurationArithmetic() {
 
       {invalidIds.size > 0 && (
         <p className="text-xs text-destructive">
-          Fix the highlighted row{invalidIds.size > 1 ? 's' : ''} — use HH:MM:SS or DD:MM:YYYY HH:MM:SS:mmm
+          Fix the highlighted row{invalidIds.size > 1 ? 's' : ''} — the value doesn&apos;t match its selected type,
+          or switch it to &quot;Mixed (Auto)&quot; to have the format detected for you
         </p>
       )}
 

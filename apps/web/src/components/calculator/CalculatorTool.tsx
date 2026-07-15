@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useMemo } from 'react';
-import { Calculator, Landmark, Coins, Calendar, ArrowRight, Download, HelpCircle, Table, Clock, Timer, Hourglass } from 'lucide-react';
+import { Calculator, Landmark, Coins, Calendar, ArrowRight, Download, HelpCircle, Table, Clock, Timer, Hourglass, History } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -10,7 +10,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
+import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import { toast } from 'sonner';
+import { useHistoryStore } from '@/store/history';
+import { CalculatorHistoryPanel } from './CalculatorHistoryPanel';
 
 // Factorial helper
 const factorial = (n: number): number => {
@@ -57,10 +60,16 @@ export function CalculatorTool() {
   const [dateMathOp, setDateMathOp] = useState<string>('add');
 
   // --- STANDARD/SCIENTIFIC CALCULATOR STATES ---
+  // `expression` does double duty, same as the Quick Access mini calculator:
+  // it's the live text you're typing, and on "=" it becomes the result
+  // itself. `lastEquation` is only set once "=" succeeds, so the small
+  // equation line above the display shows nothing while you type and only
+  // appears — "9 * 9 =" — right after you hit Enter/"=".
   const [expression, setExpression] = useState<string>('');
-  const [result, setResult] = useState<string>('');
-  const [calcHistory, setCalcHistory] = useState<string[]>([]);
+  const [lastEquation, setLastEquation] = useState<string>('');
   const [isScientific, setIsScientific] = useState<boolean>(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const addHistoryEntry = useHistoryStore((s) => s.addEntry);
 
   // --- GST CALCULATOR STATES ---
   const [gstAmount, setGstAmount] = useState<number>(1000);
@@ -83,11 +92,21 @@ export function CalculatorTool() {
 
   const clearCalc = () => {
     setExpression('');
-    setResult('');
+    setLastEquation('');
   };
 
   const backspace = () => {
     setExpression((prev) => prev.slice(0, -1));
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      calculateResult();
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      clearCalc();
+    }
   };
 
   const calculateResult = () => {
@@ -112,8 +131,23 @@ export function CalculatorTool() {
         .replace(/\^/g, '**')
         .replace(/²/g, '**2');
 
-      const matchRegex = /^[0-9+\-*\/%().Math.sinostanPIsqrtpoweabsfactorial\s]+$/;
-      if (!matchRegex.test(sanitized)) {
+      // Validate by stripping every token the replacements above can produce,
+      // then requiring the leftovers to be pure numbers/operators. (The old
+      // check here was a character-class regex — it only verified that each
+      // character individually appeared *somewhere* in an allowed set, e.g.
+      // "alert(1)" passes it because a/l/e/r/t/(/1/) are all individually in
+      // that set, which would let arbitrary code reach `new Function` below.)
+      const KNOWN_SAFE_TOKENS = [
+        'Math.PI', 'Math.E',
+        'Math.sqrt(', 'Math.sinh(', 'Math.cosh(', 'Math.tanh(',
+        'Math.sin(', 'Math.cos(', 'Math.tan(',
+        'Math.log10(', 'Math.log(', 'Math.abs(', 'factorial(',
+      ];
+      let residual = sanitized;
+      for (const token of KNOWN_SAFE_TOKENS) {
+        residual = residual.split(token).join('');
+      }
+      if (!/^[0-9+\-*/%().\s]*$/.test(residual)) {
         throw new Error('Invalid tokens');
       }
 
@@ -121,16 +155,20 @@ export function CalculatorTool() {
       const val = evalFn(factorial);
 
       if (val === undefined || isNaN(val)) {
-        setResult('Error');
+        setLastEquation('');
+        setExpression('Error');
       } else if (!isFinite(val)) {
-        setResult('Cannot divide by zero');
+        setLastEquation('');
+        setExpression('Cannot divide by zero');
       } else {
         const finalResult = Number(val.toFixed(8)).toString();
-        setResult(finalResult);
-        setCalcHistory((prev) => [expression + ' = ' + finalResult, ...prev].slice(0, 3));
+        setLastEquation(expression);
+        setExpression(finalResult);
+        addHistoryEntry({ tool: 'calculator', input: expression, output: finalResult });
       }
     } catch (e) {
-      setResult('Invalid expression');
+      setLastEquation('');
+      setExpression('Invalid expression');
     }
   };
 
@@ -395,6 +433,7 @@ export function CalculatorTool() {
   const iStroke = circumference * interestPct;
 
   return (
+    <>
     <Tabs defaultValue="standard-calc" className="space-y-6">
       <div className="flex justify-center">
         <TabsList className="grid grid-cols-3 md:grid-cols-7 w-full max-w-5xl h-auto p-1 gap-1">
@@ -437,30 +476,39 @@ export function CalculatorTool() {
               {/* Scientific Toggle header */}
               <div className="flex justify-between items-center pb-2 border-b border-border/60">
                 <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wide">Keypad Layout</span>
-                <div className="flex items-center gap-1.5 text-xs">
+                <div className="flex items-center gap-2.5 text-xs">
                   <Label htmlFor="sci-toggle" className="cursor-pointer text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Scientific Keys</Label>
                   <Switch id="sci-toggle" checked={isScientific} onCheckedChange={setIsScientific} className="h-4.5 scale-75" />
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="icon-sm"
+                        className="h-6 w-6 text-muted-foreground hover:text-foreground"
+                        onClick={() => setHistoryOpen(true)}
+                      >
+                        <History className="h-3.5 w-3.5" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>View calculation history</TooltipContent>
+                  </Tooltip>
                 </div>
               </div>
 
               {/* Screen Display */}
-              <div className="bg-black/25 dark:bg-black/45 rounded-xl p-4 font-mono text-right border border-border/80 shadow-inner space-y-1.5">
-                {/* Past Calculation logs */}
-                <div className="text-[10px] text-muted-foreground/60 min-h-[30px] flex flex-col justify-end items-end select-none border-b border-border/40 pb-1.5 space-y-0.5">
-                  {calcHistory.length > 0 ? (
-                    calcHistory.map((hist, i) => (
-                      <div key={i} className="line-clamp-1">{hist}</div>
-                    ))
-                  ) : (
-                    <div className="italic text-[9px] opacity-40">No history</div>
-                  )}
+              <div className="bg-black/25 dark:bg-black/45 rounded-xl p-4 font-mono text-right border border-border/80 shadow-inner space-y-1">
+                <div className="text-xs text-muted-foreground min-h-[16px] truncate">
+                  {lastEquation && `${lastEquation} =`}
                 </div>
-                <div className="text-xs text-muted-foreground min-h-[16px] overflow-x-auto whitespace-nowrap pt-1">
-                  {expression || '0'}
-                </div>
-                <div className="text-2xl font-black text-primary overflow-x-auto whitespace-nowrap tracking-tight">
-                  {result || '0'}
-                </div>
+                <input
+                  type="text"
+                  inputMode="text"
+                  value={expression}
+                  onChange={(e) => setExpression(e.target.value)}
+                  onKeyDown={handleKeyDown}
+                  placeholder="0"
+                  className="w-full bg-transparent text-right text-2xl font-black text-primary outline-none truncate tracking-tight placeholder:text-primary"
+                />
               </div>
 
               {/* Extra Scientific Row if toggled */}
@@ -482,11 +530,21 @@ export function CalculatorTool() {
               {/* Grid of keys */}
               <div className="grid grid-cols-5 gap-2 font-mono text-xs">
                 {/* Row 1 */}
-                <Button variant="outline" className="h-11 text-red-500 border-red-500/30 hover:bg-red-500/10 font-bold" onClick={() => clearCalc()}>C</Button>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button variant="outline" className="h-11 text-red-500 border-red-500/30 hover:bg-red-500/10 font-bold" onClick={() => clearCalc()}>C</Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Clear</TooltipContent>
+                </Tooltip>
                 <Button variant="outline" className="h-11 bg-muted/40 hover:bg-muted text-muted-foreground" onClick={() => handleInput('(')}>(</Button>
                 <Button variant="outline" className="h-11 bg-muted/40 hover:bg-muted text-muted-foreground" onClick={() => handleInput(')')}>)</Button>
                 <Button variant="outline" className="h-11 bg-muted/40 hover:bg-muted text-muted-foreground" onClick={() => handleInput('%')}>%</Button>
-                <Button variant="outline" className="h-11 text-red-500 border-red-500/30 hover:bg-red-500/10 font-bold" onClick={() => backspace()}>⌫</Button>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button variant="outline" className="h-11 text-red-500 border-red-500/30 hover:bg-red-500/10 font-bold" onClick={() => backspace()}>⌫</Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Backspace</TooltipContent>
+                </Tooltip>
 
                 {/* Row 2 */}
                 <Button variant="outline" className="h-11 bg-muted/40 hover:bg-muted text-muted-foreground font-semibold" onClick={() => handleInput('sin(')}>sin</Button>
@@ -1255,5 +1313,14 @@ export function CalculatorTool() {
         </div>
       </TabsContent>
     </Tabs>
+    <CalculatorHistoryPanel
+      open={historyOpen}
+      onOpenChange={setHistoryOpen}
+      onLoad={(equation) => {
+        setExpression(equation);
+        setLastEquation('');
+      }}
+    />
+    </>
   );
 }

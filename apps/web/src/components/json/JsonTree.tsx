@@ -48,7 +48,16 @@ function ValueDisplay({ type, value }: { type: JsonNodeType; value: unknown }) {
   return null;
 }
 
-function PathCopyButton({ path }: { path: string }) {
+// Objects/arrays copy their full (pretty-printed) subtree; scalars copy the
+// raw value itself (a string copies its bare content, no surrounding quotes).
+function getCopyText(type: JsonNodeType, value: unknown): string {
+  if (type === 'object' || type === 'array') return JSON.stringify(value, null, 2);
+  if (type === 'null') return 'null';
+  if (type === 'string') return value as string;
+  return String(value);
+}
+
+function ValueCopyButton({ type, value }: { type: JsonNodeType; value: unknown }) {
   const [copied, setCopied] = useState(false);
 
   return (
@@ -60,8 +69,8 @@ function PathCopyButton({ path }: { path: string }) {
           className="h-5 w-5 opacity-0 group-hover:opacity-100 transition-opacity"
           onClick={async (e) => {
             e.stopPropagation();
-            await copyToClipboard(path);
-            toast.success('Path copied');
+            await copyToClipboard(getCopyText(type, value));
+            toast.success('Value copied');
             setCopied(true);
             setTimeout(() => setCopied(false), 2000);
           }}
@@ -69,7 +78,7 @@ function PathCopyButton({ path }: { path: string }) {
           {copied ? <Check className="h-2.5 w-2.5 text-green-500" /> : <Copy className="h-2.5 w-2.5" />}
         </Button>
       </TooltipTrigger>
-      <TooltipContent>{`Copy path: ${path}`}</TooltipContent>
+      <TooltipContent>Copy value</TooltipContent>
     </Tooltip>
   );
 }
@@ -86,6 +95,19 @@ interface JsonTreeProps {
 const VIRTUALIZE_THRESHOLD = 500;
 const VISIBLE_ROWS = 100;
 
+// Parent of "$.a.b[2].c" is "$.a.b[2]"; parent of "$.a" is "$".
+function getParentPath(path: string): string {
+  const match = path.match(/^(.*)(\.[^.[\]]+|\[\d+\])$/);
+  return match ? match[1] : '$';
+}
+
+function nodeMatches(n: FlatNode, query: string): boolean {
+  const keyMatch = n.key?.toLowerCase().includes(query);
+  const valueMatch =
+    n.type !== 'object' && n.type !== 'array' && String(n.value).toLowerCase().includes(query);
+  return Boolean(keyMatch || valueMatch);
+}
+
 export function JsonTree({ data, searchQuery = '', collapsed = new Set(), onToggle }: JsonTreeProps) {
   const [visibleCount, setVisibleCount] = useState(VISIBLE_ROWS);
 
@@ -93,16 +115,35 @@ export function JsonTree({ data, searchQuery = '', collapsed = new Set(), onTogg
     return flattenJson(data, collapsed);
   }, [data, collapsed]);
 
+  // While searching, matches must be discoverable even inside collapsed
+  // branches, and the tree hierarchy around a match must stay visible so the
+  // result isn't a disconnected line with no context — so this flattens with
+  // nothing collapsed and keeps each match plus its ancestor chain and (for
+  // container matches) its full subtree, instead of filtering `nodes` (which
+  // already has collapsed branches pruned out).
   const filteredNodes = useMemo(() => {
     if (!searchQuery) return nodes;
     const q = searchQuery.toLowerCase();
-    return nodes.filter((n) => {
-      const keyMatch = n.key?.toLowerCase().includes(q);
-      const valueMatch =
-        n.type !== 'object' && n.type !== 'array' && String(n.value).toLowerCase().includes(q);
-      return keyMatch || valueMatch;
+    const full = flattenJson(data, new Set());
+    const visible = new Set<string>();
+
+    full.forEach((n, i) => {
+      if (!nodeMatches(n, q)) return;
+      let p = n.id;
+      visible.add(p);
+      while (p !== '$') {
+        p = getParentPath(p);
+        visible.add(p);
+      }
+      if (n.type === 'object' || n.type === 'array') {
+        for (let j = i + 1; j < full.length && full[j].depth > n.depth; j++) {
+          visible.add(full[j].id);
+        }
+      }
     });
-  }, [nodes, searchQuery]);
+
+    return full.filter((n) => visible.has(n.id));
+  }, [nodes, data, searchQuery]);
 
   const displayNodes = filteredNodes.slice(0, visibleCount);
   const hasMore = filteredNodes.length > visibleCount;
@@ -156,15 +197,25 @@ function TreeNode({
 
   const highlightMatch = (text: string) => {
     if (!searchQuery) return text;
-    const idx = text.toLowerCase().indexOf(searchQuery.toLowerCase());
-    if (idx === -1) return text;
-    return (
-      <>
-        {text.slice(0, idx)}
-        <mark className="bg-yellow-200 dark:bg-yellow-800 rounded-sm">{text.slice(idx, idx + searchQuery.length)}</mark>
-        {text.slice(idx + searchQuery.length)}
-      </>
-    );
+    const q = searchQuery.toLowerCase();
+    const lower = text.toLowerCase();
+    const parts: React.ReactNode[] = [];
+    let i = 0;
+    while (i < text.length) {
+      const idx = lower.indexOf(q, i);
+      if (idx === -1) {
+        parts.push(text.slice(i));
+        break;
+      }
+      if (idx > i) parts.push(text.slice(i, idx));
+      parts.push(
+        <mark key={idx} className="bg-yellow-200 dark:bg-yellow-800 rounded-sm">
+          {text.slice(idx, idx + q.length)}
+        </mark>,
+      );
+      i = idx + q.length;
+    }
+    return <>{parts}</>;
   };
 
   return (
@@ -174,12 +225,12 @@ function TreeNode({
       onClick={() => isContainer && onToggle(node.id)}
     >
       {/* Toggle arrow */}
-      <div className="w-4 shrink-0 flex items-center justify-center mt-0.5">
+      <div className="w-5 shrink-0 flex items-center justify-center mt-0.5">
         {isContainer ? (
           node.isCollapsed ? (
-            <ChevronRight className="h-3 w-3 text-muted-foreground" />
+            <ChevronRight className="h-4 w-4 text-muted-foreground" />
           ) : (
-            <ChevronDown className="h-3 w-3 text-muted-foreground" />
+            <ChevronDown className="h-4 w-4 text-muted-foreground" />
           )
         ) : null}
       </div>
@@ -214,8 +265,8 @@ function TreeNode({
         {/* Type badge */}
         <TypeBadge type={node.type} />
 
-        {/* Path copy */}
-        <PathCopyButton path={node.path} />
+        {/* Value copy */}
+        <ValueCopyButton type={node.type} value={node.value} />
       </div>
     </div>
   );

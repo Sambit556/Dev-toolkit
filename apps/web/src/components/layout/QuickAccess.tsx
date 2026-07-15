@@ -16,6 +16,17 @@ interface PanelPos {
   y: number;
 }
 
+interface PanelSize {
+  width: number;
+  height: number;
+}
+
+const MIN_PANEL_WIDTH = 220;
+const MAX_PANEL_WIDTH = 560;
+const MIN_PANEL_HEIGHT = 200;
+const MAX_PANEL_HEIGHT = 720;
+const clampPanelDim = (v: number, min: number, max: number) => Math.max(min, Math.min(v, max));
+
 // The 3 tools below have a built-in embedded mini panel (see MiniCalculator/
 // MiniEpochConverter/MiniJsonViewer). Any other pinned tool just navigates to
 // its full page instead — building a mini widget for all ~30 platform tools
@@ -44,6 +55,29 @@ export function QuickAccess() {
 
   const [dragOffset, setDragOffset] = useState<PanelPos>({ x: 0, y: 0 });
   const [draggingTool, setDraggingTool] = useState<ActiveTool>(null);
+
+  // Panel sizes (null = natural/default size until the user drags a resize handle)
+  const [panelSizes, setPanelSizes] = useState<Record<Exclude<ActiveTool, null>, PanelSize | null>>({
+    calc: null,
+    epoch: null,
+    json: null,
+  });
+  const [resizingTool, setResizingTool] = useState<ActiveTool>(null);
+  const resizeStartRef = useRef<{ x: number; y: number; width: number; height: number; maxWidth: number; maxHeight: number }>({
+    x: 0, y: 0, width: 0, height: 0, maxWidth: MAX_PANEL_WIDTH, maxHeight: MAX_PANEL_HEIGHT,
+  });
+  // Refs to each panel's scrollable content wrapper, so a resize can measure
+  // how big the content actually is and stop growing there — otherwise
+  // dragging past a panel's natural size (e.g. the calculator's fixed button
+  // grid) just leaves dead empty space around the content.
+  const calcContentRef = useRef<HTMLDivElement>(null);
+  const epochContentRef = useRef<HTMLDivElement>(null);
+  const jsonContentRef = useRef<HTMLDivElement>(null);
+  const contentRefs: Record<Exclude<ActiveTool, null>, React.RefObject<HTMLDivElement | null>> = {
+    calc: calcContentRef,
+    epoch: epochContentRef,
+    json: jsonContentRef,
+  };
 
   // Quick Dock Pos state and dragging refs
   const [dockPos, setDockPos] = useState<PanelPos>({ x: 16, y: 250 });
@@ -129,9 +163,72 @@ export function QuickAccess() {
     });
   };
 
-  // Dragging effect for both individual panels and dock
+  // Measures how big a panel's content actually needs to be (scrollWidth/
+  // scrollHeight, which reflect full content size even while currently
+  // clipped/scrolled) plus whatever chrome sits around it (header, resize-
+  // handle strip, padding), so resizing can be capped there instead of
+  // growing into empty dead space. Doesn't apply to 'json': its textarea
+  // flexes to fill whatever size the panel is given, so it has no fixed
+  // "natural" size to cap against in either dimension — it's the one panel
+  // that should be free to grow all the way to the absolute ceiling, in
+  // both directions, instead of just being capped to its current content.
+  const measureMaxSize = (tool: ActiveTool, rect: DOMRect): { maxWidth: number; maxHeight: number } => {
+    if (tool === 'json') return { maxWidth: MAX_PANEL_WIDTH, maxHeight: MAX_PANEL_HEIGHT };
+    const contentEl = tool ? contentRefs[tool].current : null;
+    if (!contentEl) return { maxWidth: MAX_PANEL_WIDTH, maxHeight: MAX_PANEL_HEIGHT };
+    const chromeW = rect.width - contentEl.clientWidth;
+    const chromeH = rect.height - contentEl.clientHeight;
+    return {
+      maxWidth: clampPanelDim(contentEl.scrollWidth + chromeW, MIN_PANEL_WIDTH, MAX_PANEL_WIDTH),
+      maxHeight: clampPanelDim(contentEl.scrollHeight + chromeH, MIN_PANEL_HEIGHT, MAX_PANEL_HEIGHT),
+    };
+  };
+
+  // Resizing logic — grabs the panel's current rendered size as the baseline
+  // (so a panel that's never been resized starts from its natural size,
+  // rather than jumping to some fixed default) then grows/shrinks from there.
+  const handleResizeStart = (tool: ActiveTool, e: React.MouseEvent, panelEl: HTMLElement) => {
+    e.stopPropagation();
+    const rect = panelEl.getBoundingClientRect();
+    resizeStartRef.current = {
+      x: e.clientX, y: e.clientY, width: rect.width, height: rect.height,
+      ...measureMaxSize(tool, rect),
+    };
+    setResizingTool(tool);
+  };
+
+  const handleResizeTouchStart = (tool: ActiveTool, e: React.TouchEvent, panelEl: HTMLElement) => {
+    if (e.touches.length === 0) return;
+    e.stopPropagation();
+    const touch = e.touches[0];
+    const rect = panelEl.getBoundingClientRect();
+    resizeStartRef.current = {
+      x: touch.clientX, y: touch.clientY, width: rect.width, height: rect.height,
+      ...measureMaxSize(tool, rect),
+    };
+    setResizingTool(tool);
+  };
+
+  // Dragging effect for individual panels, the dock, and panel resizing
   useEffect(() => {
-    if (!draggingTool && !isDraggingDock) return;
+    if (!draggingTool && !isDraggingDock && !resizingTool) return;
+
+    // Force the cursor for the whole document (not just whatever element
+    // happens to be under the pointer at each instant) and block text
+    // selection while a drag/resize is in progress — without this, moving
+    // the mouse fast off the tiny resize handle mid-drag left the cursor
+    // looking "stuck" on whatever icon the pointer last crossed, and text
+    // on the page would get selected as the mouse swept over it. The cleanup
+    // below always resets both, so releasing the mouse anywhere clears it.
+    document.body.style.cursor = resizingTool ? 'nwse-resize' : draggingTool || isDraggingDock ? 'grabbing' : '';
+    document.body.style.userSelect = 'none';
+
+    const applyResize = (tool: Exclude<ActiveTool, null>, clientX: number, clientY: number) => {
+      const start = resizeStartRef.current;
+      const width = clampPanelDim(start.width + (clientX - start.x), MIN_PANEL_WIDTH, start.maxWidth);
+      const height = clampPanelDim(start.height + (clientY - start.y), MIN_PANEL_HEIGHT, start.maxHeight);
+      setPanelSizes((prev) => ({ ...prev, [tool]: { width, height } }));
+    };
 
     const handleMouseMove = (e: MouseEvent) => {
       if (draggingTool) {
@@ -152,13 +249,15 @@ export function QuickAccess() {
         newY = Math.max(5, Math.min(newY, window.innerHeight - 200));
 
         setDockPos({ x: newX, y: newY });
+      } else if (resizingTool) {
+        applyResize(resizingTool, e.clientX, e.clientY);
       }
     };
 
     const handleTouchMove = (e: TouchEvent) => {
       if (e.touches.length === 0) return;
       const touch = e.touches[0];
-      
+
       if (draggingTool) {
         let newX = touch.clientX - dragOffset.x;
         let newY = touch.clientY - dragOffset.y;
@@ -177,6 +276,8 @@ export function QuickAccess() {
         newY = Math.max(5, Math.min(newY, window.innerHeight - 200));
 
         setDockPos({ x: newX, y: newY });
+      } else if (resizingTool) {
+        applyResize(resizingTool, touch.clientX, touch.clientY);
       }
     };
 
@@ -187,6 +288,7 @@ export function QuickAccess() {
         localStorage.setItem('devkits-quick-dock-pos', JSON.stringify(dockPos));
       }
       setDraggingTool(null);
+      setResizingTool(null);
     };
 
     window.addEventListener('mousemove', handleMouseMove);
@@ -199,8 +301,10 @@ export function QuickAccess() {
       window.removeEventListener('mouseup', handleDragEnd);
       window.removeEventListener('touchmove', handleTouchMove);
       window.removeEventListener('touchend', handleDragEnd);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
     };
-  }, [draggingTool, dragOffset, isDraggingDock, dockPos]);
+  }, [draggingTool, dragOffset, isDraggingDock, dockPos, resizingTool]);
 
   const toggleTool = (tool: ActiveTool) => {
     setActiveTool((prev) => (prev === tool ? null : tool));
@@ -284,8 +388,15 @@ export function QuickAccess() {
       {/* Floating Mini Panels */}
       {activeTool === 'calc' && (
         <div
-          style={{ position: 'fixed', left: `${calcPos.x}px`, top: `${calcPos.y}px`, zIndex: 50 }}
-          className="w-64 bg-background/95 border border-border/80 shadow-2xl rounded-2xl overflow-hidden backdrop-blur-md animate-fade-in flex flex-col"
+          style={{
+            position: 'fixed', left: `${calcPos.x}px`, top: `${calcPos.y}px`, zIndex: 50,
+            width: panelSizes.calc ? `${panelSizes.calc.width}px` : undefined,
+            height: panelSizes.calc ? `${panelSizes.calc.height}px` : undefined,
+          }}
+          className={cn(
+            'bg-background/95 border border-border/80 shadow-2xl rounded-2xl overflow-hidden backdrop-blur-md animate-fade-in flex flex-col',
+            !panelSizes.calc && 'w-64',
+          )}
         >
           <MiniPanelHeader
             title="Calculator"
@@ -298,14 +409,27 @@ export function QuickAccess() {
               }
             }}
           />
-          <MiniCalculator />
+          <div ref={calcContentRef} className="flex-1 min-h-0 overflow-y-auto">
+            <MiniCalculator />
+          </div>
+          <ResizeHandle
+            onMouseDown={(e) => handleResizeStart('calc', e, e.currentTarget.parentElement!)}
+            onTouchStart={(e) => handleResizeTouchStart('calc', e, e.currentTarget.parentElement!)}
+          />
         </div>
       )}
 
       {activeTool === 'epoch' && (
         <div
-          style={{ position: 'fixed', left: `${epochPos.x}px`, top: `${epochPos.y}px`, zIndex: 50 }}
-          className="w-72 bg-background/95 border border-border/80 shadow-2xl rounded-2xl overflow-hidden backdrop-blur-md animate-fade-in flex flex-col"
+          style={{
+            position: 'fixed', left: `${epochPos.x}px`, top: `${epochPos.y}px`, zIndex: 50,
+            width: panelSizes.epoch ? `${panelSizes.epoch.width}px` : undefined,
+            height: panelSizes.epoch ? `${panelSizes.epoch.height}px` : undefined,
+          }}
+          className={cn(
+            'bg-background/95 border border-border/80 shadow-2xl rounded-2xl overflow-hidden backdrop-blur-md animate-fade-in flex flex-col',
+            !panelSizes.epoch && 'w-72',
+          )}
         >
           <MiniPanelHeader
             title="Epoch Converter"
@@ -318,14 +442,27 @@ export function QuickAccess() {
               }
             }}
           />
-          <MiniEpochConverter />
+          <div ref={epochContentRef} className="flex-1 min-h-0 overflow-y-auto">
+            <MiniEpochConverter />
+          </div>
+          <ResizeHandle
+            onMouseDown={(e) => handleResizeStart('epoch', e, e.currentTarget.parentElement!)}
+            onTouchStart={(e) => handleResizeTouchStart('epoch', e, e.currentTarget.parentElement!)}
+          />
         </div>
       )}
 
       {activeTool === 'json' && (
         <div
-          style={{ position: 'fixed', left: `${jsonPos.x}px`, top: `${jsonPos.y}px`, zIndex: 50 }}
-          className="w-80 bg-background/95 border border-border/80 shadow-2xl rounded-2xl overflow-hidden backdrop-blur-md animate-fade-in flex flex-col"
+          style={{
+            position: 'fixed', left: `${jsonPos.x}px`, top: `${jsonPos.y}px`, zIndex: 50,
+            width: panelSizes.json ? `${panelSizes.json.width}px` : undefined,
+            height: panelSizes.json ? `${panelSizes.json.height}px` : undefined,
+          }}
+          className={cn(
+            'bg-background/95 border border-border/80 shadow-2xl rounded-2xl overflow-hidden backdrop-blur-md animate-fade-in flex flex-col',
+            !panelSizes.json && 'w-80',
+          )}
         >
           <MiniPanelHeader
             title="JSON Formatter"
@@ -338,7 +475,13 @@ export function QuickAccess() {
               }
             }}
           />
-          <MiniJsonViewer />
+          <div ref={jsonContentRef} className="flex-1 min-h-0 overflow-y-auto">
+            <MiniJsonViewer />
+          </div>
+          <ResizeHandle
+            onMouseDown={(e) => handleResizeStart('json', e, e.currentTarget.parentElement!)}
+            onTouchStart={(e) => handleResizeTouchStart('json', e, e.currentTarget.parentElement!)}
+          />
         </div>
       )}
     </TooltipProvider>
@@ -381,6 +524,37 @@ function MiniPanelHeader({ title, icon, onClose, onMouseDown, onTouchStart }: Mi
   );
 }
 
+/* Bottom-right resize grip for a mini panel — lets the user grow/shrink the
+   panel by dragging, independent of moving it (which the header handles). */
+function ResizeHandle({
+  onMouseDown,
+  onTouchStart,
+}: {
+  onMouseDown: (e: React.MouseEvent) => void;
+  onTouchStart: (e: React.TouchEvent) => void;
+}) {
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <div
+          onMouseDown={onMouseDown}
+          onTouchStart={onTouchStart}
+          className="absolute bottom-0 right-0 h-4 w-4 cursor-nwse-resize touch-none flex items-end justify-end p-0.5 text-muted-foreground/50 hover:text-muted-foreground transition-colors"
+        >
+          <svg viewBox="0 0 10 10" className="h-2.5 w-2.5 fill-current">
+            <circle cx="8" cy="2" r="1" />
+            <circle cx="8" cy="5" r="1" />
+            <circle cx="8" cy="8" r="1" />
+            <circle cx="5" cy="8" r="1" />
+            <circle cx="2" cy="8" r="1" />
+          </svg>
+        </div>
+      </TooltipTrigger>
+      <TooltipContent side="left">Drag to resize</TooltipContent>
+    </Tooltip>
+  );
+}
+
 /* Small copy-to-clipboard icon button used throughout the mini panels, with a styled tooltip instead of a native title attribute */
 function CopyIconButton({ onCopy, label, className }: { onCopy: () => void; label: string; className?: string }) {
   return (
@@ -398,10 +572,16 @@ function CopyIconButton({ onCopy, label, className }: { onCopy: () => void; labe
   );
 }
 
-// Evaluates a space-separated "num op num op num ..." chain (the only shape
-// MiniCalculator ever produces) with standard * / before + - precedence.
+// Evaluates a "num op num op num ..." chain (the only shape MiniCalculator
+// ever produces) with standard * / before + - precedence. Tokenizes by
+// scanning for digit runs and operator characters directly, rather than
+// splitting on whitespace, so it works whether the user typed "5+3" or
+// clicked buttons that insert " + " with spaces.
 function evaluateArithmetic(expression: string): number {
-  const tokens = expression.trim().split(/\s+/);
+  const tokens = expression.match(/\d+\.?\d*|[+\-*/]/g);
+  if (!tokens || tokens.length === 0 || tokens.length % 2 === 0 || /^[+\-*/]$/.test(tokens[0])) {
+    throw new Error('Invalid expression');
+  }
 
   const stack: (number | string)[] = [Number(tokens[0])];
   for (let i = 1; i < tokens.length; i += 2) {
@@ -426,51 +606,94 @@ function evaluateArithmetic(expression: string): number {
 
 /* Mini Calculator Logic */
 function MiniCalculator() {
-  const [display, setDisplay] = useState('0');
-  const [equation, setEquation] = useState('');
-  const [resetOnNext, setResetOnNext] = useState(false);
+  // A single freely-editable expression string, so the field behaves like a
+  // normal text input: type digits/operators directly, click anywhere to
+  // change a number, select-and-retype, etc. Starts empty (with a "0"
+  // placeholder) rather than pre-filled with "0" — a pre-filled value means
+  // typed digits land next to the leftover zero instead of replacing it
+  // (e.g. typing "12+30" into a field that already contains "0" becomes
+  // "12+300"), silently producing the wrong result.
+  // `justCalculated` only affects button clicks (a digit button after "="
+  // starts a fresh expression, matching standard calculator UX) — direct
+  // typing always edits in place.
+  const [expression, setExpression] = useState('');
+  const [justCalculated, setJustCalculated] = useState(false);
+  // The equation that produced the current result, shown small above the
+  // input (e.g. "9 * 9 =") once you hit "=" — it's the only trace of what
+  // you actually typed once the input itself gets replaced by the answer.
+  const [lastEquation, setLastEquation] = useState('');
+
+  const sanitize = (v: string) => v.replace(/[^0-9.+\-*/\s]/g, '');
 
   const handleNum = (num: string) => {
-    if (display === '0' || resetOnNext) {
-      setDisplay(num);
-      setResetOnNext(false);
-    } else {
-      setDisplay((prev) => prev + num);
-    }
+    setExpression((prev) => (justCalculated || !prev ? num : prev + num));
+    setJustCalculated(false);
   };
 
   const handleOp = (op: string) => {
-    setEquation(display + ' ' + op + ' ');
-    setResetOnNext(true);
+    // Ignore operator presses with nothing to operate on yet, rather than
+    // producing a leading-operator expression like " + " that can't evaluate.
+    setExpression((prev) => (prev.trim() ? `${prev.trim()} ${op} ` : prev));
+    setJustCalculated(false);
   };
 
   const handleClear = () => {
-    setDisplay('0');
-    setEquation('');
+    setExpression('');
+    setJustCalculated(false);
+    setLastEquation('');
+  };
+
+  const handleBackspace = () => {
+    setExpression((prev) => prev.slice(0, -1));
+    setJustCalculated(false);
   };
 
   const handleCalc = () => {
-    if (!equation) return;
+    const trimmed = expression.trim();
+    if (!trimmed) return;
     try {
-      const fullExp = equation + display;
-      // Sanitise execution bounds (allow basic arithmetic digits/ops only)
-      if (!/^[0-9.+\-*/\s]+$/.test(fullExp)) throw new Error('Unsafe evaluation');
-
-      const result = evaluateArithmetic(fullExp);
-      setDisplay(Number(result.toFixed(6)).toString());
-      setEquation('');
-      setResetOnNext(true);
+      const result = evaluateArithmetic(trimmed);
+      setLastEquation(trimmed);
+      setExpression(Number(result.toFixed(6)).toString());
     } catch {
-      setDisplay('Error');
-      setResetOnNext(true);
+      setLastEquation('');
+      setExpression('Error');
+    }
+    setJustCalculated(true);
+  };
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setExpression(sanitize(e.target.value));
+    setJustCalculated(false);
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      handleCalc();
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      handleClear();
     }
   };
 
   return (
     <div className="p-3 bg-card space-y-2 select-none" onMouseDown={(e) => e.stopPropagation()} onTouchStart={(e) => e.stopPropagation()}>
       <div className="bg-muted/50 rounded-lg p-2 border text-right">
-        <div className="text-[10px] text-muted-foreground font-mono truncate h-4">{equation}</div>
-        <div className="text-xl font-bold font-mono text-foreground truncate">{display}</div>
+        <div className="text-[10px] text-muted-foreground font-mono truncate h-4 leading-4">
+          {lastEquation && `${lastEquation} =`}
+        </div>
+        <input
+          type="text"
+          inputMode="decimal"
+          value={expression}
+          onChange={handleInputChange}
+          onKeyDown={handleKeyDown}
+          onMouseDown={(e) => e.stopPropagation()}
+          onTouchStart={(e) => e.stopPropagation()}
+          placeholder="0"
+          className="w-full bg-transparent text-right text-xl font-bold font-mono text-foreground outline-none truncate placeholder:text-foreground"
+        />
       </div>
       <div className="grid grid-cols-4 gap-1.5">
         <button onClick={handleClear} className="p-2 bg-rose-500/10 hover:bg-rose-500/20 text-rose-600 rounded-lg font-bold text-xs">C</button>
@@ -494,6 +717,7 @@ function MiniCalculator() {
 
         <button onClick={() => handleNum('0')} className="col-span-2 p-2 bg-muted/20 hover:bg-muted/30 text-foreground rounded-lg font-bold text-xs">0</button>
         <button onClick={() => handleNum('.')} className="p-2 bg-muted/20 hover:bg-muted/30 text-foreground rounded-lg font-bold text-xs">.</button>
+        <button onClick={handleBackspace} aria-label="Backspace" className="p-2 bg-rose-500/10 hover:bg-rose-500/20 text-rose-600 rounded-lg font-bold text-xs flex items-center justify-center">⌫</button>
       </div>
     </div>
   );
@@ -729,12 +953,17 @@ function MiniJsonViewer() {
   };
 
   return (
-    <div className="p-3 bg-card space-y-2.5 text-xs select-none" onMouseDown={(e) => e.stopPropagation()} onTouchStart={(e) => e.stopPropagation()}>
+    <div className="flex flex-col h-full p-3 bg-card space-y-2.5 text-xs select-none" onMouseDown={(e) => e.stopPropagation()} onTouchStart={(e) => e.stopPropagation()}>
+      {/* `resize-none` turns off the textarea's own native resize grip —
+          left on, it sat right next to (and fought with) the panel's own
+          resize handle. `flex-1` instead ties the textarea's size to the
+          panel's: growing/shrinking the outer panel (the one resize handle
+          that's left) grows/shrinks this directly, padding staying constant. */}
       <textarea
         value={input}
         onChange={(e) => setInput(e.target.value)}
         placeholder="Paste raw JSON here..."
-        className="w-full h-32 p-2 bg-muted/40 border rounded-lg text-xs font-mono outline-none text-foreground leading-normal"
+        className="w-full flex-1 min-h-32 p-2 bg-muted/40 border rounded-lg text-xs font-mono outline-none text-foreground leading-normal resize-none"
         onMouseDown={(e) => e.stopPropagation()}
         onTouchStart={(e) => e.stopPropagation()}
       />
