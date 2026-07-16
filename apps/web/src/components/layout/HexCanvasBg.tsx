@@ -89,7 +89,8 @@ export function HexCanvasBg() {
 
       const isDark = resolvedTheme === 'dark';
       const rgbColor = isDark ? '59, 130, 246' : '99, 102, 241';
-      const defaultOpacity = isDark ? 0.18 : 0.22;
+      // Prominent base opacity for inactive background dots
+      const defaultOpacity = isDark ? 0.34 : 0.40;
 
       // Calculate dynamic loop range to keep screen filled as coordinates drift infinitely
       const cols = Math.ceil(width / spacing) + 4;
@@ -118,13 +119,13 @@ export function HexCanvasBg() {
 
           let opacity = defaultOpacity;
           let radius = hexRadius;
-          let lineWidth = 0.7;
+          let lineWidth = 1.0; // Defined base line width of inactive hexagons
 
           if (dist < maxDist) {
             const factor = 1 - dist / maxDist; // 0 (far) to 1 (near)
-            opacity = defaultOpacity + factor * 0.58; // Bright hover glow
+            opacity = defaultOpacity + factor * 0.48; // Scales smoothly up to glow state
             radius = hexRadius + factor * 3.2; // Scale on hover
-            lineWidth = 0.7 + factor * 1.1; // Thicker lines on focus
+            lineWidth = 1.0 + factor * 1.0; // Thicker lines on focus
 
             // Draw glowing backdrop fill
             if (factor > 0.2) {
