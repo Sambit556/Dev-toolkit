@@ -83,7 +83,7 @@ export const metadata: Metadata = {
         alt: 'DevToolkit — 16 privacy-first developer utilities',
       },
     ],
-  },
+  }, 
   twitter: {
     card: 'summary_large_image',
     site: '@devtoolkitapp',
