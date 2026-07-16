@@ -7,6 +7,8 @@ export function HexCanvasBg() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const { resolvedTheme } = useTheme();
   const mouseRef = useRef({ x: -1000, y: -1000, targetX: -1000, targetY: -1000 });
+  const offsetsRef = useRef({ x: 0, y: 0 });
+  const swayRef = useRef({ x: 0, y: 0 });
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -38,8 +40,12 @@ export function HexCanvasBg() {
     window.addEventListener('mousemove', handleMouseMove);
     document.addEventListener('mouseleave', handleMouseLeave);
 
-    const spacing = 22;
-    const hexRadius = 2.5;
+    const spacing = 26; // Spacing for grid
+    const hexRadius = 3.0; // Base hexagon radius
+
+    // Subtle drift speeds for slow automatic floating
+    const driftSpeedX = 0.16;
+    const driftSpeedY = 0.10;
 
     const drawHex = (x: number, y: number, radius: number, opacity: number, color: string, lineWidth: number = 0.7) => {
       ctx.beginPath();
@@ -60,26 +66,55 @@ export function HexCanvasBg() {
       ctx.clearRect(0, 0, width, height);
 
       const mouse = mouseRef.current;
-      mouse.x += (mouse.targetX - mouse.x) * 0.12;
-      mouse.y += (mouse.targetY - mouse.y) * 0.12;
+      mouse.x += (mouse.targetX - mouse.x) * 0.08;
+      mouse.y += (mouse.targetY - mouse.y) * 0.08;
+
+      // Update automatic drift infinitely (without modulo resets to prevent layout jumps)
+      const offsets = offsetsRef.current;
+      offsets.x += driftSpeedX;
+      offsets.y += driftSpeedY;
+
+      // Update mouse sway (entire grid moves dynamically in direction of mouse)
+      let targetSwayX = 0;
+      let targetSwayY = 0;
+
+      if (mouse.x > -500) {
+        targetSwayX = (mouse.x - width / 2) * 0.08;
+        targetSwayY = (mouse.y - height / 2) * 0.08;
+      }
+
+      const sway = swayRef.current;
+      sway.x += (targetSwayX - sway.x) * 0.05;
+      sway.y += (targetSwayY - sway.y) * 0.05;
 
       const isDark = resolvedTheme === 'dark';
-      // Primary color mapping: warm purple in light, glowing cyan-blue in dark mode
       const rgbColor = isDark ? '59, 130, 246' : '99, 102, 241';
-      const defaultOpacity = isDark ? 0.12 : 0.16;
+      const defaultOpacity = isDark ? 0.18 : 0.22;
 
-      const cols = Math.ceil(width / spacing) + 1;
-      const rows = Math.ceil(height / (spacing * 0.86)) + 1;
+      // Calculate dynamic loop range to keep screen filled as coordinates drift infinitely
+      const cols = Math.ceil(width / spacing) + 4;
+      const rows = Math.ceil(height / (spacing * 0.86)) + 4;
 
-      for (let c = 0; c < cols; c++) {
-        for (let r = 0; r < rows; r++) {
-          const x = c * spacing + (r % 2 === 0 ? 0 : spacing / 2);
-          const y = r * spacing * 0.86;
+      const startCol = Math.floor(-offsets.x / spacing) - 2;
+      const endCol = startCol + cols;
+
+      const startRow = Math.floor(-offsets.y / (spacing * 0.86)) - 2;
+      const endRow = startRow + rows;
+
+      for (let c = startCol; c < endCol; c++) {
+        for (let r = startRow; r < endRow; r++) {
+          // Adjust alternating rows (Math.abs handles negative row indices safely)
+          const gridX = c * spacing + (Math.abs(r) % 2 === 0 ? 0 : spacing / 2);
+          const gridY = r * spacing * 0.86;
+
+          // Compute final hex position including infinite drift and sway
+          const x = gridX + offsets.x + sway.x;
+          const y = gridY + offsets.y + sway.y;
 
           const dx = x - mouse.x;
           const dy = y - mouse.y;
           const dist = Math.sqrt(dx * dx + dy * dy);
-          const maxDist = 110;
+          const maxDist = 180; // Extended glow radius
 
           let opacity = defaultOpacity;
           let radius = hexRadius;
@@ -87,9 +122,31 @@ export function HexCanvasBg() {
 
           if (dist < maxDist) {
             const factor = 1 - dist / maxDist; // 0 (far) to 1 (near)
-            opacity = defaultOpacity + factor * 0.42;
-            radius = hexRadius + factor * 1.5;
-            lineWidth = 0.7 + factor * 0.8;
+            opacity = defaultOpacity + factor * 0.58; // Bright hover glow
+            radius = hexRadius + factor * 3.2; // Scale on hover
+            lineWidth = 0.7 + factor * 1.1; // Thicker lines on focus
+
+            // Draw glowing backdrop fill
+            if (factor > 0.2) {
+              const fillOpacity = (factor - 0.2) * 0.08;
+              ctx.beginPath();
+              ctx.fillStyle = `rgba(${rgbColor}, ${fillOpacity})`;
+              for (let i = 0; i < 6; i++) {
+                const angle = (Math.PI / 3) * i;
+                const hexX = x + radius * Math.cos(angle);
+                const hexY = y + radius * Math.sin(angle);
+                if (i === 0) ctx.moveTo(hexX, hexY);
+                else ctx.lineTo(hexX, hexY);
+              }
+              ctx.closePath();
+              ctx.fill();
+            }
+
+            // Neon shadow blur for hovered items
+            ctx.shadowColor = isDark ? 'rgba(59, 130, 246, 0.45)' : 'rgba(99, 102, 241, 0.45)';
+            ctx.shadowBlur = factor * 10;
+          } else {
+            ctx.shadowBlur = 0;
           }
 
           drawHex(x, y, radius, opacity, rgbColor, lineWidth);
