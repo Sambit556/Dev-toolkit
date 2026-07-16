@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { apiPost } from '../apiClient.js';
+import { ApiError, apiPost } from '../apiClient.js';
 import { withApiKeyCheck } from '../auth.js';
 import {
   tryRepairJson,
@@ -14,6 +14,10 @@ import {
   parseJsonSafe,
 } from '../lib/json-extra.js';
 
+function fixNote(fixCount: number): string {
+  return `(auto-fixed ${fixCount} issue${fixCount === 1 ? '' : 's'} — input wasn't valid JSON as given)`;
+}
+
 export function registerJsonTools(server: McpServer): void {
   server.registerTool(
     'format_json',
@@ -23,8 +27,10 @@ export function registerJsonTools(server: McpServer): void {
         'Format and beautify a JSON string with proper indentation. Use this instead of manually ' +
         're-indenting or reformatting JSON by hand — string manipulation of JSON is error-prone ' +
         '(dropped commas, wrong nesting, misplaced brackets), while this calls the same deterministic ' +
-        'parser/serializer the DevKits JSON Viewer uses. Returns the formatted JSON, or a parse error ' +
-        'if the input is invalid.',
+        'parser/serializer the DevKits JSON Viewer uses. If the input is slightly malformed (trailing ' +
+        'commas, unquoted keys/values, single quotes, JS-only literals, comments, function values, etc.) ' +
+        'it is auto-fixed first — the same "Validate & Fix" repair the JSON Viewer\'s Validate button runs ' +
+        '— before formatting. Only genuinely unrecoverable input returns an error.',
       inputSchema: {
         json: z.string().min(1).describe('The raw JSON string to format.'),
         indent: z.number().int().min(0).max(8).optional().describe('Spaces to indent with (0-8). Defaults to 2.'),
@@ -38,10 +44,19 @@ export function registerJsonTools(server: McpServer): void {
         sortKeys,
       });
 
-      if (!result.valid) {
+      if (result.valid) {
+        return { content: [{ type: 'text', text: result.formatted }] };
+      }
+
+      const repaired = tryRepairJson(json);
+      if (!repaired) {
         return { content: [{ type: 'text', text: `Invalid JSON: ${result.error}` }], isError: true };
       }
-      return { content: [{ type: 'text', text: result.formatted }] };
+
+      const value = JSON.parse(repaired.fixed);
+      const data = sortKeys ? sortKeysDeep(value) : value;
+      const formatted = JSON.stringify(data, null, indent ?? 2);
+      return { content: [{ type: 'text', text: `${formatted}\n\n${fixNote(repaired.fixCount)}` }] };
     }),
   );
 
@@ -90,28 +105,52 @@ export function registerJsonTools(server: McpServer): void {
       description:
         'Remove all insignificant whitespace from a JSON string to minimize its size. Use this instead of ' +
         'manually stripping whitespace from JSON, which risks corrupting string values that legitimately ' +
-        'contain spaces or newlines. Returns the minified JSON and the byte savings, or a precise parse ' +
-        'error (with message) if the input is invalid.',
+        'contain spaces or newlines. If the input is slightly malformed it is auto-fixed first (the same ' +
+        '"Validate & Fix" repair the JSON Viewer uses) before minifying. Returns the minified JSON and the ' +
+        'byte savings, or an error if the input is unrecoverable.',
       inputSchema: {
         json: z.string().min(1).describe('The JSON string to minify.'),
       },
     },
     withApiKeyCheck(async ({ json }) => {
-      const result = await apiPost<{
-        minified: string;
-        originalSize: number;
-        minifiedSize: number;
-        savingPercent: number;
-      }>('/api/json/minify', { json });
+      try {
+        const result = await apiPost<{
+          minified: string;
+          originalSize: number;
+          minifiedSize: number;
+          savingPercent: number;
+        }>('/api/json/minify', { json });
 
-      return {
-        content: [
-          {
-            type: 'text',
-            text: `${result.minified}\n\n(${result.originalSize} -> ${result.minifiedSize} bytes, ${result.savingPercent}% smaller)`,
-          },
-        ],
-      };
+        return {
+          content: [
+            {
+              type: 'text',
+              text: `${result.minified}\n\n(${result.originalSize} -> ${result.minifiedSize} bytes, ${result.savingPercent}% smaller)`,
+            },
+          ],
+        };
+      } catch (err) {
+        if (!(err instanceof ApiError)) throw err;
+
+        const repaired = tryRepairJson(json);
+        if (!repaired) {
+          return { content: [{ type: 'text', text: `Invalid JSON: ${err.message}` }], isError: true };
+        }
+
+        const minified = JSON.stringify(JSON.parse(repaired.fixed));
+        const originalSize = Buffer.byteLength(json, 'utf8');
+        const minifiedSize = Buffer.byteLength(minified, 'utf8');
+        const savingPercent = ((originalSize - minifiedSize) / originalSize) * 100;
+
+        return {
+          content: [
+            {
+              type: 'text',
+              text: `${minified}\n\n(${originalSize} -> ${minifiedSize} bytes, ${savingPercent.toFixed(2)}% smaller)\n${fixNote(repaired.fixCount)}`,
+            },
+          ],
+        };
+      }
     }),
   );
 
@@ -120,16 +159,24 @@ export function registerJsonTools(server: McpServer): void {
     {
       title: 'Repair Malformed JSON',
       description:
-        'Attempt to auto-fix common JSON mistakes: trailing commas, unquoted object keys, single/curly ' +
-        'quotes, // and /* */ comments, and Python/JS-only literals (True/False/None). Use this instead of ' +
-        'manually hunting for the exact syntax error in slightly-malformed JSON (e.g. pasted from a Python ' +
-        'dict literal or a JSON5/JSONC config file) before falling back to validate_json for a precise error.',
+        'Attempt to auto-fix common JSON mistakes: trailing/extra commas, missing commas or colons, ' +
+        'unquoted object keys and string values (including hyphenated IDs like "MCH-001"), single/curly ' +
+        'quotes, // and /* */ comments, Python/JS-only literals (True/False/None/NaN/Infinity/undefined), ' +
+        'function/arrow-function values, and console-log-style prefixes. Use this instead of manually ' +
+        'hunting for the exact syntax error in slightly-malformed JSON (e.g. pasted from a Python dict ' +
+        'literal, a JSON5/JSONC config file, or a browser console dump) before falling back to ' +
+        'validate_json for a precise error.',
       inputSchema: { json: z.string().min(1).describe('The malformed JSON-like string to repair.') },
     },
     withApiKeyCheck(async ({ json }) => {
       const result = tryRepairJson(json);
       if (!result) return { content: [{ type: 'text', text: 'Could not repair this input into valid JSON.' }], isError: true };
-      return { content: [{ type: 'text', text: result.fixed }] };
+      if (!result.changed) return { content: [{ type: 'text', text: result.fixed }] };
+      return {
+        content: [
+          { type: 'text', text: `${result.fixed}\n\n(auto-fixed ${result.fixCount} issue${result.fixCount === 1 ? '' : 's'})` },
+        ],
+      };
     }),
   );
 

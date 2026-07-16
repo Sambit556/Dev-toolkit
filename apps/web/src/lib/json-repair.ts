@@ -1,160 +1,763 @@
-const QUOTE_CHARS = new Set(['"', "'", '“', '”', '‘', '’']);
+/**
+ * Lenient JSON repair engine.
+ *
+ * Rather than regex-patching the source text and re-parsing, this walks the
+ * input with a small recursive-descent parser that mirrors JSON grammar but
+ * tolerates common real-world mistakes (single quotes, unquoted keys/values,
+ * missing commas/colons/brackets, JS-only literals, comments, function
+ * values, console-log prefixes). Every tolerance it exercises is recorded as
+ * a fix and it builds a real JS value as it goes, so the output is produced
+ * via JSON.stringify — never hand-escaped — which is what keeps "never lose
+ * data" and "always valid JSON out" true simultaneously.
+ *
+ * Recovery philosophy: once we're inside a recognized `{` or `[`, we commit
+ * to interpreting everything up to its matching close (or EOF) as part of
+ * that structure — there's no going back to "unrecoverable" from there. A
+ * single bad token (an emoji, a MAC address, a stray symbol, a missing
+ * value) never aborts the whole repair; it gets captured as an opaque string,
+ * filled with `null`, or — only when it isn't even shaped like `key: value`
+ * — discarded with a fix message saying exactly what was thrown away. Only
+ * the outermost call (no enclosing braces at all) can still return
+ * "unrecoverable", for input that was never JSON-shaped to begin with.
+ */
+
+const CURLY_DOUBLE = new Set(['“', '”']);
+const CURLY_SINGLE = new Set(['‘', '’']);
 const WORD_START = /[A-Za-z_$]/;
 const WORD_CHAR = /[A-Za-z0-9_$]/;
-const LITERAL_MAP: Record<string, string> = {
-  True: 'true',
-  False: 'false',
-  None: 'null',
-  NaN: 'null',
-  Infinity: 'null',
-  undefined: 'null',
+// Unquoted bareword keys/values are frequently ID-like tokens (SKU codes,
+// slugs, machine IDs — "MCH-001", "Line-A", "adsf213-10") rather than JS
+// identifiers, so hyphens are allowed mid-token even though real JS
+// identifiers can't contain them.
+const VALUE_WORD_CHAR = /[A-Za-z0-9_$-]/;
+const NUMBER_RE = /^[+-]?(\d[\d_]*\.?[\d_]*|\.\d[\d_]*)([eE][+-]?\d+)?/;
+const HEX_RE = /^0[xX][0-9a-fA-F]+/;
+const KEY_LINE_RE = /^[ \t]*[\w$'"`-]+[ \t]*:/;
+
+const LITERAL_VALUE: Record<string, unknown> = {
+  True: true,
+  False: false,
+  TRUE: true,
+  FALSE: false,
+  NULL: null,
+  None: null,
+  NaN: null,
+  Infinity: null,
+  undefined: null,
 };
 
-/**
- * Single-pass, string-boundary-aware cleanup: strips // and /* comments,
- * normalizes single/curly-quoted strings to double-quoted, quotes bareword
- * object keys, drops trailing commas, and maps Python/JS-only literals
- * (True/False/None/NaN/Infinity/undefined) to their JSON equivalents.
- * Never touches content that's genuinely inside a JSON string.
- */
-function cleanupTokens(input: string): string {
-  let out = '';
-  let i = 0;
-  const n = input.length;
-
-  while (i < n) {
-    const ch = input[i];
-
-    // Comments (only outside strings — we only reach here when not inside one)
-    if (ch === '/' && input[i + 1] === '/') {
-      i += 2;
-      while (i < n && input[i] !== '\n') i++;
-      continue;
-    }
-    if (ch === '/' && input[i + 1] === '*') {
-      i += 2;
-      while (i < n && !(input[i] === '*' && input[i + 1] === '/')) i++;
-      i += 2;
-      continue;
-    }
-
-    // Strings — normalize to double-quoted, escaping/unescaping as needed
-    if (QUOTE_CHARS.has(ch)) {
-      const isCurly = ch === '“' || ch === '”' || ch === '‘' || ch === '’';
-      const closer = isCurly ? (ch === '“' || ch === '”' ? new Set(['“', '”']) : new Set(['‘', '’'])) : new Set([ch]);
-      let content = '';
-      let j = i + 1;
-      let closed = false;
-      while (j < n) {
-        const c = input[j];
-        if (c === '\\' && j + 1 < n) {
-          content += c + input[j + 1];
-          j += 2;
-          continue;
-        }
-        if (closer.has(c)) {
-          closed = true;
-          j++;
-          break;
-        }
-        content += c;
-        j++;
-      }
-      // Re-escape unescaped double quotes, unescape now-unnecessary escaped single quotes
-      const normalized = content
-        .replace(/\\'/g, "'")
-        .replace(/(?<!\\)"/g, '\\"');
-      out += `"${normalized}"`;
-      i = closed ? j : j; // if unterminated, we've consumed to end — leave as-is for JSON.parse to report
-      continue;
-    }
-
-    // Barewords: quote as key if followed by ':', map known non-JSON literals
-    if (WORD_START.test(ch)) {
-      let j = i + 1;
-      while (j < n && WORD_CHAR.test(input[j])) j++;
-      const word = input.slice(i, j);
-      if (word === 'true' || word === 'false' || word === 'null') {
-        out += word;
-      } else if (word in LITERAL_MAP) {
-        out += LITERAL_MAP[word];
-      } else {
-        let k = j;
-        while (k < n && /\s/.test(input[k])) k++;
-        if (input[k] === ':') {
-          out += `"${word}"`;
-        } else {
-          out += word;
-        }
-      }
-      i = j;
-      continue;
-    }
-
-    // Trailing commas: skip comma if only whitespace/comments separate it from } or ]
-    if (ch === ',') {
-      let k = i + 1;
-      while (k < n && /\s/.test(input[k])) k++;
-      if (input[k] === '}' || input[k] === ']') {
-        i++;
-        continue;
-      }
-      out += ch;
-      i++;
-      continue;
-    }
-
-    out += ch;
-    i++;
+class RepairError extends Error {
+  constructor(message: string, public position: number) {
+    super(message);
   }
-
-  return out;
 }
 
-/** Appends missing closing brackets for any unmatched { or [ left open at the end. */
-function balanceBrackets(input: string): string {
-  const stack: string[] = [];
-  let i = 0;
-  const n = input.length;
+function truncate(s: string, max = 60): string {
+  const oneLine = s.replace(/\s+/g, ' ').trim();
+  return oneLine.length > max ? `${oneLine.slice(0, max)}…` : oneLine;
+}
 
-  while (i < n) {
-    const ch = input[i];
-    if (ch === '"') {
-      i++;
-      while (i < n) {
-        if (input[i] === '\\') {
-          i += 2;
-          continue;
-        }
-        if (input[i] === '"') {
-          i++;
-          break;
-        }
-        i++;
-      }
-      continue;
-    }
-    if (ch === '{' || ch === '[') stack.push(ch === '{' ? '}' : ']');
-    else if (ch === '}' || ch === ']') stack.pop();
-    i++;
+class LenientParser {
+  private pos = 0;
+  private readonly maxFixes: number;
+  readonly fixes: string[] = [];
+
+  constructor(private input: string) {
+    // Every fix corresponds to consuming at least one character, so a
+    // well-behaved run can never need more fixes than there are characters
+    // (generously padded). This is a last-resort guard against a stuck loop
+    // in some recovery path we haven't foreseen — it should never trigger
+    // in practice, but a bounded failure beats a hang or an unbounded array.
+    this.maxFixes = Math.max(2000, input.length * 4);
   }
 
-  return stack.length ? input + stack.reverse().join('') : input;
+  get position() {
+    return this.pos;
+  }
+
+  private addFix(message: string) {
+    if (this.fixes.length >= this.maxFixes) {
+      throw new RepairError('Too many fixes — aborting to avoid a stuck loop', this.pos);
+    }
+    this.fixes.push(message);
+  }
+
+  private peek(): string {
+    return this.input[this.pos];
+  }
+
+  private atEnd(): boolean {
+    return this.pos >= this.input.length;
+  }
+
+  skipWs() {
+    while (!this.atEnd()) {
+      const ch = this.peek();
+      if (ch === ' ' || ch === '\t' || ch === '\n' || ch === '\r') {
+        this.pos++;
+        continue;
+      }
+      if (ch === '/' && this.input[this.pos + 1] === '/') {
+        this.pos += 2;
+        while (!this.atEnd() && this.input[this.pos] !== '\n') this.pos++;
+        this.addFix('Removed comment');
+        continue;
+      }
+      if (ch === '/' && this.input[this.pos + 1] === '*') {
+        this.pos += 2;
+        while (!this.atEnd() && !(this.input[this.pos] === '*' && this.input[this.pos + 1] === '/')) this.pos++;
+        this.pos += 2;
+        this.addFix('Removed comment');
+        continue;
+      }
+      break;
+    }
+  }
+
+  /** Skips a balanced open/close run (parens, braces, brackets), respecting nested strings/comments. */
+  private skipBalanced(open: string, close: string) {
+    let depth = 0;
+    do {
+      if (this.atEnd()) break;
+      const c = this.peek();
+      if (c === '"' || c === "'" || c === '`') {
+        const q = c;
+        this.pos++;
+        while (!this.atEnd() && this.input[this.pos] !== q) {
+          if (this.input[this.pos] === '\\') this.pos++;
+          this.pos++;
+        }
+        this.pos++;
+        continue;
+      }
+      if (c === '/' && this.input[this.pos + 1] === '/') {
+        while (!this.atEnd() && this.input[this.pos] !== '\n') this.pos++;
+        continue;
+      }
+      if (c === '/' && this.input[this.pos + 1] === '*') {
+        this.pos += 2;
+        while (!this.atEnd() && !(this.input[this.pos] === '*' && this.input[this.pos + 1] === '/')) this.pos++;
+        this.pos += 2;
+        continue;
+      }
+      if (c === open) depth++;
+      else if (c === close) depth--;
+      this.pos++;
+    } while (depth > 0 && !this.atEnd());
+  }
+
+  /** Consumes a JS expression body (no braces) up to the next depth-0 delimiter: , } ] or end. */
+  private skipExpressionUntilDelimiter() {
+    let depth = 0;
+    while (!this.atEnd()) {
+      const c = this.peek();
+      if (c === '"' || c === "'" || c === '`') {
+        const q = c;
+        this.pos++;
+        while (!this.atEnd() && this.input[this.pos] !== q) {
+          if (this.input[this.pos] === '\\') this.pos++;
+          this.pos++;
+        }
+        this.pos++;
+        continue;
+      }
+      if (depth === 0 && (c === ',' || c === '}' || c === ']')) return;
+      if (c === '(' || c === '[' || c === '{') depth++;
+      else if (c === ')' || c === ']' || c === '}') depth--;
+      this.pos++;
+    }
+  }
+
+  /**
+   * Scans forward (without consuming) to the nearest top-level `,` `}` `]`
+   * or newline, respecting nested brackets/quotes — used to bound a raw
+   * token when nothing recognizable parses. This is the fallback boundary
+   * for opaque value/key capture, so it deliberately stops at a newline
+   * too: most garbage tokens in hand-edited/pasted JSON are one per line.
+   */
+  private findEntryBoundary(): number {
+    let depth = 0;
+    let j = this.pos;
+    while (j < this.input.length) {
+      const c = this.input[j];
+      if (c === '"' || c === "'" || c === '`') {
+        const q = c;
+        j++;
+        while (j < this.input.length && this.input[j] !== q && this.input[j] !== '\n') {
+          if (this.input[j] === '\\') j++;
+          j++;
+        }
+        if (this.input[j] === q) j++;
+        continue;
+      }
+      if (depth === 0 && (c === ',' || c === '}' || c === ']' || c === '\n')) return j;
+      if (c === '(' || c === '[' || c === '{') depth++;
+      else if (c === ')' || c === ']' || c === '}') depth--;
+      j++;
+    }
+    return this.input.length;
+  }
+
+  /** Captures whatever's at `pos` up to the next entry boundary as a raw string (or null if empty). */
+  private captureOpaqueValue(): unknown {
+    const start = this.pos;
+    const boundary = this.findEntryBoundary();
+    const end = Math.max(boundary, start + 1);
+    const raw = this.input.slice(start, end).trim();
+    this.pos = end;
+    if (raw === '') {
+      this.addFix('Filled missing value with null');
+      return null;
+    }
+    this.addFix('Quoted unrecognized value');
+    return raw;
+  }
+
+  /** True if the char at `idx` is a legitimate place for a clean token (number/bareword) to end. */
+  private isCleanValueBoundary(idx: number): boolean {
+    if (idx >= this.input.length) return true;
+    const c = this.input[idx];
+    if (c === ' ' || c === '\t' || c === '\n' || c === '\r') return true;
+    if (c === ',' || c === '}' || c === ']') return true;
+    if (c === '/' && (this.input[idx + 1] === '/' || this.input[idx + 1] === '*')) return true;
+    return false;
+  }
+
+  private skipFunctionValue() {
+    // 'function' keyword already consumed. Optional name, then (...) then { ... }.
+    this.skipWs();
+    while (!this.atEnd() && WORD_CHAR.test(this.peek())) this.pos++;
+    this.skipWs();
+    if (this.peek() === '(') this.skipBalanced('(', ')');
+    this.skipWs();
+    if (this.peek() === '{') this.skipBalanced('{', '}');
+    this.addFix('Removed function value (not representable in JSON)');
+  }
+
+  private parseArrowFunctionFromParen(): unknown {
+    const start = this.pos;
+    this.skipBalanced('(', ')');
+    this.skipWs();
+    if (this.input.slice(this.pos, this.pos + 2) === '=>') {
+      this.pos += 2;
+      this.skipWs();
+      if (this.peek() === '{') this.skipBalanced('{', '}');
+      else this.skipExpressionUntilDelimiter();
+      this.addFix('Removed function value (not representable in JSON)');
+      return null;
+    }
+    this.pos = start;
+    throw new RepairError("Unexpected '(' where a value was expected", this.pos);
+  }
+
+  /**
+   * Called when `parseKey()` can't find a key start at all (object context).
+   * If a `:` shows up before the next entry boundary, treat everything
+   * before it as an unusual-but-intentional key name; otherwise this span
+   * isn't shaped like `key: value` at all, so it's discarded (with a fix
+   * message naming exactly what was thrown away) rather than guessed at.
+   */
+  private recoverBadEntry(): string | null {
+    const start = this.pos;
+    const boundary = this.findEntryBoundary();
+    const colonIdx = this.input.indexOf(':', start);
+    if (colonIdx !== -1 && colonIdx < boundary) {
+      const raw = this.input.slice(start, colonIdx).trim();
+      this.pos = colonIdx;
+      this.addFix(`Quoted unusual key "${truncate(raw, 40)}"`);
+      return raw || '_';
+    }
+    const end = Math.max(boundary, start + 1);
+    const raw = this.input.slice(start, end);
+    this.pos = end;
+    this.addFix(`Discarded unparseable content: "${truncate(raw)}"`);
+    return null;
+  }
+
+  private parseKey(): string {
+    this.skipWs();
+    if (this.atEnd()) throw new RepairError('Unexpected end of input while reading a key', this.pos);
+    const ch = this.peek();
+    if (ch === '"' || ch === "'" || ch === '`' || CURLY_DOUBLE.has(ch) || CURLY_SINGLE.has(ch)) {
+      return this.parseString();
+    }
+    if (WORD_START.test(ch)) {
+      const start = this.pos;
+      this.pos++;
+      while (!this.atEnd() && VALUE_WORD_CHAR.test(this.peek())) this.pos++;
+      this.addFix('Quoted unquoted key');
+      return this.input.slice(start, this.pos).replace(/-+$/, '');
+    }
+    if (/[0-9]/.test(ch)) {
+      const start = this.pos;
+      while (!this.atEnd() && /[0-9.]/.test(this.peek())) this.pos++;
+      this.addFix('Quoted unquoted numeric key');
+      return this.input.slice(start, this.pos);
+    }
+    throw new RepairError(`Unexpected character '${ch}' where a key was expected`, this.pos);
+  }
+
+  /**
+   * Bounded forward scan (from a literal newline hit mid-string) for a
+   * plausible closing quote further down. Real multi-line string content
+   * (someone pasted a value with an actual line break) should keep the
+   * newline instead of truncating; but we bail — treating the newline as
+   * the end — the moment a following line looks like the start of a new
+   * `key: value` entry, so we don't swallow unrelated keys into one string.
+   */
+  private hasNearbyCloser(closerSet: Set<string>): boolean {
+    const LOOKAHEAD_CAP = 500;
+    const limit = Math.min(this.input.length, this.pos + 1 + LOOKAHEAD_CAP);
+    let j = this.pos + 1;
+    while (j < limit) {
+      const c = this.input[j];
+      if (closerSet.has(c)) return true;
+      if (c === '\n') {
+        const nextNl = this.input.indexOf('\n', j + 1);
+        const restOfLine = this.input.slice(j + 1, nextNl === -1 ? limit : nextNl);
+        if (KEY_LINE_RE.test(restOfLine)) return false;
+      }
+      j++;
+    }
+    return false;
+  }
+
+  private parseString(): string {
+    const openChar = this.peek();
+    const isStandard = openChar === '"';
+    const closerSet = CURLY_DOUBLE.has(openChar)
+      ? CURLY_DOUBLE
+      : CURLY_SINGLE.has(openChar)
+        ? CURLY_SINGLE
+        : new Set([openChar]);
+    // Single quotes collide with English possessives/contractions ("John's
+    // Laptop") — only treat one as the real closer if what follows looks
+    // like a legitimate continuation of JSON structure. Double/curly quotes
+    // don't have this ambiguity in practice, so they close unconditionally.
+    const disambiguateCloser = openChar === "'";
+
+    if (!isStandard) this.addFix('Converted quotes to double quotes');
+
+    this.pos++; // consume opening quote
+    let result = '';
+    let closed = false;
+    while (!this.atEnd()) {
+      const c = this.input[this.pos];
+      if (c === '\\' && this.pos + 1 < this.input.length) {
+        const next = this.input[this.pos + 1];
+        switch (next) {
+          case '"': result += '"'; this.pos += 2; continue;
+          case '\\': result += '\\'; this.pos += 2; continue;
+          case '/': result += '/'; this.pos += 2; continue;
+          case 'b': result += '\b'; this.pos += 2; continue;
+          case 'f': result += '\f'; this.pos += 2; continue;
+          case 'n': result += '\n'; this.pos += 2; continue;
+          case 'r': result += '\r'; this.pos += 2; continue;
+          case 't': result += '\t'; this.pos += 2; continue;
+          case 'u': {
+            const hex = this.input.slice(this.pos + 2, this.pos + 6);
+            if (/^[0-9a-fA-F]{4}$/.test(hex)) {
+              result += String.fromCharCode(parseInt(hex, 16));
+              this.pos += 6;
+              continue;
+            }
+            result += next;
+            this.pos += 2;
+            continue;
+          }
+          default:
+            if (next === openChar) {
+              // Escaping this string's own delimiter — safe to unescape.
+              result += next;
+            } else {
+              // Unrecognized escape (e.g. a Windows path "C:\Users\Admin")
+              // — preserve both characters literally rather than silently
+              // dropping the backslash and corrupting the value.
+              result += '\\' + next;
+            }
+            this.pos += 2;
+            continue;
+        }
+      }
+      if (closerSet.has(c)) {
+        if (disambiguateCloser) {
+          let k = this.pos + 1;
+          while (k < this.input.length && (this.input[k] === ' ' || this.input[k] === '\t' || this.input[k] === '\r')) k++;
+          const after = this.input[k];
+          const looksLikeRealClose =
+            k >= this.input.length || ',}]:\n'.includes(after) ||
+            (after === '/' && (this.input[k + 1] === '/' || this.input[k + 1] === '*'));
+          if (!looksLikeRealClose) {
+            result += c;
+            this.pos++;
+            continue;
+          }
+        }
+        this.pos++;
+        closed = true;
+        break;
+      }
+      if (c === '\n') {
+        if (this.hasNearbyCloser(closerSet)) {
+          result += '\n';
+          this.pos++;
+          continue;
+        }
+        // A trailing \r right before this newline is a CRLF line-ending
+        // artifact, never meaningful content — drop it before closing.
+        if (result.endsWith('\r')) result = result.slice(0, -1);
+        this.addFix('Closed unterminated string');
+        closed = true;
+        break;
+      }
+      result += c;
+      this.pos++;
+    }
+    if (!closed) this.addFix('Closed unterminated string at end of input');
+    return result;
+  }
+
+  private parseNumberOrOpaque(): unknown {
+    const start = this.pos;
+
+    if (this.input.slice(this.pos, this.pos + 9) === '-Infinity' && this.isCleanValueBoundary(this.pos + 9)) {
+      this.pos += 9;
+      this.addFix('Converted -Infinity to null');
+      return null;
+    }
+
+    if (HEX_RE.test(this.input.slice(this.pos))) {
+      const match = HEX_RE.exec(this.input.slice(this.pos))![0];
+      if (this.isCleanValueBoundary(this.pos + match.length)) {
+        this.pos += match.length;
+        this.addFix('Converted hex number to decimal');
+        return parseInt(match, 16);
+      }
+    } else {
+      const m = NUMBER_RE.exec(this.input.slice(this.pos));
+      if (m && m[0] !== '' && m[0] !== '+' && m[0] !== '-' && this.isCleanValueBoundary(this.pos + m[0].length)) {
+        let text = m[0];
+        this.pos += text.length;
+        if (text.includes('_')) { text = text.replace(/_/g, ''); this.addFix('Removed numeric separators'); }
+        if (text.startsWith('+')) { text = text.slice(1); this.addFix('Removed redundant leading + from number'); }
+        if (text.startsWith('.') || text.startsWith('-.')) { text = text.replace('.', '0.'); this.addFix('Added leading zero to number'); }
+        if (text.endsWith('.')) { text = `${text}0`; this.addFix('Added trailing zero to number'); }
+        return Number(text);
+      }
+    }
+
+    // A numeric prefix immediately followed by more non-delimiter content
+    // (dots, colons, letters, %, ...) isn't a clean JSON number — it's more
+    // likely a version string, IP, date, MAC, or percentage. Capture the
+    // whole token as a string instead of truncating it mid-value.
+    this.pos = start;
+    return this.captureOpaqueValue();
+  }
+
+  private parseIdentifierOrOpaque(): unknown {
+    const start = this.pos;
+    this.pos++;
+    while (!this.atEnd() && VALUE_WORD_CHAR.test(this.peek())) this.pos++;
+    const word = this.input.slice(start, this.pos).replace(/-+$/, '');
+
+    // Recognized keywords are checked before the clean-boundary gate below,
+    // since e.g. "function" is *always* followed by "(" — never a "clean"
+    // delimiter — and would otherwise get treated as an opaque token.
+    if (word === 'true') return true;
+    if (word === 'false') return false;
+    if (word === 'null') return null;
+    if (word in LITERAL_VALUE) {
+      this.addFix(`Converted ${word} to ${JSON.stringify(LITERAL_VALUE[word])}`);
+      return LITERAL_VALUE[word];
+    }
+    if (word === 'function') {
+      this.skipFunctionValue();
+      return null;
+    }
+    if (word === 'new') {
+      const save = this.pos;
+      this.skipWs();
+      if (WORD_START.test(this.peek())) {
+        while (!this.atEnd() && VALUE_WORD_CHAR.test(this.peek())) this.pos++;
+        this.skipWs();
+        if (this.peek() === '(') {
+          this.skipBalanced('(', ')');
+          this.addFix('Removed constructor-call value (not representable in JSON)');
+          return null;
+        }
+      }
+      // Not actually "new X(...)" — treat "new" as a plain bareword instead.
+      this.pos = save;
+    }
+
+    if (!this.isCleanValueBoundary(this.pos)) {
+      // A word immediately followed by more non-delimiter junk (":" in a
+      // MAC address, "." in "v1.2", ...) should be captured whole rather
+      // than split at the first oddity.
+      this.pos = start;
+      return this.captureOpaqueValue();
+    }
+
+    const save = this.pos;
+    this.skipWs();
+    if (this.input.slice(this.pos, this.pos + 2) === '=>') {
+      this.pos += 2;
+      this.skipWs();
+      if (this.peek() === '{') this.skipBalanced('{', '}');
+      else this.skipExpressionUntilDelimiter();
+      this.addFix('Removed function value (not representable in JSON)');
+      return null;
+    }
+    this.pos = save;
+
+    this.addFix('Quoted unquoted string value');
+    return word;
+  }
+
+  /**
+   * True if the content at `pos` looks like a bareword/quoted-string
+   * immediately followed by `:` — i.e. the start of a NEW `key: value`
+   * entry, not a value for whatever key we're currently parsing. Used to
+   * detect a missing comma between two consecutive `key:` lines that each
+   * lack a value (`city:\ncountry:\n`), so the second key doesn't get
+   * swallowed as the first key's value.
+   */
+  private looksLikeNextKey(): boolean {
+    let j = this.pos;
+    const ch = this.input[j];
+    if (ch === '"' || ch === "'" || ch === '`') {
+      const q = ch;
+      j++;
+      while (j < this.input.length && this.input[j] !== q && this.input[j] !== '\n') {
+        if (this.input[j] === '\\') j++;
+        j++;
+      }
+      if (this.input[j] !== q) return false;
+      j++;
+    } else if (WORD_START.test(ch)) {
+      j++;
+      while (j < this.input.length && VALUE_WORD_CHAR.test(this.input[j])) j++;
+    } else {
+      return false;
+    }
+    while (j < this.input.length && (this.input[j] === ' ' || this.input[j] === '\t' || this.input[j] === '\r')) j++;
+    return this.input[j] === ':';
+  }
+
+  /**
+   * Object-context wrapper around parseValue(): only inside an object does
+   * "the next thing looks like a key:" imply a missing value, so this check
+   * doesn't run for array elements (where a bareword-then-colon is just an
+   * ordinary, if unusual, value token).
+   */
+  private parseObjectValue(): unknown {
+    const beforeWs = this.pos;
+    this.skipWs();
+    // Only treat "looks like a key" as a missing-value signal if we actually
+    // crossed a line boundary to get here — "mac:AA:BB:CC:DD:EE:FF" has no
+    // newline between the colon and "AA", so that's one value, not a new key.
+    const crossedNewline = this.input.slice(beforeWs, this.pos).includes('\n');
+    if (crossedNewline && !this.atEnd() && this.looksLikeNextKey()) {
+      this.addFix('Filled missing value with null');
+      return null;
+    }
+    return this.parseValue();
+  }
+
+  parseValue(): unknown {
+    this.skipWs();
+    if (this.atEnd()) throw new RepairError('Unexpected end of input', this.pos);
+    const ch = this.peek();
+
+    // No value at all between the colon and the next delimiter (`key:,` or
+    // `key:\n}`) — the standard, unambiguous interpretation is `null`.
+    if (ch === ',' || ch === '}' || ch === ']') {
+      this.addFix('Filled missing value with null');
+      return null;
+    }
+
+    if (ch === '{') return this.parseObject();
+    if (ch === '[') return this.parseArray();
+    if (ch === '"' || ch === "'" || ch === '`' || CURLY_DOUBLE.has(ch) || CURLY_SINGLE.has(ch)) {
+      return this.parseString();
+    }
+    if (ch === '-' || ch === '+' || ch === '.' || /[0-9]/.test(ch)) return this.parseNumberOrOpaque();
+    if (ch === '(') {
+      try {
+        return this.parseArrowFunctionFromParen();
+      } catch {
+        return this.captureOpaqueValue();
+      }
+    }
+    if (WORD_START.test(ch)) return this.parseIdentifierOrOpaque();
+
+    // Anything else (#hex colors, emoji, unicode text, regex-like /.../,
+    // HTML/JSX fragments, git-conflict-marker soup, ...) — capture it
+    // verbatim as a string rather than aborting the whole repair over one
+    // unrecognized token.
+    return this.captureOpaqueValue();
+  }
+
+  private parseObject(): Record<string, unknown> {
+    this.pos++; // consume '{'
+    const obj: Record<string, unknown> = {};
+    this.skipWs();
+    for (;;) {
+      while (this.peek() === ',') {
+        this.pos++;
+        this.addFix('Removed extra comma');
+        this.skipWs();
+      }
+      if (this.peek() === '}') { this.pos++; break; }
+      if (this.peek() === ']') { this.pos++; this.addFix('Closed object with mismatched bracket'); break; }
+      if (this.atEnd()) { this.addFix('Added missing closing brace'); break; }
+
+      let key: string;
+      try {
+        key = this.parseKey();
+      } catch {
+        const recovered = this.recoverBadEntry();
+        this.skipWs();
+        if (recovered === null) continue;
+        key = recovered;
+      }
+
+      this.skipWs();
+      if (this.peek() === ':') {
+        this.pos++;
+      } else {
+        this.addFix('Inserted missing colon');
+      }
+
+      try {
+        obj[key] = this.parseObjectValue();
+      } catch {
+        obj[key] = null;
+        this.addFix('Filled missing value with null');
+      }
+      this.skipWs();
+
+      if (this.peek() === ',') {
+        this.pos++;
+        this.skipWs();
+        if (this.peek() === '}') { this.pos++; this.addFix('Removed trailing comma'); break; }
+        continue;
+      }
+      if (this.peek() === '}') { this.pos++; break; }
+      if (this.peek() === ']') { this.pos++; this.addFix('Closed object with mismatched bracket'); break; }
+      if (this.atEnd()) { this.addFix('Added missing closing brace'); break; }
+      this.addFix('Inserted missing comma');
+    }
+    return obj;
+  }
+
+  private parseArray(): unknown[] {
+    this.pos++; // consume '['
+    const arr: unknown[] = [];
+    this.skipWs();
+    for (;;) {
+      while (this.peek() === ',') {
+        this.pos++;
+        this.addFix('Removed extra comma');
+        this.skipWs();
+      }
+      if (this.peek() === ']') { this.pos++; break; }
+      if (this.peek() === '}') { this.pos++; this.addFix('Closed array with mismatched bracket'); break; }
+      if (this.atEnd()) { this.addFix('Added missing closing bracket'); break; }
+
+      try {
+        arr.push(this.parseValue());
+      } catch {
+        arr.push(null);
+        this.addFix('Filled missing value with null');
+      }
+      this.skipWs();
+
+      if (this.peek() === ',') {
+        this.pos++;
+        this.skipWs();
+        if (this.peek() === ']') { this.pos++; this.addFix('Removed trailing comma'); break; }
+        continue;
+      }
+      if (this.peek() === ']') { this.pos++; break; }
+      if (this.peek() === '}') { this.pos++; this.addFix('Closed array with mismatched bracket'); break; }
+      if (this.atEnd()) { this.addFix('Added missing closing bracket'); break; }
+      this.addFix('Inserted missing comma');
+    }
+    return arr;
+  }
+}
+
+/** Strips a short console/log-style prefix (e.g. "Object", "LOG:") before the first { or [. */
+function stripLeadingLabel(text: string): { text: string; fix: string | null } {
+  const start = text.search(/\S/);
+  if (start === -1) return { text, fix: null };
+  const firstChar = text[start];
+  if (firstChar === '{' || firstChar === '[' || firstChar === '"' || firstChar === "'") {
+    return { text, fix: null };
+  }
+  const rest = text.slice(start);
+  const braceIdx = rest.search(/[{[]/);
+  if (braceIdx <= 0) return { text, fix: null };
+  const prefix = rest.slice(0, braceIdx);
+  if (!/^[\w\s:>=-]{1,40}$/.test(prefix)) return { text, fix: null };
+  return { text: rest.slice(braceIdx), fix: 'Removed leading label before JSON value' };
+}
+
+/** Wraps bare top-level `key: value, ...` content (no outer braces) into an object. */
+function wrapBareEntries(text: string): { text: string; fix: string | null } {
+  const t = text.trim();
+  if (!t || t[0] === '{' || t[0] === '[') return { text, fix: null };
+  const firstLine = t.split('\n')[0];
+  if (/^["'`\w]/.test(t) && firstLine.includes(':')) {
+    return { text: `{${text}}`, fix: 'Wrapped bare key-value pairs in an object' };
+  }
+  return { text, fix: null };
 }
 
 export interface RepairResult {
   fixed: string;
   changed: boolean;
+  fixCount: number;
+  fixes: string[];
 }
 
 /** Attempts to auto-fix common JSON mistakes. Returns null if the result still doesn't parse. */
 export function tryRepairJson(input: string): RepairResult | null {
-  const cleaned = cleanupTokens(input);
-  const balanced = balanceBrackets(cleaned);
-
   try {
-    JSON.parse(balanced);
-    return { fixed: balanced, changed: true };
+    JSON.parse(input);
+    return { fixed: input, changed: false, fixCount: 0, fixes: [] };
+  } catch {
+    // fall through to lenient repair
+  }
+
+  let text = input;
+  const preFixes: string[] = [];
+
+  const labelStripped = stripLeadingLabel(text);
+  text = labelStripped.text;
+  if (labelStripped.fix) preFixes.push(labelStripped.fix);
+
+  const wrapped = wrapBareEntries(text);
+  text = wrapped.text;
+  if (wrapped.fix) preFixes.push(wrapped.fix);
+
+  const parser = new LenientParser(text);
+  try {
+    const value = parser.parseValue();
+    parser.skipWs();
+
+    // Anything left over means we didn't actually manage to make sense of
+    // the whole input — that's an unrecoverable case, not a partial fix.
+    // (This only bites at the true top level: once parsing has entered a
+    // `{`/`[`, that container's own loop absorbs everything up to its
+    // matching close or EOF, so this is reached only for bare, brace-less
+    // input that was never JSON-shaped to begin with.)
+    if (parser.position < text.length) return null;
+
+    const fixes = [...preFixes, ...parser.fixes];
+    const fixed = JSON.stringify(value, null, 2);
+    return { fixed, changed: true, fixCount: fixes.length, fixes };
   } catch {
     return null;
   }

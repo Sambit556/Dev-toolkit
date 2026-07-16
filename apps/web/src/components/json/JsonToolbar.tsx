@@ -124,10 +124,10 @@ export function JsonToolbar({
   return (
     <TooltipProvider delayDuration={300}>
       <div className="flex flex-wrap items-center gap-1.5 px-3 py-2 border-b bg-muted/20">
-        {/* Format / Minify / Validate */}
+        {/* Format / Validate / Minify */}
         <ToolBtn icon={Code2} label="Format" onClick={onFormat} />
+        <ToolBtn icon={CheckCircle} label="Validate & Fix" onClick={onValidate} />
         <ToolBtn icon={Minimize2} label="Minify" onClick={onMinify} />
-        <ToolBtn icon={CheckCircle} label="Validate" onClick={onValidate} />
 
         <Separator orientation="vertical" className="h-6 mx-0.5" />
 
@@ -154,7 +154,7 @@ export function JsonToolbar({
         <Separator orientation="vertical" className="h-6 mx-0.5" />
 
         {/* Search */}
-        <div className="flex items-center gap-1.5 flex-1 min-w-[160px] max-w-[240px] h-7 px-2 rounded-md border border-input bg-background focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-1">
+        <div className="flex items-center gap-1.5 flex-1 min-w-[160px] max-w-[240px] h-7 px-2 rounded-md border border-input bg-background ring-2 ring-ring ring-offset-1">
           <Search className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
           <Input
             value={searchQuery}

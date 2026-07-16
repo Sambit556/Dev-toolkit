@@ -320,7 +320,7 @@ function HeaderStatus() {
     };
 
     checkApiHealth();
-    const interval = setInterval(checkApiHealth, 30_000);
+    const interval = setInterval(checkApiHealth, 60_000);
 
     window.addEventListener('online', checkApiHealth);
     window.addEventListener('offline', checkApiHealth);

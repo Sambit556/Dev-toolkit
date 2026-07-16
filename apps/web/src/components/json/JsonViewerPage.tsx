@@ -92,7 +92,8 @@ export function JsonViewerPage() {
     if (repaired) {
       setInput(repaired.fixed);
       saveJsonToHistory(repaired.fixed);
-      toast.success('Found issues and fixed them automatically — review the updated JSON');
+      const count = repaired.fixCount;
+      toast.success(`Fixed ${count} issue${count === 1 ? '' : 's'} automatically — review the updated JSON`);
       return;
     }
 

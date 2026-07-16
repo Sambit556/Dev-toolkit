@@ -467,8 +467,11 @@ export function LocalizationProvider({ children }: { children: React.ReactNode }
               }
             }
           }
-        } catch (e) {
-          console.warn('Geolocation mapping error:', e);
+        } catch {
+          // Permission granted but the fix itself failed (no GPS lock, timeout,
+          // OS-level location services off, etc.) — an expected, already-handled
+          // condition, so fall through to the browser-language detection below
+          // instead of logging noise for something that isn't actually a bug.
         }
       }
 
