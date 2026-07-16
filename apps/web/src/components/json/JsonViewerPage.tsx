@@ -55,6 +55,10 @@ export function JsonViewerPage() {
   }, [addHistoryEntry, lastHistoryEntry]);
 
   const handleFormat = useCallback(() => {
+    if (!input.trim()) {
+      toast.info('Please enter some JSON to format');
+      return;
+    }
     try {
       const formatted = formatJson(input);
       setInput(formatted);
@@ -66,6 +70,10 @@ export function JsonViewerPage() {
   }, [input, saveJsonToHistory]);
 
   const handleMinify = useCallback(() => {
+    if (!input.trim()) {
+      toast.info('Please enter some JSON to minify');
+      return;
+    }
     try {
       const minified = minifyJson(input);
       setInput(minified);
