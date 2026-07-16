@@ -11,6 +11,13 @@ import { Separator } from '@/components/ui/separator';
 import {
   Tooltip, TooltipContent, TooltipTrigger, TooltipProvider,
 } from '@/components/ui/tooltip';
+import { cn } from '@/lib/utils';
+
+const TONE_STYLES = {
+  blue: 'border border-blue-600/90 bg-blue-600 text-white shadow-sm hover:bg-blue-700 hover:border-blue-700 dark:bg-blue-600 dark:hover:bg-blue-500 dark:border-blue-500',
+  emerald: 'border border-emerald-600/90 bg-emerald-600 text-white shadow-sm hover:bg-emerald-700 hover:border-emerald-700 dark:bg-emerald-600 dark:hover:bg-emerald-500 dark:border-emerald-500',
+  amber: 'border border-amber-600/90 bg-amber-600 text-white shadow-sm hover:bg-amber-700 hover:border-amber-700 dark:bg-amber-600 dark:hover:bg-amber-500 dark:border-amber-500',
+} as const;
 
 interface JsonToolbarProps {
   onFormat: () => void;
@@ -33,13 +40,15 @@ function ToolBtn({
   icon: Icon,
   label,
   onClick,
-  variant = 'ghost',
+  variant = 'outline',
+  tone,
   disabled,
 }: {
   icon: React.ElementType;
   label: string;
   onClick: () => void;
   variant?: 'ghost' | 'outline' | 'default';
+  tone?: keyof typeof TONE_STYLES;
   disabled?: boolean;
 }) {
   return (
@@ -50,7 +59,7 @@ function ToolBtn({
           size="sm"
           onClick={onClick}
           disabled={disabled}
-          className="h-8 gap-1.5 text-xs"
+          className={cn('h-8 gap-1.5 text-xs font-medium', tone && TONE_STYLES[tone])}
         >
           <Icon className="h-3.5 w-3.5" />
           <span className="hidden sm:inline">{label}</span>
@@ -124,9 +133,9 @@ export function JsonToolbar({
   return (
     <TooltipProvider delayDuration={300}>
       <div className="flex flex-wrap items-center gap-1.5 px-3 py-2 border-b bg-muted/20">
-        {/* Format / Validate / Minify */}
-        <ToolBtn icon={Code2} label="Format" onClick={onFormat} />
-        <ToolBtn icon={CheckCircle} label="Validate & Fix" onClick={onValidate} />
+        {/* Primary actions */}
+        <ToolBtn icon={Code2} label="Format" onClick={onFormat} tone="blue" />
+        <ToolBtn icon={CheckCircle} label="Validate & Fix" onClick={onValidate} tone="emerald" />
         <ToolBtn icon={Minimize2} label="Minify" onClick={onMinify} />
 
         <Separator orientation="vertical" className="h-6 mx-0.5" />
@@ -142,7 +151,7 @@ export function JsonToolbar({
           className="hidden"
           onChange={handleFileChange}
         />
-        <ToolBtn icon={Upload} label="Load File" onClick={() => fileRef.current?.click()} />
+        <ToolBtn icon={Upload} label="Load File" onClick={() => fileRef.current?.click()} tone="amber" />
         <ToolBtn icon={History} label="History" onClick={onOpenHistory} />
 
         <Separator orientation="vertical" className="h-6 mx-0.5" />
@@ -154,7 +163,7 @@ export function JsonToolbar({
         <Separator orientation="vertical" className="h-6 mx-0.5" />
 
         {/* Search */}
-        <div className="flex items-center gap-1.5 flex-1 min-w-[160px] max-w-[240px] h-7 px-2 rounded-md border border-input bg-background ring-2 ring-ring ring-offset-1">
+        <div className="flex items-center gap-1.5 flex-1 min-w-[160px] max-w-[240px] h-7 px-2 rounded-md border border-input bg-background transition-shadow focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-1">
           <Search className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
           <Input
             value={searchQuery}
@@ -176,7 +185,12 @@ export function JsonToolbar({
           )}
           {isValid !== null && (
             <span
-              className={`text-xs font-medium ${isValid ? 'text-green-600 dark:text-green-400' : 'text-destructive'}`}
+              className={cn(
+                'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium',
+                isValid
+                  ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-400'
+                  : 'bg-red-100 text-red-700 dark:bg-red-500/15 dark:text-red-400',
+              )}
             >
               {isValid ? '✓ Valid JSON' : '✗ Invalid JSON'}
             </span>
@@ -184,7 +198,7 @@ export function JsonToolbar({
         </div>
 
         {/* Clear */}
-        <Button variant="ghost" size="sm" onClick={onClear} className="h-8 text-xs text-muted-foreground hover:text-destructive">
+        <Button variant="ghost" size="sm" onClick={onClear} className="h-8 text-xs text-muted-foreground hover:text-destructive hover:bg-destructive/10">
           <Trash2 className="h-3.5 w-3.5" />
           <span className="hidden sm:inline ml-1">Clear</span>
         </Button>
