@@ -1,4 +1,11 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32">
-  <rect width="32" height="32" rx="6" fill="#2563eb"/>
-  <text x="16" y="21" font-family="Arial, sans-serif" font-size="13" font-weight="900" fill="white" text-anchor="middle">DC</text>
+  <defs>
+    <linearGradient id="brand-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#2563eb" />
+      <stop offset="50%" stop-color="#3b82f6" />
+      <stop offset="100%" stop-color="#9333ea" />
+    </linearGradient>
+  </defs>
+  <rect width="32" height="32" rx="7" fill="url(#brand-grad)"/>
+  <text x="16" y="21.5" font-family="system-ui, -apple-system, sans-serif" font-size="13" font-weight="900" fill="white" text-anchor="middle">DK</text>
 </svg>

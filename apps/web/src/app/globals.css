@@ -294,3 +294,147 @@
 .animate-dice-bounce {
   animation: dice-bounce 1.2s cubic-bezier(0.25, 0.46, 0.45, 0.94) both;
 }
+
+/* Premium Splash screen entrance / loading motifs */
+@keyframes premium-splash-logo-in {
+  0% {
+    opacity: 0;
+    transform: scale(0.85) translateY(8px);
+    filter: blur(8px);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+    filter: blur(0);
+  }
+}
+
+.animate-premium-logo-in {
+  animation: premium-splash-logo-in 0.8s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes premium-splash-text-in {
+  0% {
+    opacity: 0;
+    transform: translateY(8px);
+    filter: blur(3px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+    filter: blur(0);
+  }
+}
+
+.animate-premium-text-in {
+  animation: premium-splash-text-in 0.6s cubic-bezier(0.16, 1, 0.3, 1) 0.2s both;
+}
+
+@keyframes premium-splash-shimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+.animate-premium-splash-shimmer {
+  animation: premium-splash-shimmer 1.8s cubic-bezier(0.25, 1, 0.5, 1) infinite;
+}
+
+/* Squeeze anticipation */
+@keyframes premium-logo-squeeze {
+  0% {
+    transform: scale(1);
+    filter: brightness(1);
+  }
+  100% {
+    transform: scale(0.94);
+    filter: brightness(1.2) drop-shadow(0 0 15px rgba(59, 130, 246, 0.5));
+  }
+}
+
+.animate-premium-logo-squeeze {
+  animation: premium-logo-squeeze 0.25s cubic-bezier(0.25, 1, 0.5, 1) forwards;
+}
+
+/* Staggered exit for loader & text */
+@keyframes premium-element-out {
+  0% {
+    opacity: 1;
+    transform: translateY(0);
+    filter: blur(0);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(12px);
+    filter: blur(4px);
+  }
+}
+
+.animate-premium-element-out {
+  animation: premium-element-out 0.25s cubic-bezier(0.25, 1, 0.5, 1) both;
+}
+
+
+
+
+
+/* Page emergence orchestration */
+.splash-phase-intro main {
+  opacity: 0;
+  transform: scale(0.975) translateY(16px);
+  filter: blur(3px);
+}
+
+.splash-phase-intro canvas {
+  opacity: 0 !important;
+}
+
+.splash-phase-intro header > div > *:not(:first-child) {
+  opacity: 0;
+  transform: translateY(-8px);
+}
+
+.splash-phase-intro footer {
+  opacity: 0;
+}
+
+/* During travel: animate to normal state */
+.splash-phase-traveling main {
+  opacity: 1;
+  transform: scale(1) translateY(0);
+  filter: blur(0);
+  transition: transform 0.9s cubic-bezier(0.16, 1, 0.3, 1), 
+              opacity 0.8s cubic-bezier(0.16, 1, 0.3, 1),
+              filter 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.splash-phase-traveling canvas {
+  opacity: 0.95 !important;
+  transition: opacity 1.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.splash-phase-traveling header > div > *:not(:first-child) {
+  opacity: 1;
+  transform: translateY(0);
+  transition: transform 0.75s cubic-bezier(0.16, 1, 0.3, 1) 0.15s, 
+              opacity 0.75s cubic-bezier(0.16, 1, 0.3, 1) 0.15s;
+}
+
+.splash-phase-traveling footer {
+  opacity: 1;
+  transition: opacity 1s cubic-bezier(0.16, 1, 0.3, 1) 0.3s;
+}
+
+/* Reset transition limits once done to avoid page scrolling latency/GPU thrashing */
+.splash-phase-done main,
+.splash-phase-done canvas,
+.splash-phase-done header > div > *,
+.splash-phase-done footer {
+  transform: none !important;
+  filter: none !important;
+  transition: none !important;
+}
+

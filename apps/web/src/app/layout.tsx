@@ -8,6 +8,7 @@ import { FloatingSupport } from '@/components/layout/FloatingSupport';
 import { Toaster } from '@/components/ui/sonner';
 import { LocalizationProvider } from '@/context/LocalizationContext';
 import { HexCanvasBg } from '@/components/layout/HexCanvasBg';
+import { SplashScreen } from '@/components/layout/SplashScreen';
 import { StickyNotes } from '@/components/layout/StickyNotes';
 import { QuickAccess } from '@/components/layout/QuickAccess';
 import { TooltipProvider } from '@/components/ui/tooltip';
@@ -22,7 +23,7 @@ const APP_DESCRIPTION =
 export const metadata: Metadata = {
   metadataBase: new URL(APP_URL),
   title: {
-    default: `${APP_NAME} — Premium Developer Utility Suite`,
+    default: `${APP_NAME} — Developer Utility Suite`,
     template: `%s | ${APP_NAME}`,
   },
   description: APP_DESCRIPTION,
@@ -72,7 +73,7 @@ export const metadata: Metadata = {
     locale: 'en_US',
     url: APP_URL,
     siteName: APP_NAME,
-    title: `${APP_NAME} — Premium Developer Utility Suite`,
+    title: `${APP_NAME} — Developer Utility Suite`,
     description: APP_DESCRIPTION,
     images: [
       {
@@ -180,6 +181,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         >
           <LocalizationProvider>
             <TooltipProvider delayDuration={200}>
+              <SplashScreen />
               <HexCanvasBg />
               <Header />
               <main className="flex-1 relative z-10 w-full overflow-x-hidden">{children}</main>

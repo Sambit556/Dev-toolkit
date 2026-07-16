@@ -53,6 +53,7 @@ const TRANSLATION_BUNDLES: Record<string, Record<string, string>> = {
     formatters: 'Formatters & Viewers',
     generators: 'Generators',
     utilities: 'Calculators & Utilities',
+    systemNetwork: 'System & Network',
     privacyNote: 'All processing is run client-side. Your inputs never leave your device.',
     suiteTitle: 'Developer Utility Suite',
     fastTitle: 'Blazing Fast',
@@ -126,6 +127,7 @@ const TRANSLATION_BUNDLES: Record<string, Record<string, string>> = {
     formatters: 'Formateurs & Visualiseurs',
     generators: 'Générateurs',
     utilities: 'Calculatrices & Utilitaires',
+    systemNetwork: 'Système & Réseau',
     privacyNote: 'Tous les traitements sont effectués côté client. Vos données ne quittent pas votre appareil.',
   },
   de: {
@@ -143,6 +145,7 @@ const TRANSLATION_BUNDLES: Record<string, Record<string, string>> = {
     formatters: 'Formatierer & Betrachter',
     generators: 'Generatoren',
     utilities: 'Rechner & Dienstprogramme',
+    systemNetwork: 'System & Netzwerk',
     privacyNote: 'Alle Berechnungen laufen clientseitig. Ihre Eingaben verlassen Ihr Gerät nicht.',
   },
   es: {
@@ -160,6 +163,7 @@ const TRANSLATION_BUNDLES: Record<string, Record<string, string>> = {
     formatters: 'Formateadores y Visores',
     generators: 'Generadores',
     utilities: 'Calculadoras y Utilidades',
+    systemNetwork: 'Sistema y Red',
     privacyNote: 'Todo el procesamiento se realiza en el cliente. Sus datos no salen del navegador.',
   },
   ja: {
@@ -177,6 +181,7 @@ const TRANSLATION_BUNDLES: Record<string, Record<string, string>> = {
     formatters: 'フォーマッタとビューア',
     generators: 'ジェネレータ',
     utilities: '電卓とユーティリティ',
+    systemNetwork: 'システムとネットワーク',
     privacyNote: 'すべての処理はクライアント側で実行されます。入力データがデバイスから送信されることはありません。',
   },
   pt: {
@@ -194,6 +199,7 @@ const TRANSLATION_BUNDLES: Record<string, Record<string, string>> = {
     formatters: 'Formatadores e Visualizadores',
     generators: 'Geradores',
     utilities: 'Calculadoras e Utilitários',
+    systemNetwork: 'Sistema e Rede',
     privacyNote: 'Todo o processamento é feito localmente no cliente. Seus dados nunca saem do seu navegador.',
   },
   ar: {
@@ -211,6 +217,7 @@ const TRANSLATION_BUNDLES: Record<string, Record<string, string>> = {
     formatters: 'المنسقات والمستعرضات',
     generators: 'المولدات',
     utilities: 'الحاسبات والأدوات المساعدة',
+    systemNetwork: 'النظام والشبكة',
     privacyNote: 'تتم جميع العمليات محلياً على جهازك. لا يتم إرسال بياناتك نهائياً إلى أي خادم خارجي.',
   },
   he: {
@@ -228,6 +235,7 @@ const TRANSLATION_BUNDLES: Record<string, Record<string, string>> = {
     formatters: 'מעצבים וצופים',
     generators: 'מחוללים',
     utilities: 'מחשבונים ועזרים',
+    systemNetwork: 'מערכת ורשת',
     privacyNote: 'כל העיבודים מתבצעים בדפדפן הלקוח. הנתונים שלך לעולם אינם עוזבים את המכשיר שלך.',
   },
   hi: {
@@ -245,6 +253,7 @@ const TRANSLATION_BUNDLES: Record<string, Record<string, string>> = {
     formatters: 'फ़ॉर्मेटर और व्यूअर',
     generators: 'जेनरेटर',
     utilities: 'कैलकुलेटर और उपयोगिताएँ',
+    systemNetwork: 'सिस्टम और नेटवर्क',
     privacyNote: 'सभी प्रोसेसिंग क्लाइंट-साइड चलती है। आपके इनपुट कभी भी आपके डिवाइस से बाहर नहीं जाते हैं।',
     suiteTitle: 'डेवलपर उपयोगिता सूट',
     fastTitle: 'बेहद तेज़',
@@ -316,6 +325,7 @@ const TRANSLATION_BUNDLES: Record<string, Record<string, string>> = {
     formatters: 'ଫର୍ମାଟର ଏବଂ ଭ୍ୟୁଅର୍',
     generators: 'ଜେନେରେଟର',
     utilities: 'କାଲକୁଲେଟର ଏବଂ ଉପଯୋଗିତା',
+    systemNetwork: 'ସିଷ୍ଟମ୍ ଏବଂ ନେଟୱାର୍କ',
     privacyNote: 'ସମସ୍ତ ପ୍ରକ୍ରିୟାକରଣ କ୍ଲାଏଣ୍ଟ-ସାଇଡ୍ ରେ ଚାଲେ। ଆପଣଙ୍କର ଇନପୁଟ୍ କଦାପି ଆପଣଙ୍କର ଡିଭାଇସ୍ ବାହାରକୁ ଯାଏ ନାହିଁ।',
     suiteTitle: 'ଡେଭଲପର୍ ଉପଯୋଗିତା ସୁଇଟ୍',
     fastTitle: 'ଅତି ଶୀଘ୍ର',

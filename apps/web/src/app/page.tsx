@@ -91,6 +91,18 @@ const TOOLS = [
     keywords: ['cron generator', 'cron expression builder', 'crontab generator', 'cron job creator', 'cron syntax helper', 'visual cron builder', 'schedule generator', 'cron parser', 'cron humanizer', 'crontab syntax'],
   },
   {
+    href: '/calendar',
+    icon: CalendarRange,
+    title: 'Calendar Planner',
+    description:
+      'Plan tasks and events on an interactive monthly calendar, then export them to Google Calendar, Outlook, or a downloadable .ics file.',
+    features: ['Interactive monthly view', 'Task & event scheduler', 'Google/Outlook/.ics export', 'JSON backup & restore'],
+    category: 'generators',
+    badge: 'Planner',
+    color: 'violet',
+    keywords: ['calendar planner', 'task scheduler', 'calendar app', 'event planner', 'monthly calendar', 'interactive calendar', 'plan tasks', 'agenda planner', 'export to google calendar', 'export to outlook', 'ics file export', 'icalendar generator'],
+  },
+  {
     href: '/unit-converter',
     icon: Ruler,
     title: 'All Unit Converter',
@@ -182,7 +194,7 @@ const TOOLS = [
     description:
       'Check current client/remote IP information, lookup ISP network details, and validate email or phone structures.',
     features: ['Auto client IP fetch', 'Detailed geolocation & ISP', 'Disposable email flags', 'E.164 phone check'],
-    category: 'utilities',
+    category: 'system',
     badge: 'Network',
     color: 'blue',
     keywords: ['ip lookup', 'my ip address', 'geo ip lookup', 'ip address finder', 'what is my ip', 'ip validator', 'http ping', 'ping tool'],
@@ -194,7 +206,7 @@ const TOOLS = [
     description:
       'Evaluate your internet connection latency, jitter, download speed, and upload speed with an animated speedometer.',
     features: ['Animated gauge needle', 'Ping & Jitter latency check', 'Download stream reader telemetry', 'Session logs history'],
-    category: 'utilities',
+    category: 'system',
     badge: 'Telemetry',
     color: 'pink',
     keywords: ['internet speed test', 'download speed test', 'upload speed test', 'ping test', 'jitter test', 'bandwidth test', 'network speed checker'],
@@ -290,7 +302,7 @@ const TOOLS = [
     description:
       'Merge multiple PDF documents client-side, extract specific pages, or password-protect files with User & Owner encryption.',
     features: ['Drag-and-drop file reordering', 'Client-side pdf-lib processor', 'Password locking', 'Page range selectors'],
-    category: 'utilities',
+    category: 'system',
     badge: 'PDF',
     color: 'purple',
     keywords: ['merge pdf', 'split pdf', 'password protect pdf', 'pdf tools', 'combine pdf', 'pdf merger', 'pdf splitter', 'encrypt pdf', 'compress pdf'],
@@ -326,7 +338,7 @@ const TOOLS = [
     description:
       'Simulate 3D coin flips, 3D dice rollers, split participants into random teams, or spin interactive name fortune wheels.',
     features: ['3D CSS flip animations', '3D CSS dice cubes', 'HTML5 canvas name wheel', 'Random team builders'],
-    category: 'utilities',
+    category: 'system',
     badge: 'Play',
     color: 'red',
     keywords: ['coin flip', 'dice roller', 'random name picker', 'decision maker', 'random wheel', 'spin wheel'],
@@ -374,7 +386,7 @@ const TOOLS = [
     description:
       "Look up HTTP status codes, inspect a URL's response headers server-side, or generate a live webhook capture URL to test incoming requests.",
     features: ['Searchable status code reference', 'Server-side header inspector', 'Live webhook capture URL', 'SSRF-guarded requests'],
-    category: 'utilities',
+    category: 'system',
     badge: 'HTTP',
     color: 'emerald',
     keywords: ['http status codes', 'status code reference', 'http header inspector', 'webhook tester', 'webhook.site alternative', 'http response viewer', 'header checker', 'webhook testing tool', 'http status lookup', 'api status codes', 'rest api status codes', 'check response headers'],
@@ -387,6 +399,7 @@ const CATEGORIES = [
   { value: 'formatters', label: 'Formatters & Viewers' },
   { value: 'generators', label: 'Generators' },
   { value: 'utilities', label: 'Calculators & Utilities' },
+  { value: 'system', label: 'System & Network' },
 ];
 
 const FEATURES = [
@@ -489,6 +502,7 @@ export default function HomePage() {
                     case 'formatters': return t('formatters');
                     case 'generators': return t('generators');
                     case 'utilities': return t('utilities');
+                    case 'system': return t('systemNetwork');
                     default: return val;
                   }
                 };

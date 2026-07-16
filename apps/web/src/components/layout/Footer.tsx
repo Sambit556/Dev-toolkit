@@ -39,7 +39,7 @@ export function Footer() {
   return (
     <footer className="border-t mt-auto bg-background">
       <div className="container py-12">
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-8">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 gap-8">
           {/* Brand */}
           <div className="space-y-3">
             <div className="flex items-center gap-2 font-bold">
@@ -104,10 +104,10 @@ export function Footer() {
             </ul>
           </div>
 
-          {/* Converters & Generators */}
+          {/* Converters & Parsers */}
           <div>
             <h4 className="text-xs font-bold uppercase tracking-wider text-foreground mb-4">
-              Converters & Generators
+              Converters & Parsers
             </h4>
             <ul className="space-y-2.5">
               <li>
@@ -117,15 +117,15 @@ export function Footer() {
                 </Link>
               </li>
               <li>
-                <Link href="/converters" className="flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground transition-colors">
-                  <RefreshCw className="h-3.5 w-3.5 text-primary/70" />
-                  Structured Data Converter
-                </Link>
-              </li>
-              <li>
                 <Link href="/encoder-decoder" className="flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground transition-colors">
                   <ShieldCheck className="h-3.5 w-3.5 text-primary/70" />
                   Text Encoder / Decoder
+                </Link>
+              </li>
+              <li>
+                <Link href="/converters" className="flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground transition-colors">
+                  <RefreshCw className="h-3.5 w-3.5 text-primary/70" />
+                  Structured Data Converter
                 </Link>
               </li>
               <li>
@@ -140,16 +140,25 @@ export function Footer() {
                   Universal File Converter
                 </Link>
               </li>
-              <li>
-                <Link href="/cron" className="flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground transition-colors">
-                  <CalendarRange className="h-3.5 w-3.5 text-primary/70" />
-                  Cron Generator
-                </Link>
-              </li>
+            </ul>
+          </div>
+
+          {/* Generators */}
+          <div>
+            <h4 className="text-xs font-bold uppercase tracking-wider text-foreground mb-4">
+              Generators
+            </h4>
+            <ul className="space-y-2.5">
               <li>
                 <Link href="/calendar" className="flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground transition-colors">
                   <Calendar className="h-3.5 w-3.5 text-primary/70" />
                   Calendar Planner
+                </Link>
+              </li>
+              <li>
+                <Link href="/cron" className="flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground transition-colors">
+                  <CalendarRange className="h-3.5 w-3.5 text-primary/70" />
+                  Cron Generator
                 </Link>
               </li>
               <li>
@@ -179,10 +188,10 @@ export function Footer() {
             </ul>
           </div>
 
-          {/* Calculators & Utilities */}
+          {/* Calculators & Design */}
           <div>
             <h4 className="text-xs font-bold uppercase tracking-wider text-foreground mb-4">
-              Calculators & Utilities
+              Calculators & Design
             </h4>
             <ul className="space-y-2.5">
               <li>
@@ -216,6 +225,21 @@ export function Footer() {
                 </Link>
               </li>
               <li>
+                <Link href="/countdown" className="flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground transition-colors">
+                  <Timer className="h-3.5 w-3.5 text-primary/70" />
+                  Countdown & Stopwatch
+                </Link>
+              </li>
+            </ul>
+          </div>
+
+          {/* System & Network */}
+          <div>
+            <h4 className="text-xs font-bold uppercase tracking-wider text-foreground mb-4">
+              System & Network
+            </h4>
+            <ul className="space-y-2.5">
+              <li>
                 <Link href="/ip-intel" className="flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground transition-colors">
                   <Globe className="h-3.5 w-3.5 text-primary/70" />
                   IP & Identity
@@ -237,12 +261,6 @@ export function Footer() {
                 <Link href="/http-toolkit" className="flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground transition-colors">
                   <Webhook className="h-3.5 w-3.5 text-primary/70" />
                   HTTP Toolkit
-                </Link>
-              </li>
-              <li>
-                <Link href="/countdown" className="flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground transition-colors">
-                  <Timer className="h-3.5 w-3.5 text-primary/70" />
-                  Countdown & Stopwatch
                 </Link>
               </li>
               <li>

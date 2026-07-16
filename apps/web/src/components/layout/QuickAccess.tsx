@@ -163,25 +163,26 @@ export function QuickAccess() {
     });
   };
 
-  // Measures how big a panel's content actually needs to be (scrollWidth/
-  // scrollHeight, which reflect full content size even while currently
-  // clipped/scrolled) plus whatever chrome sits around it (header, resize-
-  // handle strip, padding), so resizing can be capped there instead of
-  // growing into empty dead space. Doesn't apply to 'json': its textarea
-  // flexes to fill whatever size the panel is given, so it has no fixed
-  // "natural" size to cap against in either dimension — it's the one panel
-  // that should be free to grow all the way to the absolute ceiling, in
-  // both directions, instead of just being capped to its current content.
-  const measureMaxSize = (tool: ActiveTool, rect: DOMRect): { maxWidth: number; maxHeight: number } => {
-    if (tool === 'json') return { maxWidth: MAX_PANEL_WIDTH, maxHeight: MAX_PANEL_HEIGHT };
+  // Measures how tall a panel's content actually needs to be (scrollHeight,
+  // which reflects full content height even while currently clipped/scrolled)
+  // plus whatever chrome sits around it (header, resize-handle strip), so
+  // resizing can be capped there instead of growing into empty dead space
+  // below a fixed-height content block (e.g. the calculator's button grid).
+  //
+  // Width is never capped this way and always uses the flat MAX_PANEL_WIDTH
+  // ceiling for every tool — Calculator/Epoch's rows are built from flexible
+  // (`flex-1`/grid-fr) elements that stretch to fill whatever width they're
+  // given with no dead space, so there's no "natural" width to measure
+  // against; capping it to scrollWidth (which, for already-fluid content,
+  // just equals the current width) doesn't bound growth to something
+  // reasonable, it freezes width resizing entirely — every tool must stay
+  // freely resizable in both directions, min and max, the same as JSON.
+  const measureMaxHeight = (tool: ActiveTool, rect: DOMRect): number => {
+    if (tool === 'json') return MAX_PANEL_HEIGHT;
     const contentEl = tool ? contentRefs[tool].current : null;
-    if (!contentEl) return { maxWidth: MAX_PANEL_WIDTH, maxHeight: MAX_PANEL_HEIGHT };
-    const chromeW = rect.width - contentEl.clientWidth;
-    const chromeH = rect.height - contentEl.clientHeight;
-    return {
-      maxWidth: clampPanelDim(contentEl.scrollWidth + chromeW, MIN_PANEL_WIDTH, MAX_PANEL_WIDTH),
-      maxHeight: clampPanelDim(contentEl.scrollHeight + chromeH, MIN_PANEL_HEIGHT, MAX_PANEL_HEIGHT),
-    };
+    if (!contentEl) return MAX_PANEL_HEIGHT;
+    const chrome = rect.height - contentEl.clientHeight;
+    return clampPanelDim(contentEl.scrollHeight + chrome, MIN_PANEL_HEIGHT, MAX_PANEL_HEIGHT);
   };
 
   // Resizing logic — grabs the panel's current rendered size as the baseline
@@ -192,7 +193,7 @@ export function QuickAccess() {
     const rect = panelEl.getBoundingClientRect();
     resizeStartRef.current = {
       x: e.clientX, y: e.clientY, width: rect.width, height: rect.height,
-      ...measureMaxSize(tool, rect),
+      maxWidth: MAX_PANEL_WIDTH, maxHeight: measureMaxHeight(tool, rect),
     };
     setResizingTool(tool);
   };
@@ -204,7 +205,7 @@ export function QuickAccess() {
     const rect = panelEl.getBoundingClientRect();
     resizeStartRef.current = {
       x: touch.clientX, y: touch.clientY, width: rect.width, height: rect.height,
-      ...measureMaxSize(tool, rect),
+      maxWidth: MAX_PANEL_WIDTH, maxHeight: measureMaxHeight(tool, rect),
     };
     setResizingTool(tool);
   };
