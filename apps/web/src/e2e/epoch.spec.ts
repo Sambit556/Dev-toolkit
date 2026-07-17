@@ -15,12 +15,12 @@ test.describe('Epoch Converter', () => {
     await page.getByRole('tab', { name: /timestamp.*date/i }).click();
     await page.getByLabel('Unix Timestamp').fill('1700000000');
     await page.getByRole('button', { name: /convert to date/i }).click();
-    await expect(page.getByText('14 Nov 2023')).toBeVisible();
+    await expect(page.getByText('14 Nov 2026')).toBeVisible();
   });
 
   test('converts date to timestamp', async ({ page }) => {
     await page.getByRole('tab', { name: /date.*timestamp/i }).click();
-    await page.getByLabel(/date/i).fill('2023-11-14T22:13:20Z');
+    await page.getByLabel(/date/i).fill('2026-11-14T22:13:20Z');
     await page.getByRole('button', { name: /convert to timestamp/i }).click();
     await expect(page.getByText('1700000000')).toBeVisible();
   });

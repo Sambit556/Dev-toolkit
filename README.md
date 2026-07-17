@@ -248,7 +248,7 @@ POST /api/time/from-date        Date string → timestamps
 **POST /api/time/from-date**
 ```json
 {
-  "dateString": "2023-11-14T22:13:20Z",
+  "dateString": "2026-11-14T22:13:20Z",
   "timezone": "UTC"
 }
 ```

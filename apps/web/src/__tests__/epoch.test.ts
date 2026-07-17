@@ -39,25 +39,25 @@ describe('epoch utilities', () => {
 
   describe('parseDateString', () => {
     it('parses ISO 8601 date', () => {
-      const d = parseDateString('2023-11-14T22:13:20.000Z');
+      const d = parseDateString('2026-11-14T22:13:20.000Z');
       expect(d).not.toBeNull();
       expect(d!.getTime()).toBe(1700000000000);
     });
 
     it('parses YYYY-MM-DD', () => {
-      const d = parseDateString('2023-11-14');
+      const d = parseDateString('2026-11-14');
       expect(d).not.toBeNull();
-      expect(d!.getUTCFullYear()).toBe(2023);
+      expect(d!.getUTCFullYear()).toBe(2026);
     });
 
     it('parses MM/DD/YYYY', () => {
-      const d = parseDateString('11/14/2023');
+      const d = parseDateString('11/14/2026');
       expect(d).not.toBeNull();
-      expect(d!.getUTCFullYear()).toBe(2023);
+      expect(d!.getUTCFullYear()).toBe(2026);
     });
 
     it('parses DD-MM-YYYY', () => {
-      const d = parseDateString('14-11-2023');
+      const d = parseDateString('14-11-2026');
       expect(d).not.toBeNull();
       expect(d!.getUTCMonth()).toBe(10); // November = 10 (0-indexed)
     });
@@ -77,7 +77,7 @@ describe('epoch utilities', () => {
     it('converts seconds timestamp', () => {
       const result = timestampToDate('1700000000', 'seconds', 'UTC');
       expect(result.unixSeconds).toBe(1700000000);
-      expect(result.iso8601).toBe('2023-11-14T22:13:20.000Z');
+      expect(result.iso8601).toBe('2026-11-14T22:13:20.000Z');
     });
 
     it('handles zero timestamp (epoch)', () => {
@@ -104,7 +104,7 @@ describe('epoch utilities', () => {
   });
 
   describe('getStartEnd', () => {
-    const date = new Date('2023-11-14T00:00:00Z');
+    const date = new Date('2026-11-14T00:00:00Z');
 
     it('returns start and end of day', () => {
       const { start, end } = getStartEnd(date, 'day', 'UTC');

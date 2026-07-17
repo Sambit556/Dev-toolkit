@@ -61,7 +61,7 @@ export function DateToTimestamp() {
 
     const date = parseDateString(trimmed, timezone);
     if (!date || isNaN(date.getTime())) {
-      setError(`Cannot parse "${trimmed}" as a date. Try formats like: 2023-11-14, 2023-11-14T22:13:20Z`);
+      setError(`Cannot parse "${trimmed}" as a date. Try formats like: 2026-11-14, 2026-11-14T22:13:20Z`);
       setResult(null);
       return;
     }
@@ -94,7 +94,7 @@ export function DateToTimestamp() {
           <div className="flex gap-2">
             <Input
               id="date-input"
-              placeholder="e.g. 2023-11-14T22:13:20Z"
+              placeholder="e.g. 2026-11-14T22:13:20Z"
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && convert()}
