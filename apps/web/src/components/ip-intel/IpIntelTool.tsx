@@ -7,12 +7,10 @@ import {
   Mail, 
   Phone, 
   MapPin, 
-  ShieldAlert, 
-  CheckCircle, 
-  AlertTriangle, 
-  Copy, 
-  Check, 
-  Clock, 
+  ShieldAlert,
+  CheckCircle,
+  AlertTriangle,
+  Clock,
   Navigation,
   Compass,
   Cpu,
@@ -32,6 +30,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
+import { CopyButton } from '@/components/ui/copy-button';
 import { useLocale } from '@/context/LocalizationContext';
 import { toast } from 'sonner';
 
@@ -172,11 +171,8 @@ export function IpIntelTool() {
   const [searchResult, setSearchResult] = useState<IpInfo | null>(null);
   const [ipLoading, setIpLoading] = useState(false);
   const [ipError, setIpError] = useState<string | null>(null);
-  const [copiedKey, setCopiedKey] = useState<string | null>(null);
   const [userIpv4, setUserIpv4] = useState<string | null>(null);
   const [userIpv6, setUserIpv6] = useState<string | null>(null);
-  const [copiedIpv4, setCopiedIpv4] = useState(false);
-  const [copiedIpv6, setCopiedIpv6] = useState(false);
 
   // Identity states
   const [inputVal, setInputVal] = useState('');
@@ -399,11 +395,6 @@ export function IpIntelTool() {
     rebuildUrl(updated);
   };
 
-  const copyUrlToClipboard = (text: string, label: string) => {
-    navigator.clipboard.writeText(text);
-    toast.success(`${label} copied!`);
-  };
-
   useEffect(() => {
     // Fetch current user IP and both protocols on mount
     fetchUserIp();
@@ -600,12 +591,6 @@ export function IpIntelTool() {
     } finally {
       setIpLoading(false);
     }
-  };
-
-  const copyToClipboard = (text: string, key: string) => {
-    navigator.clipboard.writeText(text);
-    setCopiedKey(key);
-    setTimeout(() => setCopiedKey(null), 1500);
   };
 
   // Helper to determine flag emoji
@@ -853,18 +838,12 @@ export function IpIntelTool() {
                   </div>
                 </div>
                 {userIpv4 && (
-                  <Button
-                    variant="ghost"
-                    size="icon"
+                  <CopyButton
+                    value={userIpv4}
+                    toastMessage="Client IPv4 copied!"
                     className="h-8 w-8 hover:bg-muted/80 shrink-0"
-                    onClick={() => {
-                      navigator.clipboard.writeText(userIpv4);
-                      setCopiedIpv4(true);
-                      setTimeout(() => setCopiedIpv4(false), 1500);
-                    }}
-                  >
-                    {copiedIpv4 ? <Check className="h-3.5 w-3.5 text-green-500" /> : <Copy className="h-3.5 w-3.5 text-muted-foreground/80" />}
-                  </Button>
+                    iconClassName="h-3.5 w-3.5"
+                  />
                 )}
               </CardContent>
             </Card>
@@ -888,18 +867,12 @@ export function IpIntelTool() {
                   </div>
                 </div>
                 {userIpv6 && (
-                  <Button
-                    variant="ghost"
-                    size="icon"
+                  <CopyButton
+                    value={userIpv6}
+                    toastMessage="Client IPv6 copied!"
                     className="h-8 w-8 hover:bg-muted/80 shrink-0"
-                    onClick={() => {
-                      navigator.clipboard.writeText(userIpv6);
-                      setCopiedIpv6(true);
-                      setTimeout(() => setCopiedIpv6(false), 1500);
-                    }}
-                  >
-                    {copiedIpv6 ? <Check className="h-3.5 w-3.5 text-green-500" /> : <Copy className="h-3.5 w-3.5 text-muted-foreground/80" />}
-                  </Button>
+                    iconClassName="h-3.5 w-3.5"
+                  />
                 )}
               </CardContent>
             </Card>
@@ -1050,13 +1023,11 @@ export function IpIntelTool() {
                 <div className="flex justify-between items-center">
                   <CardTitle className="text-sm font-bold uppercase tracking-wider text-muted-foreground">Raw Response</CardTitle>
                   {searchResult && (
-                    <Button 
-                      variant="ghost" 
-                      size="icon-sm" 
-                      onClick={() => copyToClipboard(JSON.stringify(searchResult, null, 2), 'json')}
-                    >
-                      {copiedKey === 'json' ? <Check className="h-3.5 w-3.5 text-green-500" /> : <Copy className="h-3.5 w-3.5" />}
-                    </Button>
+                    <CopyButton
+                      value={JSON.stringify(searchResult, null, 2)}
+                      toastMessage="Raw response copied!"
+                      iconClassName="h-3.5 w-3.5"
+                    />
                   )}
                 </div>
               </CardHeader>
@@ -1354,9 +1325,7 @@ export function IpIntelTool() {
                     onChange={(e) => { setUrlInput(e.target.value); parseUrlString(e.target.value); }}
                     className="h-10 text-xs bg-background/50 font-mono"
                   />
-                  <Button onClick={() => copyUrlToClipboard(urlInput, 'URL')} size="sm" className="h-10 font-bold shrink-0">
-                    Copy URL
-                  </Button>
+                  <CopyButton value={urlInput} label="Copy URL" toastMessage="URL copied!" size="sm" className="h-10 font-bold shrink-0" />
                 </div>
 
                 <div className="grid grid-cols-2 md:grid-cols-5 gap-3 pt-2 text-xs">

@@ -1,3 +1,4 @@
+import { BackToHomeLink } from '@/components/layout/BackToHomeLink';
 import type { Metadata } from 'next';
 import { Clock, Timer, Calendar, Code2, Settings, Calculator } from 'lucide-react';
 import { LiveClock } from '@/components/epoch/LiveClock';
@@ -23,6 +24,7 @@ export default function EpochPage() {
       {/* Page header */}
       <div className="mb-6">
         <div className="flex items-center gap-2 mb-1">
+          <BackToHomeLink />
           <Clock className="h-5 w-5 text-primary" />
           <h1 className="text-2xl font-bold">Epoch Converter</h1>
         </div>

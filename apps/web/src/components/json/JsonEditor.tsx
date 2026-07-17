@@ -154,6 +154,14 @@ export function JsonEditor({ value, onChange, onError, errorLine, readOnly = fal
           showFoldingControls: 'always',
           foldingHighlight: true,
           glyphMargin: true,
+          // Monaco's defaults (lineNumbersMinChars: 5, lineDecorationsWidth: 10)
+          // reserve room for 5-digit line numbers plus a wide decorations
+          // strip, which leaves a big dead gap between the line number and
+          // the actual text on a narrow panel like this one. Tightening both
+          // keeps folding chevrons and the glyph margin working while
+          // pulling the text closer to the gutter.
+          lineNumbersMinChars: 3,
+          lineDecorationsWidth: 4,
           renderWhitespace: 'selection',
           tabSize: 2,
           formatOnPaste: false,

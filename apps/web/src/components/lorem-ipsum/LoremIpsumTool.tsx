@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useCallback, useEffect } from 'react';
-import { Type, Copy, Download, RefreshCw, FileText } from 'lucide-react';
+import { Type, Download, RefreshCw, FileText } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
+import { CopyButton } from '@/components/ui/copy-button';
 import { toast } from 'sonner';
 
 // Standard Lorem dictionary
@@ -128,12 +129,6 @@ export function LoremIpsumTool() {
     generateOutput();
   }, [generateOutput]);
 
-  const handleCopy = () => {
-    if (!output) return;
-    navigator.clipboard.writeText(output);
-    toast.success('Generated text copied to clipboard!');
-  };
-
   const handleDownload = () => {
     if (!output) return;
     const blob = new Blob([output], { type: 'text/plain;charset=utf-8' });
@@ -217,10 +212,7 @@ export function LoremIpsumTool() {
               Generated Placeholder Text
             </Label>
             <div className="flex gap-2">
-              <Button variant="outline" size="sm" onClick={handleCopy} className="h-8 gap-1 text-xs">
-                <Copy className="h-3.5 w-3.5" />
-                Copy
-              </Button>
+              <CopyButton value={output} label="Copy" disabled={!output} toastMessage="Generated text copied to clipboard!" variant="outline" className="h-8" />
               <Button variant="outline" size="sm" onClick={handleDownload} className="h-8 gap-1 text-xs text-primary">
                 <Download className="h-3.5 w-3.5" />
                 Download

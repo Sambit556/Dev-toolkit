@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useMemo, useRef, useEffect } from 'react';
-import { ArrowLeftRight, Copy, Download, HelpCircle, FileSpreadsheet, Code2, Eye, FileText, Bold, Italic, Link2, List, Heading2, Code, Quote } from 'lucide-react';
+import { ArrowLeftRight, Download, HelpCircle, FileSpreadsheet, Code2, Eye, FileText, Bold, Italic, Link2, List, Heading2, Code, Quote } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -12,6 +12,7 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
+import { CopyButton } from '@/components/ui/copy-button';
 import jsyaml from 'js-yaml';
 import { marked } from 'marked';
 import DOMPurify from 'dompurify';
@@ -344,11 +345,6 @@ export function ConvertersTool() {
     });
   };
 
-  const handleCopyText = (text: string, label: string) => {
-    navigator.clipboard.writeText(text);
-    toast.success(`${label} copied!`);
-  };
-
   const handleDownloadFile = (content: string, filename: string, mime: string) => {
     const blob = new Blob([content], { type: mime });
     const url = URL.createObjectURL(blob);
@@ -420,10 +416,7 @@ export function ConvertersTool() {
                   <span className="text-sm font-bold">Converted Output</span>
                   {csvOutput && (
                     <div className="flex gap-1.5">
-                      <Button variant="outline" size="sm" onClick={() => handleCopyText(csvOutput, 'Output')} className="h-7 text-xs">
-                        <Copy className="h-3 w-3 mr-1" />
-                        Copy
-                      </Button>
+                      <CopyButton value={csvOutput} label="Copy" toastMessage="Output copied!" variant="outline" className="h-7" />
                       <Button
                         variant="outline"
                         size="sm"
@@ -523,10 +516,7 @@ export function ConvertersTool() {
                   <span className="text-sm font-bold">Converted Output</span>
                   {xmlOutput && (
                     <div className="flex gap-1.5">
-                      <Button variant="outline" size="sm" onClick={() => handleCopyText(xmlOutput, 'Output')} className="h-7 text-xs">
-                        <Copy className="h-3 w-3 mr-1" />
-                        Copy
-                      </Button>
+                      <CopyButton value={xmlOutput} label="Copy" toastMessage="Output copied!" variant="outline" className="h-7" />
                       <Button
                         variant="outline"
                         size="sm"
@@ -658,10 +648,7 @@ export function ConvertersTool() {
               <div className="space-y-2 flex-1 flex flex-col">
                 <div className="flex items-center justify-between pb-2 border-b">
                   <span className="text-sm font-bold">Converted Code Output</span>
-                  <Button variant="outline" size="sm" onClick={() => handleCopyText(mdOutput, 'Output')} className="h-7 text-xs">
-                    <Copy className="h-3 w-3 mr-1" />
-                    Copy Code
-                  </Button>
+                  <CopyButton value={mdOutput} label="Copy Code" toastMessage="Output copied!" variant="outline" className="h-7" />
                 </div>
 
                 <div className="flex-1">
@@ -756,10 +743,7 @@ export function ConvertersTool() {
                 <div className="flex items-center justify-between pb-2 border-b">
                   <span className="text-sm font-bold">Converted Code Output</span>
                   <div className="flex items-center gap-1.5">
-                    <Button variant="outline" size="sm" onClick={() => handleCopyText(yamlOutput, 'Output')} className="h-7 text-xs">
-                      <Copy className="h-3 w-3 mr-1" />
-                      Copy
-                    </Button>
+                    <CopyButton value={yamlOutput} label="Copy" toastMessage="Output copied!" variant="outline" className="h-7" />
                     <Button
                       variant="outline"
                       size="sm"

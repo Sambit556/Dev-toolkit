@@ -2,7 +2,7 @@
 
 import React, { useRef } from 'react';
 import {
-  Code2, Minimize2, CheckCircle, Trash2, Copy, Download,
+  Code2, Minimize2, CheckCircle, Trash2, Download,
   Upload, ChevronDown, ChevronUp, Search, X, History,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -11,6 +11,7 @@ import { Separator } from '@/components/ui/separator';
 import {
   Tooltip, TooltipContent, TooltipTrigger, TooltipProvider,
 } from '@/components/ui/tooltip';
+import { CopyButton } from '@/components/ui/copy-button';
 import { cn } from '@/lib/utils';
 
 const TONE_STYLES = {
@@ -141,7 +142,14 @@ export function JsonToolbar({
         <Separator orientation="vertical" className="h-6 mx-0.5" />
 
         {/* Copy / Download / Upload */}
-        <ToolBtn icon={Copy} label="Copy" onClick={onCopy} />
+        <CopyButton
+          action={onCopy}
+          label="Copy"
+          toastMessage={false}
+          tooltip="Copy"
+          variant="outline"
+          className="h-8 gap-1.5 text-xs font-medium"
+        />
         <ToolBtn icon={Download} label="Download" onClick={onDownload} />
 
         <input

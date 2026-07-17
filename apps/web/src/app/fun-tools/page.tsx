@@ -1,3 +1,4 @@
+import { BackToHomeLink } from '@/components/layout/BackToHomeLink';
 import type { Metadata } from 'next';
 import { Gamepad2 } from 'lucide-react';
 import { FunTools } from '@/components/fun-tools/FunTools';
@@ -15,6 +16,7 @@ export default function FunToolsPage() {
     <div className="container py-6 md:py-8 max-w-5xl">
       <div className="mb-6">
         <div className="flex items-center gap-2 mb-1">
+          <BackToHomeLink />
           <Gamepad2 className="h-5 w-5 text-primary" />
           <h1 className="text-2xl font-bold">Fun & Random Utilities</h1>
         </div>

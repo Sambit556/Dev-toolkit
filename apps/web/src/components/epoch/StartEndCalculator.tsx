@@ -1,14 +1,12 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Copy, Check } from 'lucide-react';
-import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { CopyButton } from '@/components/ui/copy-button';
 import { TimezoneSelector } from './TimezoneSelector';
 import { getStartEnd } from '@/lib/epoch';
-import { copyToClipboard } from '@/lib/utils';
 import { usePreferencesStore } from '@/store/preferences';
 
 type Period = 'day' | 'month' | 'year';
@@ -20,25 +18,6 @@ interface PeriodResult {
   end: number;
   startISO: string;
   endISO: string;
-}
-
-function CopyBtn({ value }: { value: string }) {
-  const [copied, setCopied] = useState(false);
-  return (
-    <Button
-      variant="ghost"
-      size="icon-sm"
-      className="h-6 w-6"
-      onClick={async () => {
-        await copyToClipboard(value);
-        toast.success('Copied!');
-        setCopied(true);
-        setTimeout(() => setCopied(false), 2000);
-      }}
-    >
-      {copied ? <Check className="h-3 w-3 text-green-500" /> : <Copy className="h-3 w-3" />}
-    </Button>
-  );
 }
 
 export function StartEndCalculator() {
@@ -109,11 +88,11 @@ export function StartEndCalculator() {
                     <span className="text-xs text-muted-foreground w-14 shrink-0">{sub}</span>
                     <div className="flex items-center gap-2 flex-1">
                       <code className="font-mono font-medium">{ts}</code>
-                      <CopyBtn value={ts.toString()} />
+                      <CopyButton value={ts.toString()} className="h-6 w-6" />
                     </div>
                     <div className="flex items-center gap-2 text-muted-foreground">
                       <code className="font-mono text-xs">{iso}</code>
-                      <CopyBtn value={iso} />
+                      <CopyButton value={iso} className="h-6 w-6" />
                     </div>
                   </div>
                 ))}

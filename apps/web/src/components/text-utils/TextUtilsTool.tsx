@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useMemo } from 'react';
-import { Type, Copy, Trash2, AlignLeft, BarChart3, Clock, Play } from 'lucide-react';
+import { Type, Trash2, AlignLeft, BarChart3, Clock, Play } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -9,6 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
+import { CopyButton } from '@/components/ui/copy-button';
 import { toast } from 'sonner';
 
 // Text conversion helper functions
@@ -237,19 +238,13 @@ export function TextUtilsTool() {
                     <div key={item.key} className="space-y-1.5 border rounded-lg p-2.5 bg-muted/20 relative group">
                       <div className="flex items-center justify-between text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
                         <span>{item.label}</span>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-5 w-5 opacity-0 group-hover:opacity-100 transition-opacity absolute right-2 top-2"
-                              onClick={() => handleCopy(item.value, item.label)}
-                            >
-                              <Copy className="h-3 w-3" />
-                            </Button>
-                          </TooltipTrigger>
-                          <TooltipContent>{`Copy ${item.label}`}</TooltipContent>
-                        </Tooltip>
+                        <CopyButton
+                          action={() => handleCopy(item.value, item.label)}
+                          toastMessage={false}
+                          tooltip={`Copy ${item.label}`}
+                          className="h-5 w-5 opacity-0 group-hover:opacity-100 transition-opacity absolute right-2 top-2"
+                          iconClassName="h-3 w-3"
+                        />
                       </div>
                       <div className="font-mono text-xs text-foreground truncate pr-6 select-all min-h-[16px] break-all pt-1">
                         {item.value || <span className="text-muted-foreground/30 italic">No input</span>}

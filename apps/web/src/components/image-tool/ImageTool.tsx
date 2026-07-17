@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { Upload, Image as ImageIcon, Sliders, Check, Download, RefreshCw, Sparkles, Scale, Info, Palette, Camera, FileText, Star, Copy, Loader2 } from 'lucide-react';
+import { Upload, Image as ImageIcon, Sliders, Check, Download, RefreshCw, Sparkles, Scale, Info, Palette, Camera, FileText, Star, Loader2 } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
+import { CopyButton } from '@/components/ui/copy-button';
 import { toast } from 'sonner';
 import JSZip from 'jszip';
 import { buildIco } from '@/lib/ico';
@@ -722,6 +723,9 @@ export function ImageTool() {
                                 style={{ backgroundColor: color }}
                                 className="h-8 w-8 rounded-full border border-white/20 shadow-md relative hover:scale-110 active:scale-95 transition-all group flex items-center justify-center cursor-pointer"
                               >
+                                {copiedColor === color && (
+                                  <Check className="h-4 w-4 text-white drop-shadow animate-check-pop" />
+                                )}
                                 <span className="opacity-0 group-hover:opacity-100 text-[8px] bg-slate-900/90 text-white font-mono rounded px-1 absolute -bottom-5 z-10 transition-opacity pointer-events-none">
                                   {color}
                                 </span>
@@ -830,17 +834,7 @@ export function ImageTool() {
                     <div className="space-y-1.5 pt-2 border-t">
                       <div className="flex items-center justify-between">
                         <span className="font-bold text-[10px] uppercase text-muted-foreground">HTML &lt;head&gt; snippet</span>
-                        <Button
-                          variant="ghost"
-                          size="icon-sm"
-                          className="h-5 w-5"
-                          onClick={() => {
-                            navigator.clipboard.writeText(faviconHtmlSnippet);
-                            toast.success('Snippet copied!');
-                          }}
-                        >
-                          <Copy className="h-3 w-3" />
-                        </Button>
+                        <CopyButton value={faviconHtmlSnippet} toastMessage="Snippet copied!" className="h-5 w-5" iconClassName="h-3 w-3" />
                       </div>
                       <pre className="text-[9px] font-mono p-2 bg-muted/30 border rounded-md overflow-x-auto whitespace-pre-wrap break-all">
                         {faviconHtmlSnippet}

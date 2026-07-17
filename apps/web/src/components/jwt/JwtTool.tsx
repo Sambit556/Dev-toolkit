@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { ShieldAlert, ShieldCheck, Copy, RefreshCw, Key, Braces, Layers, HelpCircle } from 'lucide-react';
+import { ShieldAlert, ShieldCheck, RefreshCw, Key, Braces, Layers, HelpCircle } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -10,7 +10,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
-import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
+import { CopyButton } from '@/components/ui/copy-button';
 import { CodeEditor } from '@/components/ui/CodeEditor';
 import { decodeJwt, verifySignature, signJwt } from '@/lib/jwt';
 import { toast } from 'sonner';
@@ -137,11 +137,6 @@ export function JwtTool() {
     toast.success('Loaded HS256 Example!');
   };
 
-  const handleCopy = (text: string, label: string) => {
-    navigator.clipboard.writeText(text);
-    toast.success(`${label} copied to clipboard!`);
-  };
-
   const formatTimestamp = (ts: any) => {
     if (typeof ts !== 'number') return '';
     try {
@@ -229,19 +224,12 @@ export function JwtTool() {
         <div className="flex flex-col gap-1.5 p-3 bg-red-500/5 dark:bg-red-500/10 border border-red-500/20 border-l-4 border-l-red-500 rounded-r-lg">
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-black uppercase text-red-600 dark:text-red-400 tracking-wider">Part 1: Header (Algorithm & Type)</span>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon-sm"
-                  onClick={() => handleCopy(parts[0], 'Header segment')}
-                  className="h-5 w-5 text-red-500 hover:text-red-600 hover:bg-red-500/10"
-                >
-                  <Copy className="h-3 w-3" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>Copy header part</TooltipContent>
-            </Tooltip>
+            <CopyButton
+              value={parts[0]}
+              tooltip="Copy header part"
+              toastMessage="Header segment copied to clipboard!"
+              className="h-5 w-5 text-red-500 hover:text-red-600 hover:bg-red-500/10"
+            />
           </div>
           <span className="break-all text-red-600 dark:text-red-400 select-text leading-relaxed">{parts[0]}</span>
         </div>
@@ -250,19 +238,12 @@ export function JwtTool() {
           <div className="flex flex-col gap-1.5 p-3 bg-purple-500/5 dark:bg-purple-500/10 border border-purple-500/20 border-l-4 border-l-purple-500 rounded-r-lg">
             <div className="flex items-center justify-between">
               <span className="text-[10px] font-black uppercase text-purple-600 dark:text-purple-400 tracking-wider">Part 2: Payload (Claims & Data)</span>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="icon-sm"
-                    onClick={() => handleCopy(parts[1], 'Payload segment')}
-                    className="h-5 w-5 text-purple-500 hover:text-purple-600 hover:bg-purple-500/10"
-                  >
-                    <Copy className="h-3 w-3" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>Copy payload part</TooltipContent>
-              </Tooltip>
+              <CopyButton
+                value={parts[1]}
+                tooltip="Copy payload part"
+                toastMessage="Payload segment copied to clipboard!"
+                className="h-5 w-5 text-purple-500 hover:text-purple-600 hover:bg-purple-500/10"
+              />
             </div>
             <span className="break-all text-purple-600 dark:text-purple-400 select-text leading-relaxed">{parts[1]}</span>
           </div>
@@ -272,19 +253,12 @@ export function JwtTool() {
           <div className="flex flex-col gap-1.5 p-3 bg-emerald-500/5 dark:bg-emerald-500/10 border border-emerald-500/20 border-l-4 border-l-emerald-500 rounded-r-lg">
             <div className="flex items-center justify-between">
               <span className="text-[10px] font-black uppercase text-emerald-600 dark:text-emerald-455 tracking-wider">Part 3: Signature (Verification Signature)</span>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="icon-sm"
-                    onClick={() => handleCopy(parts[2], 'Signature segment')}
-                    className="h-5 w-5 text-emerald-500 hover:text-emerald-600 hover:bg-emerald-500/10"
-                  >
-                    <Copy className="h-3 w-3" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>Copy signature part</TooltipContent>
-              </Tooltip>
+              <CopyButton
+                value={parts[2]}
+                tooltip="Copy signature part"
+                toastMessage="Signature segment copied to clipboard!"
+                className="h-5 w-5 text-emerald-500 hover:text-emerald-600 hover:bg-emerald-500/10"
+              />
             </div>
             <span className="break-all text-emerald-600 dark:text-emerald-455 select-text leading-relaxed">{parts[2]}</span>
           </div>
@@ -648,15 +622,14 @@ export function JwtTool() {
                 <div className="flex items-center justify-between pb-2 border-b">
                   <span className="text-sm font-bold">Generated Signed Token</span>
                   {!encodedToken.startsWith('//') && (
-                    <Button
+                    <CopyButton
+                      value={encodedToken}
+                      label="Copy Token"
+                      copiedLabel="Copied!"
+                      toastMessage="Signed token copied to clipboard!"
                       variant="outline"
-                      size="sm"
-                      onClick={() => handleCopy(encodedToken, 'Signed token')}
-                      className="h-7 text-xs"
-                    >
-                      <Copy className="h-3 w-3 mr-1" />
-                      Copy Token
-                    </Button>
+                      className="h-7"
+                    />
                   )}
                 </div>
                 <div className="flex-1 rounded-md border bg-muted/40 p-3 select-all overflow-y-auto font-mono text-xs max-h-80 break-all leading-relaxed whitespace-pre-wrap select-all">

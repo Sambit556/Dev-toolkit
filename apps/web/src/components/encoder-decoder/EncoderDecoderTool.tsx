@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useMemo } from 'react';
-import { RefreshCw, Copy, ArrowLeftRight } from 'lucide-react';
+import { RefreshCw, ArrowLeftRight } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -10,6 +10,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import { toast } from 'sonner';
+import { CopyButton } from '@/components/ui/copy-button';
 
 // Morse Code mappings
 const MORSE_MAP: Record<string, string> = {
@@ -143,11 +144,6 @@ export function EncoderDecoderTool() {
     }
   }, [inputVal, conversionType, isDecodeMode, caesarShift]);
 
-  const handleCopyText = (text: string, label: string) => {
-    navigator.clipboard.writeText(text);
-    toast.success(`${label} copied!`);
-  };
-
   const handleFileDrop = (e: React.DragEvent<HTMLTextAreaElement>) => {
     e.preventDefault();
     const file = e.dataTransfer.files?.[0];
@@ -268,19 +264,13 @@ export function EncoderDecoderTool() {
               </span>
 
               <div className="flex items-center gap-1.5">
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      size="icon-sm"
-                      variant="ghost"
-                      onClick={() => handleCopyText(outputVal, 'Result')}
-                      disabled={!outputVal}
-                    >
-                      <Copy className="h-4 w-4" />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>Copy result string</TooltipContent>
-                </Tooltip>
+                <CopyButton
+                  value={outputVal}
+                  disabled={!outputVal}
+                  toastMessage="Result copied!"
+                  tooltip="Copy result string"
+                  iconClassName="h-4 w-4"
+                />
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <Button

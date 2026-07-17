@@ -1,3 +1,4 @@
+import { BackToHomeLink } from '@/components/layout/BackToHomeLink';
 import type { Metadata } from 'next';
 import { Eye } from 'lucide-react';
 import { HtmlPreviewTool } from '@/components/html-preview/HtmlPreviewTool';
@@ -15,6 +16,7 @@ export default function HtmlPreviewPage() {
     <div className="container py-6 md:py-8 max-w-6xl">
       <div className="mb-6">
         <div className="flex items-center gap-2 mb-1">
+          <BackToHomeLink />
           <Eye className="h-5 w-5 text-primary" />
           <h1 className="text-2xl font-bold">HTML / CSS / JS Previewer</h1>
         </div>

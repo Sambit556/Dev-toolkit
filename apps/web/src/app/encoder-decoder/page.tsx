@@ -1,3 +1,4 @@
+import { BackToHomeLink } from '@/components/layout/BackToHomeLink';
 import type { Metadata } from 'next';
 import { ShieldCheck } from 'lucide-react';
 import { EncoderDecoderTool } from '@/components/encoder-decoder/EncoderDecoderTool';
@@ -16,6 +17,7 @@ export default function EncoderDecoderPage() {
       {/* Page header */}
       <div className="mb-6">
         <div className="flex items-center gap-2 mb-1">
+          <BackToHomeLink />
           <ShieldCheck className="h-5 w-5 text-primary" />
           <h1 className="text-2xl font-bold">Encoder / Decoder</h1>
         </div>

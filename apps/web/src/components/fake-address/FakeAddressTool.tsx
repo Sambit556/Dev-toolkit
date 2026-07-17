@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useCallback, useEffect } from 'react';
-import { MapPin, User, Mail, Phone, CreditCard, Briefcase, Download, Copy, RefreshCw, Layers } from 'lucide-react';
+import { MapPin, User, Mail, Phone, CreditCard, Briefcase, Download, RefreshCw, Layers } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -10,6 +10,7 @@ import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
+import { CopyButton } from '@/components/ui/copy-button';
 import { toast } from 'sonner';
 
 // --- DATASETS ---
@@ -213,12 +214,6 @@ export function FakeAddressTool() {
     regenerate();
   }, [regenerate]);
 
-  const handleCopy = (text: string, label: string) => {
-    if (!text) return;
-    navigator.clipboard.writeText(text);
-    toast.success(`${label} copied to clipboard!`);
-  };
-
   const handleDownloadJson = () => {
     const data = viewMode === 'single' ? JSON.stringify(persona, null, 2) : bulkResult;
     if (!data) return;
@@ -317,9 +312,7 @@ export function FakeAddressTool() {
                   Mock Identity Persona Profile
                 </h3>
                 <div className="flex gap-2">
-                  <Button variant="outline" size="sm" onClick={() => handleCopy(JSON.stringify(persona, null, 2), 'JSON')} className="h-7 text-[10px] gap-1">
-                    <Copy className="h-3 w-3" /> Copy JSON
-                  </Button>
+                  <CopyButton value={JSON.stringify(persona, null, 2)} label="Copy JSON" toastMessage="JSON copied to clipboard!" variant="outline" className="h-7 text-[10px]" />
                   <Button variant="outline" size="sm" onClick={handleDownloadJson} className="h-7 text-[10px] text-primary gap-1">
                     <Download className="h-3 w-3" /> Download
                   </Button>
@@ -398,9 +391,7 @@ export function FakeAddressTool() {
                   Bulk Generated Dataset JSON
                 </Label>
                 <div className="flex gap-2">
-                  <Button variant="outline" size="sm" onClick={() => handleCopy(bulkResult, 'Dataset')} className="h-8 gap-1 text-xs">
-                    <Copy className="h-3.5 w-3.5" /> Copy
-                  </Button>
+                  <CopyButton value={bulkResult} label="Copy" toastMessage="Dataset copied to clipboard!" variant="outline" className="h-8" />
                   <Button variant="outline" size="sm" onClick={handleDownloadJson} className="h-8 gap-1 text-xs text-primary">
                     <Download className="h-3.5 w-3.5" /> Download
                   </Button>

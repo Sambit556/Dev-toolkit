@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useMemo, useState } from 'react';
-import { Regex, Copy, AlertTriangle, CheckCircle2, ArrowLeftRight } from 'lucide-react';
+import { Regex, AlertTriangle, CheckCircle2, ArrowLeftRight } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -10,6 +10,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import { toast } from 'sonner';
+import { CopyButton } from '@/components/ui/copy-button';
 
 interface FlagDef {
   key: 'g' | 'i' | 'm' | 's' | 'u' | 'y';
@@ -121,11 +122,6 @@ export function RegexTesterTool() {
     setPattern(preset.pattern);
     setActiveFlags(new Set(preset.flags.split('')));
     toast.success(`Loaded "${preset.label}" pattern`);
-  };
-
-  const handleCopy = (text: string, label: string) => {
-    navigator.clipboard.writeText(text);
-    toast.success(`${label} copied!`);
   };
 
   return (
@@ -244,10 +240,7 @@ export function RegexTesterTool() {
                 {mode === 'test' ? 'Live Match Highlighting' : 'Replacement Result'}
               </span>
               {mode === 'replace' && (
-                <Button variant="outline" size="sm" onClick={() => handleCopy(replacedOutput, 'Result')} className="h-7 text-xs">
-                  <Copy className="h-3 w-3 mr-1" />
-                  Copy
-                </Button>
+                <CopyButton value={replacedOutput} label="Copy" toastMessage="Result copied!" variant="outline" className="h-7" />
               )}
             </div>
 

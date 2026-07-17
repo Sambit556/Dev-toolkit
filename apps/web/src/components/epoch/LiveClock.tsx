@@ -1,10 +1,11 @@
 'use client';
 
 import React, { useEffect, useState, useCallback } from 'react';
-import { Copy, RefreshCw } from 'lucide-react';
+import { RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { CopyButton } from '@/components/ui/copy-button';
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import { copyToClipboard } from '@/lib/utils';
 import { formatDateForDisplay } from '@/lib/epoch';
@@ -94,37 +95,41 @@ export function LiveClock() {
       </div>
 
       <div className="divide-y">
-        {rows.map(({ label, value, unit, badge }) => (
-          <div
-            key={label}
-            className="flex items-center justify-between px-4 py-3 group hover:bg-muted/20 transition-colors"
-          >
-            <div className="flex items-center gap-3 min-w-0">
+        {rows.map(({ label, value, unit, badge }) => {
+          const isMs = label === 'Milliseconds';
+          return (
+            <div
+              key={label}
+              className={`flex items-center justify-between px-4 py-3 group hover:bg-muted/20 transition-colors ${
+                isMs ? 'bg-primary/5 border-l-2 border-primary' : ''
+              }`}
+            >
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="flex items-center gap-2">
+                  <span className={`text-xs w-24 shrink-0 ${isMs ? 'text-primary font-semibold' : 'font-medium text-muted-foreground'}`}>
+                    {label}
+                  </span>
+                  {badge && (
+                    <Badge variant={isMs ? 'default' : 'outline'} className="text-[10px] py-0 hidden sm:inline-flex">
+                      {badge}
+                    </Badge>
+                  )}
+                </div>
+              </div>
               <div className="flex items-center gap-2">
-                <span className="text-xs font-medium text-muted-foreground w-24 shrink-0">{label}</span>
-                {badge && (
-                  <Badge variant="outline" className="text-[10px] py-0 hidden sm:inline-flex">
-                    {badge}
-                  </Badge>
-                )}
+                <code className={`font-mono text-sm tabular-nums tracking-tight ${isMs ? 'font-bold text-primary' : 'font-medium'}`}>
+                  {value}
+                </code>
+                <span className="text-xs text-muted-foreground w-6 text-right">{unit}</span>
+                <CopyButton
+                  action={() => handleCopy(value, label)}
+                  toastMessage={false}
+                  className="opacity-0 group-hover:opacity-100 transition-opacity h-6 w-6"
+                />
               </div>
             </div>
-            <div className="flex items-center gap-2">
-              <code className="font-mono text-sm font-medium tabular-nums tracking-tight">
-                {value}
-              </code>
-              <span className="text-xs text-muted-foreground w-6 text-right">{unit}</span>
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                className="opacity-0 group-hover:opacity-100 transition-opacity h-6 w-6"
-                onClick={() => handleCopy(value, label)}
-              >
-                <Copy className="h-3 w-3" />
-              </Button>
-            </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );

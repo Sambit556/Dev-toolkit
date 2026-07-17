@@ -1,13 +1,12 @@
 'use client';
 
 import React, { useState, useCallback, useMemo } from 'react';
-import { ChevronRight, ChevronDown, Copy, Check } from 'lucide-react';
-import { toast } from 'sonner';
+import { ChevronRight, ChevronDown } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
+import { CopyButton } from '@/components/ui/copy-button';
 import { flattenJson, type FlatNode } from '@/lib/json-utils';
-import { copyToClipboard, cn } from '@/lib/utils';
+import { cn } from '@/lib/utils';
 import type { JsonNodeType } from '@devchrono/shared';
 
 function TypeBadge({ type }: { type: JsonNodeType }) {
@@ -58,28 +57,14 @@ function getCopyText(type: JsonNodeType, value: unknown): string {
 }
 
 function ValueCopyButton({ type, value }: { type: JsonNodeType; value: unknown }) {
-  const [copied, setCopied] = useState(false);
-
   return (
-    <Tooltip>
-      <TooltipTrigger asChild>
-        <Button
-          variant="ghost"
-          size="icon-sm"
-          className="h-5 w-5 opacity-0 group-hover:opacity-100 transition-opacity"
-          onClick={async (e) => {
-            e.stopPropagation();
-            await copyToClipboard(getCopyText(type, value));
-            toast.success('Value copied');
-            setCopied(true);
-            setTimeout(() => setCopied(false), 2000);
-          }}
-        >
-          {copied ? <Check className="h-2.5 w-2.5 text-green-500" /> : <Copy className="h-2.5 w-2.5" />}
-        </Button>
-      </TooltipTrigger>
-      <TooltipContent>Copy value</TooltipContent>
-    </Tooltip>
+    <CopyButton
+      value={getCopyText(type, value)}
+      tooltip="Copy value"
+      toastMessage="Value copied"
+      className="h-5 w-5 opacity-0 group-hover:opacity-100 transition-opacity"
+      iconClassName="h-2.5 w-2.5"
+    />
   );
 }
 

@@ -1,3 +1,4 @@
+import { BackToHomeLink } from '@/components/layout/BackToHomeLink';
 import type { Metadata } from 'next';
 import { MapPin } from 'lucide-react';
 import { FakeAddressTool } from '@/components/fake-address/FakeAddressTool';
@@ -15,6 +16,7 @@ export default function FakeAddressPage() {
     <div className="container py-6 md:py-8 max-w-5xl">
       <div className="mb-6">
         <div className="flex items-center gap-2 mb-1">
+          <BackToHomeLink />
           <MapPin className="h-5 w-5 text-primary" />
           <h1 className="text-2xl font-bold">Fake Address & Persona Generator</h1>
         </div>

@@ -1,3 +1,4 @@
+import { BackToHomeLink } from '@/components/layout/BackToHomeLink';
 import type { Metadata } from 'next';
 import { Shield } from 'lucide-react';
 import { JwtTool } from '@/components/jwt/JwtTool';
@@ -16,6 +17,7 @@ export default function JwtPage() {
       {/* Page header */}
       <div className="mb-6">
         <div className="flex items-center gap-2 mb-1">
+          <BackToHomeLink />
           <Shield className="h-5 w-5 text-primary" />
           <h1 className="text-2xl font-bold">JWT Decoder & Encoder</h1>
         </div>

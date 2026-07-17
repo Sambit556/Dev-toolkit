@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { ArrowLeftRight, Copy, RefreshCw, Landmark, SlidersHorizontal, Info, TrendingUp, HelpCircle } from 'lucide-react';
+import { ArrowLeftRight, RefreshCw, Landmark, SlidersHorizontal, Info, TrendingUp, HelpCircle } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
-import { toast } from 'sonner';
+import { CopyButton } from '@/components/ui/copy-button';
 
 function generateSparklinePoints(): string {
   const points = [];
@@ -186,11 +186,6 @@ export function CurrencyExchangerTool() {
   const currentRate = rates[toCurrency] || 1;
   const convertedAmount = amount * currentRate;
 
-  const handleCopy = (val: string, label: string) => {
-    navigator.clipboard.writeText(val);
-    toast.success(`${label} copied!`);
-  };
-
   return (
     <div className="grid gap-6 md:grid-cols-3">
       {/* Exchanger main card */}
@@ -292,20 +287,13 @@ export function CurrencyExchangerTool() {
               </p>
             </div>
 
-            <Button
+            <CopyButton
+              value={`${amount} ${fromCurrency} = ${convertedAmount.toFixed(4)} ${toCurrency}`}
+              label="Copy Output"
+              toastMessage="Exchanged result copied!"
               variant="outline"
-              size="sm"
-              onClick={() =>
-                handleCopy(
-                  `${amount} ${fromCurrency} = ${convertedAmount.toFixed(4)} ${toCurrency}`,
-                  'Exchanged result'
-                )
-              }
-              className="text-xs shrink-0 self-start md:self-center h-8"
-            >
-              <Copy className="h-3.5 w-3.5 mr-1" />
-              Copy Output
-            </Button>
+              className="shrink-0 self-start md:self-center h-8"
+            />
           </div>
 
           {/* SVG sparkline simulated trend */}
@@ -426,14 +414,12 @@ export function CurrencyExchangerTool() {
                           {c.symbol} {rate.toLocaleString(undefined, { maximumFractionDigits: 5 })}
                         </p>
                       </div>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => handleCopy(rate.toString(), c.value)}
+                      <CopyButton
+                        value={rate.toString()}
+                        toastMessage={`${c.value} copied!`}
                         className="h-6 w-6 text-muted-foreground"
-                      >
-                        <Copy className="h-3 w-3" />
-                      </Button>
+                        iconClassName="h-3 w-3"
+                      />
                     </div>
                   );
                 })}

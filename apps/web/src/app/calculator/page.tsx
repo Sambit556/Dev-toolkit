@@ -1,3 +1,4 @@
+import { BackToHomeLink } from '@/components/layout/BackToHomeLink';
 import type { Metadata } from 'next';
 import { Calculator } from 'lucide-react';
 import { CalculatorTool } from '@/components/calculator/CalculatorTool';
@@ -16,6 +17,7 @@ export default function CalculatorPage() {
       {/* Page header */}
       <div className="mb-6">
         <div className="flex items-center gap-2 mb-1">
+          <BackToHomeLink />
           <Calculator className="h-5 w-5 text-primary" />
           <h1 className="text-2xl font-bold">Calculators</h1>
         </div>

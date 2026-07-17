@@ -10,10 +10,11 @@ import { JsonAdvancedTools } from './JsonAdvancedTools';
 import { JsonHistoryPanel } from './JsonHistoryPanel';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { copyToClipboard, downloadFile } from '@/lib/utils';
+import { cn, copyToClipboard, downloadFile } from '@/lib/utils';
 import { parseJsonSafe, formatJson, minifyJson, countNodes } from '@/lib/json-utils';
 import { tryRepairJson } from '@/lib/json-repair';
 import { useHistoryStore } from '@/store/history';
+import { BackToHomeLink } from '@/components/layout/BackToHomeLink';
 
 export function JsonViewerPage() {
   const [input, setInput] = useState('');
@@ -171,6 +172,7 @@ export function JsonViewerPage() {
       {/* Page header */}
       <div className="border-b px-4 py-3 flex items-center justify-between gap-3 shrink-0">
         <div className="flex items-center gap-2">
+          <BackToHomeLink />
           <Braces className="h-5 w-5 text-primary" />
           <h1 className="text-lg font-bold">JSON Viewer</h1>
           {isValid !== null && (
@@ -258,7 +260,17 @@ export function JsonViewerPage() {
             </Tabs>
           </div>
 
-          <div className="flex-1 min-h-0 overflow-hidden p-2">
+          <div
+            className={cn(
+              'flex-1 min-h-0 overflow-hidden p-2',
+              // Transparent (shows the decorative background) with no data yet.
+              // Once there's something to read: a light, translucent "crystal"
+              // glass panel in light mode (bright enough to stay legible, but
+              // not a flat solid card) and the equivalent dark glass in dark
+              // mode, which already reads cleanly against light text.
+              input.trim() && 'bg-white/55 backdrop-blur-md dark:bg-black/30 rounded-lg',
+            )}
+          >
             {rightTab === 'tree' ? (
               !input.trim() ? (
                 <div className="h-full flex flex-col items-center justify-center text-center gap-2">

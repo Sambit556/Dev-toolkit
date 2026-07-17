@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useMemo } from 'react';
-import { Calendar, Play, FileText, CheckSquare, Sliders, Info, Copy } from 'lucide-react';
+import { Calendar, Play, FileText, CheckSquare, Sliders, Info } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import cronstrue from 'cronstrue';
 import parser from 'cron-parser';
 import { toast } from 'sonner';
+import { CopyButton } from '@/components/ui/copy-button';
 
 export function CronTool() {
   const [cronExpression, setCronExpression] = useState<string>('*/5 * * * *');
@@ -106,11 +107,6 @@ export function CronTool() {
     }
 
     return `${min} ${hr} ${day} ${mon} ${wk}`;
-  };
-
-  const handleCopy = () => {
-    navigator.clipboard.writeText(cronExpression);
-    toast.success('Cron expression copied!');
   };
 
   const toggleSpecific = (
@@ -460,10 +456,7 @@ export function CronTool() {
           <CardContent className="p-4 space-y-4">
             <div className="flex items-center justify-between border-b pb-2">
               <span className="text-sm font-bold">Cron Expression</span>
-              <Button variant="outline" size="sm" onClick={handleCopy} className="h-7 text-xs">
-                <Copy className="h-3 w-3 mr-1" />
-                Copy
-              </Button>
+              <CopyButton value={cronExpression} label="Copy" toastMessage="Cron expression copied!" variant="outline" className="h-7" />
             </div>
             
             <Input

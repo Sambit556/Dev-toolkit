@@ -1,3 +1,4 @@
+import { BackToHomeLink } from '@/components/layout/BackToHomeLink';
 import type { Metadata } from 'next';
 import { Activity } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
@@ -16,6 +17,7 @@ export default function SpeedTestPage() {
       {/* Page header */}
       <div className="mb-6">
         <div className="flex items-center gap-2 mb-1">
+          <BackToHomeLink />
           <Activity className="h-5 w-5 text-primary" />
           <h1 className="text-2xl font-bold">Internet Speed Tester</h1>
         </div>

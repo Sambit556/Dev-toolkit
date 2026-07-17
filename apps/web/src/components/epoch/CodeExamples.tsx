@@ -1,12 +1,9 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Copy, Check } from 'lucide-react';
-import { toast } from 'sonner';
-import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { CODE_EXAMPLES, type CodeLanguage } from '@/lib/epoch';
-import { copyToClipboard } from '@/lib/utils';
+import { CopyButton } from '@/components/ui/copy-button';
 
 const LANGUAGES: { value: CodeLanguage; label: string }[] = [
   { value: 'javascript', label: 'JavaScript' },
@@ -19,27 +16,11 @@ const LANGUAGES: { value: CodeLanguage; label: string }[] = [
 ];
 
 function CodeBlock({ code, language }: { code: string; language: string }) {
-  const [copied, setCopied] = useState(false);
-
-  const handleCopy = async () => {
-    await copyToClipboard(code);
-    toast.success(`${language} code copied`);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
-
   return (
     <div className="relative rounded-lg border bg-muted/50 overflow-hidden">
       <div className="flex items-center justify-between px-4 py-2 border-b bg-muted/30">
         <span className="text-xs font-medium text-muted-foreground">{language}</span>
-        <Button
-          variant="ghost"
-          size="icon-sm"
-          onClick={handleCopy}
-          className="h-6 w-6"
-        >
-          {copied ? <Check className="h-3 w-3 text-green-500" /> : <Copy className="h-3 w-3" />}
-        </Button>
+        <CopyButton value={code} toastMessage={`${language} code copied`} className="h-6 w-6" />
       </div>
       <pre className="p-4 overflow-x-auto text-sm">
         <code className="font-mono text-foreground/90 whitespace-pre">{code}</code>

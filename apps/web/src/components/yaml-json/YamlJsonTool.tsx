@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useMemo } from 'react';
-import { ArrowLeftRight, Copy, Download, RefreshCw, Braces, AlignLeft, Info } from 'lucide-react';
+import { ArrowLeftRight, Download, RefreshCw, Braces, AlignLeft, Info } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { CodeEditor } from '@/components/ui/CodeEditor';
 import jsyaml from 'js-yaml';
 import { toast } from 'sonner';
+import { CopyButton } from '@/components/ui/copy-button';
 
 export function YamlJsonTool() {
   const [direction, setDirection] = useState<'json2yaml' | 'yaml2json'>('json2yaml');
@@ -73,11 +74,6 @@ export function YamlJsonTool() {
     }
   };
 
-  const handleCopy = () => {
-    navigator.clipboard.writeText(outputVal);
-    toast.success('Converted output copied!');
-  };
-
   const handleDownload = () => {
     const isYaml = direction === 'json2yaml';
     const blob = new Blob([outputVal], { type: isYaml ? 'text/yaml' : 'application/json' });
@@ -122,10 +118,7 @@ export function YamlJsonTool() {
 
           {outputVal && (
             <div className="flex items-center gap-1.5">
-              <Button variant="outline" size="sm" onClick={handleCopy} className="h-8 text-xs">
-                <Copy className="h-3 w-3 mr-1" />
-                Copy
-              </Button>
+              <CopyButton value={outputVal} label="Copy" toastMessage="Converted output copied!" variant="outline" className="h-8" />
               <Button variant="outline" size="sm" onClick={handleDownload} className="h-8 text-xs">
                 <Download className="h-3 w-3 mr-1" />
                 Download

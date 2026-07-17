@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { Palette, Copy, RefreshCw, Layers, ShieldCheck, Check, X, ShieldAlert, Lock, Unlock } from 'lucide-react';
+import { Palette, RefreshCw, Layers, ShieldCheck, Check, X, ShieldAlert, Lock, Unlock } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
+import { CopyButton } from '@/components/ui/copy-button';
 import { hexToRgb, rgbToHex, rgbToHsl, hslToRgb, rgbToHsv, rgbToCmyk, getContrastRatio, getColorHarmonies } from '@/lib/color';
 import { toast } from 'sonner';
 
@@ -250,9 +251,7 @@ export function ColorTool() {
                       <p className="font-bold text-[9px] uppercase text-muted-foreground">HEX</p>
                       <p className="font-mono font-bold text-sm text-primary">{hexColor}</p>
                     </div>
-                    <Button variant="ghost" size="icon-sm" onClick={() => handleCopy(hexColor, 'HEX')} className="h-7 w-7 text-muted-foreground">
-                      <Copy className="h-3.5 w-3.5" />
-                    </Button>
+                    <CopyButton value={hexColor} toastMessage="HEX copied!" className="h-7 w-7 text-muted-foreground" />
                   </div>
 
                   {/* RGB */}
@@ -261,9 +260,7 @@ export function ColorTool() {
                       <p className="font-bold text-[9px] uppercase text-muted-foreground">RGB</p>
                       <p className="font-mono font-bold text-sm">{`rgb(${rgb.r}, ${rgb.g}, ${rgb.b})`}</p>
                     </div>
-                    <Button variant="ghost" size="icon-sm" onClick={() => handleCopy(`rgb(${rgb.r}, ${rgb.g}, ${rgb.b})`, 'RGB')} className="h-7 w-7 text-muted-foreground">
-                      <Copy className="h-3.5 w-3.5" />
-                    </Button>
+                    <CopyButton value={`rgb(${rgb.r}, ${rgb.g}, ${rgb.b})`} toastMessage="RGB copied!" className="h-7 w-7 text-muted-foreground" />
                   </div>
 
                   {/* HSL */}
@@ -272,9 +269,7 @@ export function ColorTool() {
                       <p className="font-bold text-[9px] uppercase text-muted-foreground">HSL</p>
                       <p className="font-mono font-bold text-sm">{`hsl(${hsl.h}, ${hsl.s}%, ${hsl.l}%)`}</p>
                     </div>
-                    <Button variant="ghost" size="icon-sm" onClick={() => handleCopy(`hsl(${hsl.h}, ${hsl.s}%, ${hsl.l}%)`, 'HSL')} className="h-7 w-7 text-muted-foreground">
-                      <Copy className="h-3.5 w-3.5" />
-                    </Button>
+                    <CopyButton value={`hsl(${hsl.h}, ${hsl.s}%, ${hsl.l}%)`} toastMessage="HSL copied!" className="h-7 w-7 text-muted-foreground" />
                   </div>
 
                   {/* CMYK */}
@@ -283,9 +278,7 @@ export function ColorTool() {
                       <p className="font-bold text-[9px] uppercase text-muted-foreground">CMYK</p>
                       <p className="font-mono font-bold text-sm">{`cmyk(${cmyk.c}%, ${cmyk.m}%, ${cmyk.y}%, ${cmyk.k}%)`}</p>
                     </div>
-                    <Button variant="ghost" size="icon-sm" onClick={() => handleCopy(`cmyk(${cmyk.c}%, ${cmyk.m}%, ${cmyk.y}%, ${cmyk.k}%)`, 'CMYK')} className="h-7 w-7 text-muted-foreground">
-                      <Copy className="h-3.5 w-3.5" />
-                    </Button>
+                    <CopyButton value={`cmyk(${cmyk.c}%, ${cmyk.m}%, ${cmyk.y}%, ${cmyk.k}%)`} toastMessage="CMYK copied!" className="h-7 w-7 text-muted-foreground" />
                   </div>
                 </div>
               </CardContent>
@@ -537,14 +530,13 @@ export function ColorTool() {
                       >
                         {color.locked ? <Lock className="h-4 w-4" /> : <Unlock className="h-4 w-4" />}
                       </Button>
-                      <Button
+                      <CopyButton
+                        value={color.hex}
+                        toastMessage={`Color ${color.hex} copied!`}
                         variant="ghost"
-                        size="icon"
                         className={`h-8 w-8 hover:bg-black/10 dark:hover:bg-white/10 rounded-lg ${textColorClass}`}
-                        onClick={() => handleCopy(color.hex, `Color ${color.hex}`)}
-                      >
-                        <Copy className="h-4 w-4" />
-                      </Button>
+                        iconClassName="h-4 w-4"
+                      />
                     </div>
 
                     {/* Color hex title at bottom */}

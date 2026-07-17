@@ -7,7 +7,6 @@ import {
   Webhook,
   Search,
   Loader2,
-  Copy,
   RefreshCcw,
   Trash2,
   ChevronDown,
@@ -38,6 +37,7 @@ import { gradeSecurityHeaders, type SecurityGradeResult } from '@/lib/security-h
 import { buildCurlCommand, tryPrettyJson } from '@/lib/http-toolkit-utils';
 import { KeyValueEditor, type KeyValuePair } from './KeyValueEditor';
 import { toast } from 'sonner';
+import { CopyButton } from '@/components/ui/copy-button';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
@@ -789,14 +789,14 @@ export function HttpToolkitTool() {
                     <Webhook className="h-4 w-4" />
                   </div>
                   <Input value={captureUrl ?? ''} readOnly className="font-mono text-xs h-8" />
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button variant="outline" size="icon" onClick={() => handleCopy(captureUrl ?? '', 'Capture URL copied')} className="h-8 w-8 shrink-0">
-                        <Copy className="h-3.5 w-3.5" />
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent>Copy capture URL</TooltipContent>
-                  </Tooltip>
+                  <CopyButton
+                    value={captureUrl ?? ''}
+                    variant="outline"
+                    size="icon"
+                    tooltip="Copy capture URL"
+                    toastMessage="Capture URL copied"
+                    className="h-8 w-8 shrink-0"
+                  />
                 </div>
                 <div className="flex flex-wrap items-center gap-1.5">
                   <Badge className="border-0 bg-violet-500/10 text-violet-600 dark:text-violet-400 text-[10px] gap-1">

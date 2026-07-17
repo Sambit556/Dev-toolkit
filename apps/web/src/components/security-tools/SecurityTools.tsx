@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { Shield, Key, Eye, EyeOff, Copy, RefreshCw, Hash, CheckCircle, XCircle, Sliders } from 'lucide-react';
+import { Shield, Key, Eye, EyeOff, RefreshCw, Hash, CheckCircle, XCircle, Sliders } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -12,6 +12,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
+import { CopyButton } from '@/components/ui/copy-button';
 import bcrypt from 'bcryptjs';
 import { toast } from 'sonner';
 import { generateV4, generateV1, generateUlid, generateNanoId, generateV5, decodeUuidV1 } from '@/lib/uuid';
@@ -379,12 +380,6 @@ export function SecurityTools() {
     }
   };
 
-  const handleCopy = (text: string, label: string) => {
-    if (!text) return;
-    navigator.clipboard.writeText(text);
-    toast.success(`${label} copied to clipboard!`);
-  };
-
   const strength = getPasswordStrength(generatedPass);
 
   return (
@@ -443,9 +438,7 @@ export function SecurityTools() {
                   </TooltipTrigger>
                   <TooltipContent>Regenerate</TooltipContent>
                 </Tooltip>
-                <Button size="icon" className="h-8 w-8" onClick={() => handleCopy(generatedPass, 'Password')}>
-                  <Copy className="h-4 w-4" />
-                </Button>
+                <CopyButton value={generatedPass} variant="default" size="icon" toastMessage="Password copied to clipboard!" className="h-8 w-8" />
               </div>
 
               {/* Strength Rating */}
@@ -508,14 +501,14 @@ export function SecurityTools() {
                   <Shield className="h-4 w-4 text-primary" />
                   Token & Bulk Generator
                 </span>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button size="icon" className="h-7 w-7" onClick={() => handleCopy(generatedTokens, 'Tokens')}>
-                      <Copy className="h-4 w-4" />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>Copy All</TooltipContent>
-                </Tooltip>
+                <CopyButton
+                  value={generatedTokens}
+                  variant="default"
+                  size="icon"
+                  tooltip="Copy All"
+                  toastMessage="Tokens copied to clipboard!"
+                  className="h-7 w-7"
+                />
               </div>
 
               {/* Display Result */}
@@ -631,9 +624,7 @@ export function SecurityTools() {
                 <div className="space-y-1.5">
                   <div className="flex justify-between items-center text-[10px] font-bold text-muted-foreground uppercase">
                     <span>HMAC HEX Signature</span>
-                    <Button variant="ghost" size="icon" className="h-5 w-5" onClick={() => handleCopy(hmacHexResult, 'Hex HMAC')}>
-                      <Copy className="h-3 w-3" />
-                    </Button>
+                    <CopyButton value={hmacHexResult} toastMessage="Hex HMAC copied to clipboard!" className="h-5 w-5" iconClassName="h-3 w-3" />
                   </div>
                   <Textarea
                     value={hmacHexResult}
@@ -646,9 +637,7 @@ export function SecurityTools() {
                 <div className="space-y-1.5">
                   <div className="flex justify-between items-center text-[10px] font-bold text-muted-foreground uppercase">
                     <span>HMAC BASE64 Signature</span>
-                    <Button variant="ghost" size="icon" className="h-5 w-5" onClick={() => handleCopy(hmacB64Result, 'Base64 HMAC')}>
-                      <Copy className="h-3 w-3" />
-                    </Button>
+                    <CopyButton value={hmacB64Result} toastMessage="Base64 HMAC copied to clipboard!" className="h-5 w-5" iconClassName="h-3 w-3" />
                   </div>
                   <Input
                     value={hmacB64Result}
@@ -706,9 +695,7 @@ export function SecurityTools() {
               <div className="space-y-1.5 text-xs pt-2 border-t">
                 <div className="flex justify-between items-center text-[10px] font-bold text-muted-foreground uppercase">
                   <span>BCrypt Hash Output</span>
-                  <Button variant="ghost" size="icon" className="h-5 w-5" onClick={() => handleCopy(bcryptHashResult, 'BCrypt Hash')}>
-                    <Copy className="h-3.5 w-3.5" />
-                  </Button>
+                  <CopyButton value={bcryptHashResult} toastMessage="BCrypt Hash copied to clipboard!" className="h-5 w-5" />
                 </div>
                 <Textarea
                   value={bcryptHashResult}
@@ -962,10 +949,13 @@ export function SecurityTools() {
                         </Badge>
                       </span>
                       <div className="flex items-center gap-1.5">
-                        <Button variant="outline" size="sm" onClick={handleUuidCopyAll} className="h-7 text-xs font-bold">
-                          <Copy className="h-3.5 w-3.5 mr-1" />
-                          Copy All
-                        </Button>
+                        <CopyButton
+                          action={handleUuidCopyAll}
+                          label="Copy All"
+                          toastMessage={false}
+                          variant="outline"
+                          className="h-7 font-bold"
+                        />
                         <Button variant="outline" size="sm" onClick={() => handleUuidDownload('txt')} className="h-7 text-xs font-bold">
                           <Download className="h-3.5 w-3.5 mr-1" />
                           TXT

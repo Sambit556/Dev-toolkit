@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useMemo } from 'react';
-import { Ruler, Scale, Box, Thermometer, Zap, Layers, RefreshCw, Copy, ArrowLeftRight } from 'lucide-react';
+import { Ruler, Scale, Box, Thermometer, Zap, Layers, RefreshCw, ArrowLeftRight } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import { UNIT_CATEGORIES, convertUnit } from '@/lib/unit';
-import { toast } from 'sonner';
+import { CopyButton } from '@/components/ui/copy-button';
 
 // Helper to map category icons
 const CATEGORY_ICONS: Record<string, any> = {
@@ -54,10 +54,6 @@ export function UnitTool() {
     setToUnit(temp);
   };
 
-  const handleCopy = (val: string | number, label: string) => {
-    navigator.clipboard.writeText(val.toString());
-    toast.success(`${label} copied to clipboard!`);
-  };
 
   const formatNumber = (num: number): string => {
     if (num === 0) return '0';
@@ -164,15 +160,13 @@ export function UnitTool() {
                   </span>
                 </p>
               </div>
-              <Button
+              <CopyButton
+                value={formatNumber(result)}
+                label="Copy Result"
+                toastMessage="Result copied to clipboard!"
                 variant="outline"
-                size="sm"
-                onClick={() => handleCopy(formatNumber(result), 'Result')}
-                className="h-8 text-xs shrink-0"
-              >
-                <Copy className="h-3.5 w-3.5 mr-1" />
-                Copy Result
-              </Button>
+                className="h-8 shrink-0"
+              />
             </div>
           </CardContent>
         </Card>
@@ -210,14 +204,11 @@ export function UnitTool() {
                       </p>
                     </div>
                     <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <Button
-                        variant="ghost"
-                        size="icon-sm"
-                        onClick={() => handleCopy(formatNumber(converted), unit.label)}
+                      <CopyButton
+                        value={formatNumber(converted)}
+                        toastMessage={`${unit.label} copied to clipboard!`}
                         className="h-5 w-5"
-                      >
-                        <Copy className="h-3 w-3" />
-                      </Button>
+                      />
                       {!isCurrent && (
                         <Tooltip>
                           <TooltipTrigger asChild>

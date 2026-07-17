@@ -1,15 +1,15 @@
 'use client';
 
 import React, { useState, useCallback, useEffect, useMemo } from 'react';
-import { Copy, RotateCcw, AlertCircle, Check } from 'lucide-react';
-import { toast } from 'sonner';
+import { RotateCcw, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
+import { CopyButton } from '@/components/ui/copy-button';
 import { TimezoneSelector } from './TimezoneSelector';
 import { detectTimestampUnit, timestampToDate, formatRelativeTime, type DateTimeResult } from '@/lib/epoch';
-import { copyToClipboard, cn } from '@/lib/utils';
+import { cn } from '@/lib/utils';
 import { usePreferencesStore } from '@/store/preferences';
 import type { TimestampUnit } from '@devchrono/shared';
 import {
@@ -27,21 +27,6 @@ interface ResultRow {
   label: string;
   value: string;
   highlight?: boolean;
-}
-
-function CopyButton({ value, label }: { value: string; label: string }) {
-  const [copied, setCopied] = useState(false);
-  const handle = async () => {
-    await copyToClipboard(value);
-    setCopied(true);
-    toast.success(`Copied ${label}`);
-    setTimeout(() => setCopied(false), 2000);
-  };
-  return (
-    <Button variant="ghost" size="icon-sm" onClick={handle} className="h-6 w-6 shrink-0">
-      {copied ? <Check className="h-3 w-3 text-green-500" /> : <Copy className="h-3 w-3" />}
-    </Button>
-  );
 }
 
 export function TimestampToDate() {
@@ -211,7 +196,7 @@ export function TimestampToDate() {
                   {label}
                 </span>
                 <code className="font-mono text-sm flex-1 break-all">{value}</code>
-                <CopyButton value={value} label={label} />
+                <CopyButton value={value} toastMessage={`Copied ${label}`} className="h-6 w-6 shrink-0" />
               </div>
             ))}
           </div>

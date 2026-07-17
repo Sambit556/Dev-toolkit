@@ -1,9 +1,10 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
-import { StickyNote, Plus, Trash2, Minimize2, Maximize2, Palette, Copy, Check, Search, GripHorizontal, Pin, ChevronRight } from 'lucide-react';
+import { StickyNote, Plus, Trash2, Minimize2, Maximize2, Palette, Search, GripHorizontal, Pin, ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '@/components/ui/tooltip';
+import { CopyButton } from '@/components/ui/copy-button';
 
 export interface StickyNoteData {
   id: string;
@@ -194,10 +195,6 @@ export function StickyNotes() {
 
   const deleteNote = (id: string) => {
     saveNotes(notes.filter((n) => n.id !== id));
-  };
-
-  const copyToClipboard = (text: string) => {
-    navigator.clipboard.writeText(text);
   };
 
   // Dragging logic
@@ -503,17 +500,13 @@ export function StickyNotes() {
                 </Tooltip>
 
                 {/* Copy content */}
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <button
-                      onClick={() => copyToClipboard(note.text)}
-                      className="text-muted-foreground/80 hover:text-foreground p-1 rounded transition-colors"
-                    >
-                      <Copy className="h-3 w-3" />
-                    </button>
-                  </TooltipTrigger>
-                  <TooltipContent side="top" className="text-[10px] py-1 px-2">Copy content</TooltipContent>
-                </Tooltip>
+                <CopyButton
+                  value={note.text}
+                  tooltip="Copy content"
+                  toastMessage={false}
+                  iconClassName="h-3 w-3"
+                  className="h-auto w-auto p-1 text-muted-foreground/80 hover:text-foreground hover:bg-transparent rounded"
+                />
 
                 {/* Minimize toggle */}
                 <Tooltip>

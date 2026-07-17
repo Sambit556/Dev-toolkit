@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useMemo } from 'react';
-import { Database, Copy, Download, Wand2, Minimize2, AlertTriangle } from 'lucide-react';
+import { Database, Download, Wand2, Minimize2, AlertTriangle } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -9,6 +9,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { format, type SqlLanguage } from 'sql-formatter';
 import { toast } from 'sonner';
+import { CopyButton } from '@/components/ui/copy-button';
 
 const DIALECTS: { value: SqlLanguage; label: string }[] = [
   { value: 'sql', label: 'Standard SQL' },
@@ -48,11 +49,6 @@ export function SqlFormatterTool() {
       return { output: '', error: (e as Error).message || 'Failed to format SQL' };
     }
   }, [input, dialect, indentSize, keywordCase, minify]);
-
-  const handleCopy = () => {
-    navigator.clipboard.writeText(output);
-    toast.success('Formatted SQL copied!');
-  };
 
   const handleDownload = () => {
     const blob = new Blob([output], { type: 'text/plain' });
@@ -145,10 +141,7 @@ export function SqlFormatterTool() {
                 Formatted Output
               </span>
               <div className="flex gap-1.5">
-                <Button variant="outline" size="sm" onClick={handleCopy} disabled={!output} className="h-7 text-xs">
-                  <Copy className="h-3 w-3 mr-1" />
-                  Copy
-                </Button>
+                <CopyButton value={output} label="Copy" disabled={!output} toastMessage="Formatted SQL copied!" variant="outline" className="h-7" />
                 <Button variant="outline" size="sm" onClick={handleDownload} disabled={!output} className="h-7 text-xs">
                   <Download className="h-3 w-3 mr-1" />
                   Download

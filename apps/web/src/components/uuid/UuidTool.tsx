@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { Copy, Download, RefreshCw, Eye, EyeOff, Search, Settings2, Sparkles, HelpCircle } from 'lucide-react';
+import { Download, RefreshCw, Eye, EyeOff, Search, Settings2, Sparkles, HelpCircle } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -12,6 +12,7 @@ import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { generateV4, generateV1, generateUlid, generateNanoId, generateV5, decodeUuidV1 } from '@/lib/uuid';
+import { CopyButton } from '@/components/ui/copy-button';
 import { toast } from 'sonner';
 
 const NAMESPACES = {
@@ -314,10 +315,7 @@ export function UuidTool() {
                     </Badge>
                   </span>
                   <div className="flex items-center gap-1.5">
-                    <Button variant="outline" size="sm" onClick={handleCopyAll} className="h-7 text-xs">
-                      <Copy className="h-3 w-3 mr-1" />
-                      Copy All
-                    </Button>
+                    <CopyButton action={handleCopyAll} label="Copy All" toastMessage={false} variant="outline" className="h-7" />
                     <Button variant="outline" size="sm" onClick={() => handleDownload('txt')} className="h-7 text-xs">
                       <Download className="h-3 w-3 mr-1" />
                       TXT

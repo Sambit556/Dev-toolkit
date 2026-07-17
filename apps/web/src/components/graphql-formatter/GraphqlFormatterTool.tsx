@@ -1,12 +1,13 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Share2, Copy, Download, Wand2, Minimize2, AlertTriangle, CheckCircle2, ShieldCheck } from 'lucide-react';
+import { Share2, Download, Wand2, Minimize2, AlertTriangle, CheckCircle2, ShieldCheck } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
+import { CopyButton } from '@/components/ui/copy-button';
 import { parse, print, buildSchema, validate, stripIgnoredCharacters, GraphQLError } from 'graphql';
 import { toast } from 'sonner';
 
@@ -77,11 +78,6 @@ export function GraphqlFormatterTool() {
     } catch (e) {
       setFormatResult((prev) => ({ output: prev.output, errors: [formatGraphqlError(e as GraphQLError)] }));
     }
-  };
-
-  const handleCopy = () => {
-    navigator.clipboard.writeText(output);
-    toast.success('Copied!');
   };
 
   const handleDownload = () => {
@@ -169,10 +165,7 @@ export function GraphqlFormatterTool() {
                 Formatted Output
               </span>
               <div className="flex gap-1.5">
-                <Button variant="outline" size="sm" onClick={handleCopy} disabled={!output} className="h-7 text-xs">
-                  <Copy className="h-3 w-3 mr-1" />
-                  Copy
-                </Button>
+                <CopyButton value={output} label="Copy" disabled={!output} variant="outline" className="h-7" />
                 <Button variant="outline" size="sm" onClick={handleDownload} disabled={!output} className="h-7 text-xs">
                   <Download className="h-3 w-3 mr-1" />
                   Download

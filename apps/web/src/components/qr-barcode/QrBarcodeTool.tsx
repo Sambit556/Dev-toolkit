@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
-import { QrCode, Barcode, Download, Copy, RefreshCw, LayoutGrid } from 'lucide-react';
+import { QrCode, Barcode, Download, RefreshCw, LayoutGrid } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -12,6 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import QRCode from 'qrcode';
 import JsBarcode from 'jsbarcode';
 import { toast } from 'sonner';
+import { CopyButton } from '@/components/ui/copy-button';
 
 export function QrBarcodeTool() {
   const [activeTab, setActiveTab] = useState('qr-gen');
@@ -266,10 +267,7 @@ export function QrBarcodeTool() {
                   <Download className="h-3.5 w-3.5" />
                   Download
                 </Button>
-                <Button variant="outline" onClick={() => { navigator.clipboard.writeText(qrText); toast.success('Encoded text copied!'); }} className="w-32 gap-1.5 text-xs" disabled={!qrText}>
-                  <Copy className="h-3.5 w-3.5" />
-                  Copy Data
-                </Button>
+                <CopyButton value={qrText} label="Copy Data" disabled={!qrText} toastMessage="Encoded text copied!" variant="outline" className="w-32" />
               </div>
             </CardContent>
           </Card>
@@ -409,10 +407,7 @@ export function QrBarcodeTool() {
                   <Download className="h-3.5 w-3.5" />
                   Download
                 </Button>
-                <Button variant="outline" onClick={() => { navigator.clipboard.writeText(bcText); toast.success('Barcode value copied!'); }} className="w-32 gap-1.5 text-xs" disabled={!bcText}>
-                  <Copy className="h-3.5 w-3.5" />
-                  Copy Value
-                </Button>
+                <CopyButton value={bcText} label="Copy Value" disabled={!bcText} toastMessage="Barcode value copied!" variant="outline" className="w-32" />
               </div>
             </CardContent>
           </Card>

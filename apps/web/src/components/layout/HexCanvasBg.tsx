@@ -89,8 +89,9 @@ export function HexCanvasBg() {
 
       const isDark = resolvedTheme === 'dark';
       const rgbColor = isDark ? '59, 130, 246' : '99, 102, 241';
-      // Prominent base opacity for inactive background dots
-      const defaultOpacity = isDark ? 0.34 : 0.40;
+      // // Subtle base opacity for inactive background dots
+      // const defaultOpacity = isDark ? 0.34 : 0.40;
+      const defaultOpacity = isDark ? 0.16 : 0.20;
 
       // Calculate dynamic loop range to keep screen filled as coordinates drift infinitely
       const cols = Math.ceil(width / spacing) + 4;

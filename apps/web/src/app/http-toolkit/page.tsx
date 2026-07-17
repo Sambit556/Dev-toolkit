@@ -1,3 +1,4 @@
+import { BackToHomeLink } from '@/components/layout/BackToHomeLink';
 import type { Metadata } from 'next';
 import { Webhook } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
@@ -15,6 +16,7 @@ export default function HttpToolkitPage() {
     <div className="container py-6 md:py-8 max-w-5xl">
       <div className="mb-6">
         <div className="flex items-center gap-2 mb-1">
+          <BackToHomeLink />
           <Webhook className="h-5 w-5 text-primary" />
           <h1 className="text-2xl font-bold">HTTP Toolkit</h1>
         </div>

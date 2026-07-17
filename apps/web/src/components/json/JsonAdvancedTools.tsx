@@ -7,7 +7,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
-import { copyToClipboard, downloadFile } from '@/lib/utils';
+import { downloadFile } from '@/lib/utils';
+import { CopyButton } from '@/components/ui/copy-button';
 import {
   generateTypeScript,
   jsonToCsv,
@@ -158,14 +159,7 @@ export function JsonAdvancedTools({ jsonInput, onJsonChange }: AdvancedToolsProp
                 <pre className="rounded-md border bg-muted p-3 text-xs font-mono overflow-auto max-h-64 whitespace-pre-wrap">
                   {tsOutput}
                 </pre>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="absolute top-2 right-2 h-6 text-xs"
-                  onClick={async () => { await copyToClipboard(tsOutput); toast.success('Copied!'); }}
-                >
-                  Copy
-                </Button>
+                <CopyButton value={tsOutput} label="Copy" variant="outline" className="absolute top-2 right-2 h-6" />
               </div>
             )}
           </Section>
@@ -183,9 +177,7 @@ export function JsonAdvancedTools({ jsonInput, onJsonChange }: AdvancedToolsProp
                   className="font-mono text-xs h-48"
                 />
                 <div className="flex gap-2">
-                  <Button size="sm" variant="outline" onClick={async () => { await copyToClipboard(csvOutput); toast.success('Copied!'); }}>
-                    Copy CSV
-                  </Button>
+                  <CopyButton value={csvOutput} label="Copy CSV" variant="outline" />
                   <Button size="sm" variant="outline" onClick={() => downloadFile(csvOutput, 'data.csv', 'text/csv')}>
                     Download CSV
                   </Button>
@@ -247,14 +239,7 @@ export function JsonAdvancedTools({ jsonInput, onJsonChange }: AdvancedToolsProp
                   readOnly
                   className="font-mono text-xs h-32"
                 />
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="mt-1 h-7 text-xs"
-                  onClick={async () => { await copyToClipboard(escapedOutput); toast.success('Copied!'); }}
-                >
-                  Copy
-                </Button>
+                <CopyButton value={escapedOutput} label="Copy" variant="outline" className="mt-1 h-7" />
               </div>
             )}
           </Section>
