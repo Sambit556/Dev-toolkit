@@ -41,11 +41,11 @@ function CopyButton({ value }: { value: string }) {
 }
 
 const FORMAT_EXAMPLES = [
-  { label: 'ISO 8601', value: '2023-11-14T22:13:20Z' },
-  { label: 'Date + Time', value: '2023-11-14 22:13:20' },
-  { label: 'Date only', value: '2023-11-14' },
-  { label: 'MM/DD/YYYY', value: '11/14/2023' },
-  { label: 'DD-MM-YYYY', value: '14-11-2023' },
+  { label: 'ISO 8601', value: '2026-11-14T22:13:20Z' },
+  { label: 'Date + Time', value: '2026-11-14 22:13:20' },
+  { label: 'Date only', value: '2026-11-14' },
+  { label: 'MM/DD/YYYY', value: '11/14/2026' },
+  { label: 'DD-MM-YYYY', value: '14-11-2026' },
 ];
 
 export function DateToTimestamp() {
