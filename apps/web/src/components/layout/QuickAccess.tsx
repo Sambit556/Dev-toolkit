@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { Calculator, Clock, Braces, X, Play, RotateCcw, GripHorizontal, Settings2, ArrowRight, Pencil, TreePine } from 'lucide-react';
+import { Calculator, Clock, Braces, X, Play, RotateCcw, GripHorizontal, Settings2, ArrowRight, Pencil, TreePine, ChevronDown, ChevronUp } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { toolCategories } from '@/lib/tools';
@@ -44,6 +44,7 @@ const WIDGET_HREFS: Record<string, Exclude<ActiveTool, null>> = {
 
 const DEFAULT_PINNED = ['/calculator', '/epoch', '/json'];
 const PINNED_STORAGE_KEY = 'devkits-quick-tools';
+const COLLAPSED_STORAGE_KEY = 'devkits-quick-dock-collapsed';
 
 const ALL_TOOLS = toolCategories.flatMap((cat) => cat.items.map((item) => ({ ...item, categoryName: cat.name })));
 
@@ -52,6 +53,7 @@ export function QuickAccess() {
   const [activeTool, setActiveTool] = useState<ActiveTool>(null);
   const [pinned, setPinned] = useState<string[]>(DEFAULT_PINNED);
   const [manageOpen, setManageOpen] = useState(false);
+  const [collapsed, setCollapsed] = useState(false);
 
   // Floating panel positions
   const [calcPos, setCalcPos] = useState<PanelPos>({ x: 80, y: 150 });
@@ -83,6 +85,17 @@ export function QuickAccess() {
     epoch: epochContentRef,
     json: jsonContentRef,
   };
+  // Refs to each panel's own outer (fixed-positioned) wrapper — used to read
+  // its real on-screen width/height so drag bounds and the viewport-clamp
+  // effect can keep the whole panel visible instead of assuming a fixed size.
+  const calcPanelRef = useRef<HTMLDivElement>(null);
+  const epochPanelRef = useRef<HTMLDivElement>(null);
+  const jsonPanelRef = useRef<HTMLDivElement>(null);
+  const panelRefs: Record<Exclude<ActiveTool, null>, React.RefObject<HTMLDivElement | null>> = {
+    calc: calcPanelRef,
+    epoch: epochPanelRef,
+    json: jsonPanelRef,
+  };
 
   // Quick Dock Pos state and dragging refs
   const [dockPos, setDockPos] = useState<PanelPos>({ x: 16, y: 250 });
@@ -108,7 +121,56 @@ export function QuickAccess() {
         if (Array.isArray(parsed)) setPinned(parsed);
       } catch {}
     }
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setCollapsed(localStorage.getItem(COLLAPSED_STORAGE_KEY) === 'true');
   }, []);
+
+  const toggleCollapsed = () => {
+    setCollapsed((prev) => {
+      const next = !prev;
+      localStorage.setItem(COLLAPSED_STORAGE_KEY, String(next));
+      return next;
+    });
+  };
+
+  // Re-pulls the dock and any open mini panel back inside the viewport
+  // whenever it resizes, and once on mount — a position saved from a wider/
+  // taller screen (or from before the window was resized) would otherwise
+  // sit partly or fully off-screen with no way to drag it back into view.
+  useEffect(() => {
+    const clamp = () => {
+      const dockRect = dockRef.current?.getBoundingClientRect();
+      if (dockRect) {
+        setDockPos((prev) => {
+          const maxX = Math.max(4, window.innerWidth - dockRect.width - 4);
+          const maxY = Math.max(4, window.innerHeight - dockRect.height - 4);
+          const x = Math.max(4, Math.min(prev.x, maxX));
+          const y = Math.max(4, Math.min(prev.y, maxY));
+          if (x !== prev.x || y !== prev.y) {
+            localStorage.setItem('devkits-quick-dock-pos', JSON.stringify({ x, y }));
+            return { x, y };
+          }
+          return prev;
+        });
+      }
+
+      const panelSetters = { calc: setCalcPos, epoch: setEpochPos, json: setJsonPos } as const;
+      (Object.keys(panelRefs) as Exclude<ActiveTool, null>[]).forEach((tool) => {
+        const rect = panelRefs[tool].current?.getBoundingClientRect();
+        if (!rect) return;
+        const maxX = Math.max(4, window.innerWidth - rect.width - 4);
+        const maxY = Math.max(4, window.innerHeight - rect.height - 4);
+        panelSetters[tool]((prev) => ({
+          x: Math.max(4, Math.min(prev.x, maxX)),
+          y: Math.max(4, Math.min(prev.y, maxY)),
+        }));
+      });
+    };
+
+    clamp();
+    window.addEventListener('resize', clamp);
+    return () => window.removeEventListener('resize', clamp);
+  }, [activeTool, collapsed, pinned.length]);
 
   const togglePinned = (href: string) => {
     setPinned((prev) => {
@@ -236,23 +298,34 @@ export function QuickAccess() {
       setPanelSizes((prev) => ({ ...prev, [tool]: { width, height } }));
     };
 
+    // Bounds the drag target's top-left so the whole element (measured from
+    // its own rendered size, not a guessed constant) stays on-screen — lets
+    // it reach every edge/corner of the viewport without ever letting part of
+    // it drift off-screen where it'd be invisible and undraggable back.
+    const clampToViewport = (x: number, y: number, elRect: DOMRect | undefined, fallback: number, margin: number) => {
+      const w = elRect?.width ?? fallback;
+      const h = elRect?.height ?? fallback;
+      return {
+        x: Math.max(margin, Math.min(x, Math.max(margin, window.innerWidth - w - margin))),
+        y: Math.max(margin, Math.min(y, Math.max(margin, window.innerHeight - h - margin))),
+      };
+    };
+
     const handleMouseMove = (e: MouseEvent) => {
       if (draggingTool) {
-        let newX = e.clientX - dragOffset.x;
-        let newY = e.clientY - dragOffset.y;
-
-        newX = Math.max(10, Math.min(newX, window.innerWidth - 300));
-        newY = Math.max(10, Math.min(newY, window.innerHeight - 300));
+        const rect = panelRefs[draggingTool].current?.getBoundingClientRect();
+        const { x: newX, y: newY } = clampToViewport(e.clientX - dragOffset.x, e.clientY - dragOffset.y, rect, 300, 4);
 
         if (draggingTool === 'calc') setCalcPos({ x: newX, y: newY });
         if (draggingTool === 'epoch') setEpochPos({ x: newX, y: newY });
         if (draggingTool === 'json') setJsonPos({ x: newX, y: newY });
       } else if (isDraggingDock) {
-        let newX = e.clientX - dockDragOffsetRef.current.x;
-        let newY = e.clientY - dockDragOffsetRef.current.y;
-
-        newX = Math.max(5, Math.min(newX, window.innerWidth - 65));
-        newY = Math.max(5, Math.min(newY, window.innerHeight - 200));
+        const rect = dockRef.current?.getBoundingClientRect();
+        const { x: newX, y: newY } = clampToViewport(
+          e.clientX - dockDragOffsetRef.current.x,
+          e.clientY - dockDragOffsetRef.current.y,
+          rect, 60, 4,
+        );
 
         setDockPos({ x: newX, y: newY });
       } else if (resizingTool) {
@@ -265,21 +338,19 @@ export function QuickAccess() {
       const touch = e.touches[0];
 
       if (draggingTool) {
-        let newX = touch.clientX - dragOffset.x;
-        let newY = touch.clientY - dragOffset.y;
-
-        newX = Math.max(10, Math.min(newX, window.innerWidth - 300));
-        newY = Math.max(10, Math.min(newY, window.innerHeight - 300));
+        const rect = panelRefs[draggingTool].current?.getBoundingClientRect();
+        const { x: newX, y: newY } = clampToViewport(touch.clientX - dragOffset.x, touch.clientY - dragOffset.y, rect, 300, 4);
 
         if (draggingTool === 'calc') setCalcPos({ x: newX, y: newY });
         if (draggingTool === 'epoch') setEpochPos({ x: newX, y: newY });
         if (draggingTool === 'json') setJsonPos({ x: newX, y: newY });
       } else if (isDraggingDock) {
-        let newX = touch.clientX - dockDragOffsetRef.current.x;
-        let newY = touch.clientY - dockDragOffsetRef.current.y;
-
-        newX = Math.max(5, Math.min(newX, window.innerWidth - 65));
-        newY = Math.max(5, Math.min(newY, window.innerHeight - 200));
+        const rect = dockRef.current?.getBoundingClientRect();
+        const { x: newX, y: newY } = clampToViewport(
+          touch.clientX - dockDragOffsetRef.current.x,
+          touch.clientY - dockDragOffsetRef.current.y,
+          rect, 60, 4,
+        );
 
         setDockPos({ x: newX, y: newY });
       } else if (resizingTool) {
@@ -325,7 +396,12 @@ export function QuickAccess() {
             position: 'fixed',
             left: `${dockPos.x}px`,
             top: `${dockPos.y}px`,
-            zIndex: 40
+            // Above ordinary in-page chrome (headers, dropdowns commonly sit at
+            // z-40/z-50 — e.g. the Storage Vault's own "SECURE SHIELD" header
+            // is z-50) so this floating dock is never visually buried under a
+            // page's own content when dragged into that region; still below
+            // real modals/dialogs, which use z-[100] and up.
+            zIndex: 90
           }}
           className="flex flex-col gap-3.5 bg-background/70 dark:bg-slate-900/80 backdrop-blur-md border border-border/80 p-2 rounded-2xl shadow-2xl animate-fade-in select-none"
         >
@@ -334,7 +410,10 @@ export function QuickAccess() {
               <div
                 onMouseDown={(e) => handleDockMouseDown(e, dockRef.current!)}
                 onTouchStart={(e) => handleDockTouchStart(e, dockRef.current!)}
-                className="cursor-move flex flex-col items-center gap-1 border-b pb-2 px-1 hover:text-primary transition-colors text-muted-foreground/80"
+                className={cn(
+                  "cursor-move flex flex-col items-center gap-1 px-1 hover:text-primary transition-colors text-muted-foreground/80",
+                  !collapsed && "border-b pb-2",
+                )}
               >
                 <GripHorizontal className="h-3.5 w-3.5" />
                 <div className="text-[8px] uppercase tracking-widest font-black text-center">
@@ -345,43 +424,59 @@ export function QuickAccess() {
             <TooltipContent side="right">Drag to reposition toolbar</TooltipContent>
           </Tooltip>
 
-          {pinned.map((href) => {
-            const tool = ALL_TOOLS.find((t) => t.href === href);
-            if (!tool) return null;
-            const Icon = tool.icon;
-            const widgetKey = WIDGET_HREFS[href];
-            const isActive = widgetKey !== undefined && activeTool === widgetKey;
-            return (
-              <Tooltip key={href}>
-                <TooltipTrigger asChild>
-                  <button
-                    onClick={() => handleLaunch(href)}
-                    className={cn(
-                      "h-10 w-10 flex items-center justify-center rounded-xl transition-all shadow-sm active:scale-95",
-                      isActive
-                        ? "bg-primary text-primary-foreground scale-105"
-                        : "bg-muted/50 hover:bg-muted text-muted-foreground hover:text-foreground"
-                    )}
-                  >
-                    <Icon className="h-4.5 w-4.5" />
-                  </button>
-                </TooltipTrigger>
-                <TooltipContent side="right">{tool.label}</TooltipContent>
-              </Tooltip>
-            );
-          })}
-
           <Tooltip>
             <TooltipTrigger asChild>
               <button
-                onClick={() => setManageOpen(true)}
-                className="h-10 w-10 flex items-center justify-center rounded-xl transition-all shadow-sm active:scale-95 bg-muted/30 hover:bg-muted text-muted-foreground hover:text-foreground border border-dashed border-border/80"
+                onClick={toggleCollapsed}
+                className="h-5 w-10 flex items-center justify-center text-muted-foreground/70 hover:text-primary transition-colors"
               >
-                <Settings2 className="h-4 w-4" />
+                {collapsed ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronUp className="h-3.5 w-3.5" />}
               </button>
             </TooltipTrigger>
-            <TooltipContent side="right">Manage Quick Access tools</TooltipContent>
+            <TooltipContent side="right">{collapsed ? 'Expand toolbar' : 'Collapse toolbar'}</TooltipContent>
           </Tooltip>
+
+          {!collapsed && (
+            <>
+              {pinned.map((href) => {
+                const tool = ALL_TOOLS.find((t) => t.href === href);
+                if (!tool) return null;
+                const Icon = tool.icon;
+                const widgetKey = WIDGET_HREFS[href];
+                const isActive = widgetKey !== undefined && activeTool === widgetKey;
+                return (
+                  <Tooltip key={href}>
+                    <TooltipTrigger asChild>
+                      <button
+                        onClick={() => handleLaunch(href)}
+                        className={cn(
+                          "h-10 w-10 flex items-center justify-center rounded-xl transition-all shadow-sm active:scale-95",
+                          isActive
+                            ? "bg-primary text-primary-foreground scale-105"
+                            : "bg-muted/50 hover:bg-muted text-muted-foreground hover:text-foreground"
+                        )}
+                      >
+                        <Icon className="h-4.5 w-4.5" />
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent side="right">{tool.label}</TooltipContent>
+                  </Tooltip>
+                );
+              })}
+
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    onClick={() => setManageOpen(true)}
+                    className="h-10 w-10 flex items-center justify-center rounded-xl transition-all shadow-sm active:scale-95 bg-muted/30 hover:bg-muted text-muted-foreground hover:text-foreground border border-dashed border-border/80"
+                  >
+                    <Settings2 className="h-4 w-4" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="right">Manage Quick Access tools</TooltipContent>
+              </Tooltip>
+            </>
+          )}
       </div>
 
       <QuickAccessManager
@@ -394,8 +489,9 @@ export function QuickAccess() {
       {/* Floating Mini Panels */}
       {activeTool === 'calc' && (
         <div
+          ref={calcPanelRef}
           style={{
-            position: 'fixed', left: `${calcPos.x}px`, top: `${calcPos.y}px`, zIndex: 50,
+            position: 'fixed', left: `${calcPos.x}px`, top: `${calcPos.y}px`, zIndex: 100,
             width: panelSizes.calc ? `${panelSizes.calc.width}px` : undefined,
             height: panelSizes.calc ? `${panelSizes.calc.height}px` : undefined,
           }}
@@ -427,8 +523,9 @@ export function QuickAccess() {
 
       {activeTool === 'epoch' && (
         <div
+          ref={epochPanelRef}
           style={{
-            position: 'fixed', left: `${epochPos.x}px`, top: `${epochPos.y}px`, zIndex: 50,
+            position: 'fixed', left: `${epochPos.x}px`, top: `${epochPos.y}px`, zIndex: 100,
             width: panelSizes.epoch ? `${panelSizes.epoch.width}px` : undefined,
             height: panelSizes.epoch ? `${panelSizes.epoch.height}px` : undefined,
           }}
@@ -460,8 +557,9 @@ export function QuickAccess() {
 
       {activeTool === 'json' && (
         <div
+          ref={jsonPanelRef}
           style={{
-            position: 'fixed', left: `${jsonPos.x}px`, top: `${jsonPos.y}px`, zIndex: 50,
+            position: 'fixed', left: `${jsonPos.x}px`, top: `${jsonPos.y}px`, zIndex: 100,
             width: panelSizes.json ? `${panelSizes.json.width}px` : undefined,
             height: panelSizes.json ? `${panelSizes.json.height}px` : undefined,
           }}

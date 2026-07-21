@@ -2,15 +2,11 @@ import type { Metadata, Viewport } from 'next';
 import { Inter, JetBrains_Mono } from 'next/font/google';
 import './globals.css';
 import { ThemeProvider } from '@/components/layout/ThemeProvider';
-import { Header } from '@/components/layout/Header';
-import { Footer } from '@/components/layout/Footer';
-import { FloatingSupport } from '@/components/layout/FloatingSupport';
+import { ChromeGate } from '@/components/layout/ChromeGate';
 import { Toaster } from '@/components/ui/sonner';
 import { LocalizationProvider } from '@/context/LocalizationContext';
 import { HexCanvasBg } from '@/components/layout/HexCanvasBg';
 import { SplashScreen } from '@/components/layout/SplashScreen';
-import { StickyNotes } from '@/components/layout/StickyNotes';
-import { QuickAccess } from '@/components/layout/QuickAccess';
 import { TooltipProvider } from '@/components/ui/tooltip';
 
 const inter = Inter({ subsets: ['latin'], variable: '--font-inter' });
@@ -193,12 +189,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <TooltipProvider delayDuration={200}>
               <SplashScreen />
               <HexCanvasBg />
-              <Header />
-              <main className="flex-1 relative z-10 w-full overflow-x-hidden">{children}</main>
-              <Footer />
-              <FloatingSupport />
-              <StickyNotes />
-              <QuickAccess />
+              <ChromeGate>{children}</ChromeGate>
               <Toaster richColors position="bottom-right" />
             </TooltipProvider>
           </LocalizationProvider>

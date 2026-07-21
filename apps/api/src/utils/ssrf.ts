@@ -2,6 +2,7 @@ import dns from 'dns';
 import net from 'net';
 import { fetch, Agent, type Dispatcher } from 'undici';
 import { AppError } from '../middleware/errorHandler';
+import { HttpStatus } from './httpStatus';
 
 const MAX_REDIRECTS = 5;
 const FETCH_TIMEOUT_MS = 10_000;
@@ -59,10 +60,10 @@ async function resolveAllowedIps(hostname: string, allowPrivate: boolean): Promi
   const literalFamily = net.isIP(hostname);
   const check = (ip: string) => {
     if (isAlwaysBlockedIp(ip)) {
-      throw new AppError(400, 'Target host resolves to a reserved or non-routable address', 'SSRF_BLOCKED');
+      throw new AppError(HttpStatus.BAD_REQUEST, 'Target host resolves to a reserved or non-routable address', 'SSRF_BLOCKED');
     }
     if (!allowPrivate && isPrivateIp(ip)) {
-      throw new AppError(400, 'Target host resolves to a private address. Enable "allow private targets" to inspect internal APIs.', 'SSRF_BLOCKED_PRIVATE');
+      throw new AppError(HttpStatus.BAD_REQUEST, 'Target host resolves to a private address. Enable "allow private targets" to inspect internal APIs.', 'SSRF_BLOCKED_PRIVATE');
     }
   };
 
@@ -73,7 +74,7 @@ async function resolveAllowedIps(hostname: string, allowPrivate: boolean): Promi
 
   const records = await dns.promises.lookup(hostname, { all: true });
   if (records.length === 0) {
-    throw new AppError(400, 'Could not resolve host', 'DNS_ERROR');
+    throw new AppError(HttpStatus.BAD_REQUEST, 'Could not resolve host', 'DNS_ERROR');
   }
   for (const r of records) check(r.address);
   return records.map((r) => ({ address: r.address, family: r.family as 4 | 6 }));
@@ -121,7 +122,7 @@ export async function safeFetch(targetUrl: string, options: SafeFetchOptions = {
   for (let hop = 0; hop <= MAX_REDIRECTS; hop++) {
     const parsed = new URL(currentUrl);
     if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
-      throw new AppError(400, 'Only http and https URLs are supported', 'INVALID_PROTOCOL');
+      throw new AppError(HttpStatus.BAD_REQUEST, 'Only http and https URLs are supported', 'INVALID_PROTOCOL');
     }
 
     const dnsStart = Date.now();
@@ -165,7 +166,7 @@ export async function safeFetch(targetUrl: string, options: SafeFetchOptions = {
     }
     if (!res) {
       const detail = lastConnectError instanceof Error ? lastConnectError.message : 'connection failed';
-      throw new AppError(502, `Could not connect to target host (${detail})`, 'CONNECT_FAILED');
+      throw new AppError(HttpStatus.BAD_GATEWAY, `Could not connect to target host (${detail})`, 'CONNECT_FAILED');
     }
     const connectAndWaitMs = Date.now() - connectStart;
 
@@ -205,5 +206,5 @@ export async function safeFetch(targetUrl: string, options: SafeFetchOptions = {
     };
   }
 
-  throw new AppError(400, 'Too many redirects', 'TOO_MANY_REDIRECTS');
+  throw new AppError(HttpStatus.BAD_REQUEST, 'Too many redirects', 'TOO_MANY_REDIRECTS');
 }

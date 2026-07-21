@@ -1,82 +1,173 @@
 import { Request, Response, NextFunction } from 'express';
 import { ZodError } from 'zod';
 import { logger } from '../utils/logger';
+import { getTransactionId } from '../utils/context';
+import { HttpStatus } from '../utils/httpStatus';
 
 export class AppError extends Error {
   constructor(
     public statusCode: number,
     message: string,
     public code?: string,
+    public details: any = {}
   ) {
     super(message);
     this.name = 'AppError';
   }
 }
 
-export function notFoundHandler(req: Request, res: Response): void {
-  res.status(404).json({
-    error: 'Not found',
-    message: `Route ${req.method} ${req.path} not found`,
-    requestId: req.headers['x-request-id'],
-  });
+export function notFoundHandler(req: Request, res: Response, next: NextFunction): void {
+  const err = new AppError(
+    HttpStatus.NOT_FOUND,
+    `Route ${req.method} ${req.path} not found`,
+    'ROUTE_NOT_FOUND'
+  );
+  next(err);
 }
 
 export function errorHandler(
-  err: Error,
+  err: any,
   req: Request,
   res: Response,
-  _next: NextFunction,
+  _next: NextFunction
 ): void {
-  const requestId = req.headers['x-request-id'];
+  const transactionId = getTransactionId() || (req as any).transactionId || '00000000-0000-0000-0000-000000000000';
+  const timestamp = new Date().toISOString();
 
+  let statusCode: number = HttpStatus.INTERNAL_SERVER_ERROR;
+  let code = 'INTERNAL_SERVER_ERROR';
+  let message = 'An unexpected error occurred';
+  let details: any = {};
+
+  // 1. Zod validation errors
   if (err instanceof ZodError) {
-    res.status(400).json({
-      error: 'Validation error',
-      message: 'Invalid request data',
-      details: err.errors.map((e) => ({
-        field: e.path.join('.'),
-        message: e.message,
-      })),
-      requestId,
-    });
-    return;
+    statusCode = HttpStatus.BAD_REQUEST;
+    code = 'VALIDATION_ERROR';
+    message = 'Validation failed';
+    details = err.errors.reduce((acc: any, e) => {
+      const field = e.path.join('.');
+      acc[field] = e.message;
+      return acc;
+    }, {});
+  }
+  // 2. Custom AppErrors
+  else if (err instanceof AppError) {
+    statusCode = err.statusCode;
+    code = err.code || 'ERROR';
+    message = err.message;
+    details = err.details || {};
+  }
+  // 3. CORS errors
+  else if (err.message && err.message.startsWith('CORS:')) {
+    statusCode = HttpStatus.FORBIDDEN;
+    code = 'CORS_BLOCKED';
+    message = err.message;
+  }
+  // 4. PostgreSQL Errors
+  else if (err.code && typeof err.code === 'string' && /^[0-9A-Z]{5}$/.test(err.code)) {
+    statusCode = HttpStatus.INTERNAL_SERVER_ERROR;
+    message = 'A database error occurred';
+    
+    // Map PG codes
+    switch (err.code) {
+      case '23505': // Unique key violation
+        statusCode = HttpStatus.CONFLICT;
+        code = 'DUPLICATE_KEY';
+        message = err.detail || 'A resource with this key already exists.';
+        break;
+      case '23503': // Foreign key violation
+        statusCode = HttpStatus.BAD_REQUEST;
+        code = 'FOREIGN_KEY_VIOLATION';
+        message = err.detail || 'Foreign key constraint violated.';
+        break;
+      case '42P01': // Undefined table
+        code = 'DATABASE_TABLE_MISSING';
+        message = 'Required database table is missing.';
+        break;
+      case '3F000': // Invalid schema
+      case '42P06':
+        code = 'DATABASE_SCHEMA_MISSING';
+        message = 'Required database schema is missing.';
+        break;
+      case '40001': // Serialization failure
+      case '40P01': // Deadlock
+        code = 'DATABASE_DEADLOCK';
+        message = 'A database deadlock occurred. Please retry.';
+        break;
+      case '57014': // Query timeout
+        statusCode = HttpStatus.GATEWAY_TIMEOUT;
+        code = 'DATABASE_TIMEOUT';
+        message = 'Database query timed out.';
+        break;
+      default:
+        code = 'DATABASE_ERROR';
+        break;
+    }
+  }
+  // 5. AWS S3 Client Errors
+  else if (err.$metadata) {
+    statusCode = err.$metadata.httpStatusCode || HttpStatus.INTERNAL_SERVER_ERROR;
+    message = err.message || 'An error occurred during S3 storage operation';
+
+    switch (err.name) {
+      case 'NoSuchBucket':
+        code = 'S3_BUCKET_NOT_FOUND';
+        message = 'The configured storage bucket does not exist.';
+        break;
+      case 'AccessDenied':
+        code = 'S3_ACCESS_DENIED';
+        message = 'Access denied to storage services.';
+        break;
+      case 'InvalidAccessKeyId':
+      case 'SignatureDoesNotMatch':
+      case 'UnrecognizedClientException':
+        code = 'S3_CREDENTIALS_INVALID';
+        message = 'Invalid storage credentials.';
+        break;
+      case 'NoSuchKey':
+        statusCode = HttpStatus.NOT_FOUND;
+        code = 'S3_OBJECT_NOT_FOUND';
+        message = 'The requested file or note does not exist in storage.';
+        break;
+      case 'ExpiredToken':
+        code = 'S3_URL_EXPIRED';
+        message = 'Presigned URL has expired.';
+        break;
+      default:
+        code = 'S3_ERROR';
+        break;
+    }
   }
 
-  if (err instanceof AppError) {
-    res.status(err.statusCode).json({
-      error: err.code || 'error',
-      message: err.message,
-      requestId,
+  // Log errors
+  if (statusCode >= HttpStatus.INTERNAL_SERVER_ERROR) {
+    logger.error('Server execution error', {
+      error: err.message,
+      stack: err.stack,
+      code,
+      transactionId,
+      path: req.path,
+      method: req.method,
     });
-    return;
+  } else {
+    logger.warn('Client request warning', {
+      error: err.message,
+      code,
+      statusCode,
+      transactionId,
+      path: req.path,
+      method: req.method,
+    });
   }
 
-  // The `cors` package rejects disallowed origins by calling its callback
-  // with a plain Error, which lands here — before it ever gets a chance to
-  // set Access-Control-Allow-Origin. Left as a generic 500, that reads to
-  // the browser as an opaque CORS failure with no indication of the real
-  // cause. Surface it as a 403 with the actual reason instead.
-  if (err.message.startsWith('CORS:')) {
-    logger.warn('CORS rejection', { error: err.message, requestId, method: req.method, path: req.path });
-    res.status(403).json({
-      error: 'CORS_BLOCKED',
-      message: err.message,
-      requestId,
-    });
-    return;
-  }
-
-  logger.error('Unhandled error', {
-    error: err.message,
-    stack: err.stack,
-    requestId,
-    method: req.method,
-    path: req.path,
-  });
-
-  res.status(500).json({
-    error: 'Internal server error',
-    message: 'An unexpected error occurred',
-    requestId,
+  // Centralized standard response format
+  res.status(statusCode).json({
+    success: false,
+    transactionId,
+    code,
+    message,
+    details,
+    timestamp,
   });
 }
+

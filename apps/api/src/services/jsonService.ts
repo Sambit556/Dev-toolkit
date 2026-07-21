@@ -4,6 +4,7 @@ import type {
   JsonMinifyResponse,
 } from '@devchrono/shared';
 import { AppError } from '../middleware/errorHandler';
+import { HttpStatus } from '../utils/httpStatus';
 
 interface JsonParseError {
   message: string;
@@ -98,7 +99,7 @@ export function minifyJson(jsonStr: string): JsonMinifyResponse {
   const { value, error } = parseJsonSafe(jsonStr);
 
   if (error) {
-    throw new AppError(400, error.message, 'INVALID_JSON');
+    throw new AppError(HttpStatus.BAD_REQUEST, error.message, 'INVALID_JSON');
   }
 
   const minified = JSON.stringify(value);

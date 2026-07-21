@@ -6,6 +6,7 @@ import type {
 } from '@devchrono/shared';
 import { detectTimestampUnit, toUnixMs, isValidIANATimezone } from '@devchrono/shared';
 import { AppError } from '../middleware/errorHandler';
+import { HttpStatus } from '../utils/httpStatus';
 
 function formatWithTimezone(ms: number, timezone: string, use24h = true): string {
   try {
@@ -21,7 +22,7 @@ function formatWithTimezone(ms: number, timezone: string, use24h = true): string
       timeZoneName: 'short',
     }).format(new Date(ms));
   } catch {
-    throw new AppError(400, `Invalid timezone: ${timezone}`, 'INVALID_TIMEZONE');
+    throw new AppError(HttpStatus.BAD_REQUEST, `Invalid timezone: ${timezone}`, 'INVALID_TIMEZONE');
   }
 }
 
@@ -54,7 +55,7 @@ export function convertTimestamp(
   timezone = 'UTC',
 ): ConvertTimestampResponse {
   if (!isValidIANATimezone(timezone)) {
-    throw new AppError(400, `Invalid IANA timezone: ${timezone}`, 'INVALID_TIMEZONE');
+    throw new AppError(HttpStatus.BAD_REQUEST, `Invalid IANA timezone: ${timezone}`, 'INVALID_TIMEZONE');
   }
 
   const detectedUnit = unit ?? detectTimestampUnit(timestamp);
@@ -64,7 +65,7 @@ export function convertTimestamp(
 
   // Overflow check (JS Date range: -8640000000000000 to 8640000000000000)
   if (ms < -8_640_000_000_000_000 || ms > 8_640_000_000_000_000) {
-    throw new AppError(400, 'Timestamp is out of valid date range', 'TIMESTAMP_OVERFLOW');
+    throw new AppError(HttpStatus.BAD_REQUEST, 'Timestamp is out of valid date range', 'TIMESTAMP_OVERFLOW');
   }
 
   return {
@@ -87,7 +88,7 @@ export function convertDate(
   timezone = 'UTC',
 ): ConvertDateResponse {
   if (!isValidIANATimezone(timezone)) {
-    throw new AppError(400, `Invalid IANA timezone: ${timezone}`, 'INVALID_TIMEZONE');
+    throw new AppError(HttpStatus.BAD_REQUEST, `Invalid IANA timezone: ${timezone}`, 'INVALID_TIMEZONE');
   }
 
   let ms: number;
@@ -119,7 +120,7 @@ export function convertDate(
   }
 
   if (isNaN(ms)) {
-    throw new AppError(400, `Cannot parse date: "${dateString}"`, 'INVALID_DATE');
+    throw new AppError(HttpStatus.BAD_REQUEST, `Cannot parse date: "${dateString}"`, 'INVALID_DATE');
   }
 
   const unixS = Math.floor(ms / 1000);

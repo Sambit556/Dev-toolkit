@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { webhookRateLimit, httpInspectRateLimit } from '../middleware/rateLimiter';
 import { AppError } from '../middleware/errorHandler';
 import { safeFetch } from '../utils/ssrf';
+import { HttpStatus } from '../utils/httpStatus';
 
 const router = Router();
 
@@ -31,7 +32,7 @@ interface MockResponseConfig {
 }
 
 const DEFAULT_MOCK_RESPONSE: MockResponseConfig = {
-  status: 200,
+  status: HttpStatus.OK,
   headers: { 'Content-Type': 'application/json' },
   body: JSON.stringify({ ok: true }),
 };
@@ -66,7 +67,7 @@ function sanitizeHeaders(headers: Request['headers']): Record<string, string> {
 function getBucketOrThrow(id: string): WebhookBucket {
   const bucket = store.get(id);
   if (!bucket) {
-    throw new AppError(404, 'Unknown or expired webhook id', 'NOT_FOUND');
+    throw new AppError(HttpStatus.NOT_FOUND, 'Unknown or expired webhook id', 'NOT_FOUND');
   }
   return bucket;
 }
@@ -89,7 +90,7 @@ router.post('/create', (_req: Request, res: Response) => {
     lastActivity: Date.now(),
     responseConfig: { ...DEFAULT_MOCK_RESPONSE, headers: { ...DEFAULT_MOCK_RESPONSE.headers } },
   });
-  res.status(201).json({ id });
+  res.status(HttpStatus.CREATED).json({ id });
 });
 
 /**
@@ -195,7 +196,7 @@ router.post('/:id/requests/:reqId/replay', httpInspectRateLimit, async (req: Req
     const bucket = getBucketOrThrow(req.params.id);
     const captured = bucket.requests.find((r) => r.id === req.params.reqId);
     if (!captured) {
-      throw new AppError(404, 'Unknown captured request id', 'NOT_FOUND');
+      throw new AppError(HttpStatus.NOT_FOUND, 'Unknown captured request id', 'NOT_FOUND');
     }
     const { targetUrl, allowPrivate } = ReplaySchema.parse(req.body);
 
@@ -232,7 +233,7 @@ router.post('/:id/requests/:reqId/replay', httpInspectRateLimit, async (req: Req
 router.all('/capture/:id', webhookRateLimit, (req: Request, res: Response) => {
   const bucket = store.get(req.params.id);
   if (!bucket) {
-    res.status(404).json({ error: 'Not found', message: 'Unknown or expired webhook id' });
+    res.status(HttpStatus.NOT_FOUND).json({ error: 'Not found', message: 'Unknown or expired webhook id' });
     return;
   }
 

@@ -65,6 +65,46 @@ export function StickyNotes() {
     }
   }, []);
 
+  // Pulls the trigger tab and every note back inside the viewport on mount
+  // and whenever the window resizes — positions are saved in localStorage as
+  // raw pixel coordinates, so a note placed on a larger screen (or before a
+  // resize) would otherwise sit partly or fully off-screen with no way to
+  // drag it back into view.
+  useEffect(() => {
+    const clamp = () => {
+      const screenWidth = window.innerWidth;
+      const screenHeight = window.innerHeight;
+
+      setTriggerY((prev) => Math.max(50, Math.min(prev, screenHeight - 100)));
+
+      setNotes((prev) => {
+        let changed = false;
+        const next = prev.map((n) => {
+          const w = n.isMinimized ? 170 : (n.w ?? 256);
+          const h = n.isMinimized ? 34 : (n.h ?? 170);
+          const maxX = Math.max(10, screenWidth - w - 10);
+          const maxY = Math.max(10, screenHeight - h - 10);
+          const x = Math.max(10, Math.min(n.x, maxX));
+          const y = Math.max(10, Math.min(n.y, maxY));
+          if (x !== n.x || y !== n.y) {
+            changed = true;
+            return { ...n, x, y };
+          }
+          return n;
+        });
+        if (changed) {
+          localStorage.setItem('devkits-sticky-notes', JSON.stringify(next));
+          return next;
+        }
+        return prev;
+      });
+    };
+
+    clamp();
+    window.addEventListener('resize', clamp);
+    return () => window.removeEventListener('resize', clamp);
+  }, []);
+
   // Draggable Sticky notes trigger handlers
   const startDragTrigger = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -198,6 +238,7 @@ export function StickyNotes() {
   };
 
   // Dragging logic
+  const dragSizeRef = useRef({ w: 256, h: 170 });
   const startDrag = (id: string, clientX: number, clientY: number, noteEl: HTMLElement) => {
     setActiveDragId(id);
     const rect = noteEl.getBoundingClientRect();
@@ -205,22 +246,26 @@ export function StickyNotes() {
       x: clientX - rect.left,
       y: clientY - rect.top,
     };
+    // Captured once at drag-start (not re-measured every move) since the
+    // note's own size doesn't change mid-drag — used so bounds reflect this
+    // note's actual (possibly user-resized) footprint instead of a guess.
+    dragSizeRef.current = { w: rect.width, h: rect.height };
   };
 
   useEffect(() => {
     if (!activeDragId) return;
 
     const handleMouseMove = (e: MouseEvent) => {
-      const screenWidth = window.innerWidth;
-      const screenHeight = window.innerHeight;
-      
+      const maxX = Math.max(10, window.innerWidth - dragSizeRef.current.w - 10);
+      const maxY = Math.max(10, window.innerHeight - dragSizeRef.current.h - 10);
+
       // Calculate new coords
       let newX = e.clientX - dragOffsetRef.current.x;
       let newY = e.clientY - dragOffsetRef.current.y;
 
-      // Keep inside viewport bounds
-      newX = Math.max(10, Math.min(newX, screenWidth - 280));
-      newY = Math.max(10, Math.min(newY, screenHeight - 80));
+      // Keep the whole note inside viewport bounds
+      newX = Math.max(10, Math.min(newX, maxX));
+      newY = Math.max(10, Math.min(newY, maxY));
 
       setNotes((prev) =>
         prev.map((n) => (n.id === activeDragId ? { ...n, x: newX, y: newY } : n))
@@ -230,14 +275,14 @@ export function StickyNotes() {
     const handleTouchMove = (e: TouchEvent) => {
       if (e.touches.length === 0) return;
       const touch = e.touches[0];
-      const screenWidth = window.innerWidth;
-      const screenHeight = window.innerHeight;
+      const maxX = Math.max(10, window.innerWidth - dragSizeRef.current.w - 10);
+      const maxY = Math.max(10, window.innerHeight - dragSizeRef.current.h - 10);
 
       let newX = touch.clientX - dragOffsetRef.current.x;
       let newY = touch.clientY - dragOffsetRef.current.y;
 
-      newX = Math.max(10, Math.min(newX, screenWidth - 280));
-      newY = Math.max(10, Math.min(newY, screenHeight - 80));
+      newX = Math.max(10, Math.min(newX, maxX));
+      newY = Math.max(10, Math.min(newY, maxY));
 
       setNotes((prev) =>
         prev.map((n) => (n.id === activeDragId ? { ...n, x: newX, y: newY } : n))
@@ -276,7 +321,11 @@ export function StickyNotes() {
           position: 'fixed',
           right: 0,
           top: `${triggerY}px`,
-          zIndex: 40
+          // Above ordinary in-page chrome (headers/dropdowns commonly sit at
+          // z-40/z-50 — e.g. the Storage Vault's own "SECURE SHIELD" header is
+          // z-50) so the trigger tab is never buried under a page's own
+          // content; still below real modals/dialogs (z-[100]+).
+          zIndex: 90
         }}
         className="flex flex-col items-end"
       >
@@ -311,7 +360,7 @@ export function StickyNotes() {
 
       {/* Slide-out Notes Manager Panel */}
       {isOpen && (
-        <div className="fixed right-0 top-0 bottom-0 w-80 bg-background/95 backdrop-blur-md border-l border-border/80 shadow-2xl z-50 flex flex-col p-4 animate-slide-in-right">
+        <div className="fixed right-0 top-0 bottom-0 w-80 bg-background/95 backdrop-blur-md border-l border-border/80 shadow-2xl z-[100] flex flex-col p-4 animate-slide-in-right">
           <div className="flex items-center justify-between pb-3 border-b">
             <div className="flex items-center gap-2">
               <StickyNote className="h-5 w-5 text-primary" />
@@ -417,7 +466,7 @@ export function StickyNotes() {
               top: `${note.y}px`,
               width: note.isMinimized ? '170px' : `${note.w ?? 256}px`,
               height: note.isMinimized ? '34px' : `${note.h ?? 170}px`,
-              zIndex: isDragging ? 60 : 30,
+              zIndex: isDragging ? 110 : 80,
               transform: isDragging ? 'scale(1.02)' : `rotate(${tiltDeg}deg)`,
               transition: isDragging ? 'none' : 'transform 0.15s ease-out, shadow 0.15s ease-out',
               resize: note.isMinimized ? 'none' : 'both',

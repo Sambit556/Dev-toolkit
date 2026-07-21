@@ -9,12 +9,17 @@ import { requestLogger } from './middleware/requestLogger';
 import { defaultRateLimit } from './middleware/rateLimiter';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler';
 import healthRouter from './routes/health';
+import authRouter from './routes/auth';
+import storageRouter from './routes/storage';
+import adminRouter from './routes/admin';
+import profileRouter from './routes/profile';
 import timeRouter from './routes/time';
 import jsonRouter from './routes/json';
 import httpInspectRouter from './routes/httpInspect';
 import webhookRouter from './routes/webhook';
 import { swaggerSpec } from './swagger';
 import { logger } from './utils/logger';
+import { getEnvWithDefault } from './utils/env';
 
 const app = express();
 
@@ -38,7 +43,7 @@ app.use(
 );
 
 // CORS
-const allowedOrigins = (process.env.CORS_ORIGIN || 'http://localhost:4001')
+const allowedOrigins = getEnvWithDefault('CORS_ORIGIN', 'http://localhost:4001')
   .split(',')
   .map((o) => o.trim());
 
@@ -52,7 +57,7 @@ app.use(
       }
     },
     credentials: true,
-    methods: ['GET', 'POST', 'DELETE', 'OPTIONS'],
+    methods: ['GET', 'POST', 'PATCH', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'X-Request-ID'],
   }),
 );
@@ -61,8 +66,8 @@ app.use(
 app.use(compression());
 
 // Body parsing
-const defaultLimit = process.env.BODY_LIMIT_DEFAULT || '1mb';
-const jsonLimit = process.env.BODY_LIMIT_JSON || '10mb';
+const defaultLimit = getEnvWithDefault('BODY_LIMIT_DEFAULT', '1mb');
+const jsonLimit = getEnvWithDefault('BODY_LIMIT_JSON', '10mb');
 
 app.use('/api/json', express.json({ limit: jsonLimit }));
 // Webhook capture must read the exact bytes sent, for any content type —
@@ -92,6 +97,10 @@ app.use('/health', healthRouter);
 // both fine; /api/status sidesteps that without touching Render's own
 // healthCheckPath, which must stay pointed at /health.
 app.use('/api/status', healthRouter);
+app.use('/api/auth', authRouter);
+app.use('/api/storage', storageRouter);
+app.use('/api/backoffice', adminRouter);
+app.use('/api/profile', profileRouter);
 app.use('/api/time', timeRouter);
 app.use('/api/json', jsonRouter);
 app.use('/api/http-inspect', httpInspectRouter);

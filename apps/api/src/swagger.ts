@@ -19,7 +19,21 @@ export const swaggerSpec = swaggerJsdoc({
       { name: 'System', description: 'System health and status' },
       { name: 'Time', description: 'Unix timestamp conversion endpoints' },
       { name: 'JSON', description: 'JSON validation and formatting endpoints' },
+      { name: 'Auth', description: 'Authentication, session, and password management' },
+      { name: 'Storage', description: 'Cloud Storage Vault — files, folders, notes, uploads, sharing' },
+      { name: 'Admin', description: 'Superadmin-only user management' },
+      { name: 'Profile', description: 'Authenticated user’s own profile and avatar' },
     ],
+    components: {
+      securitySchemes: {
+        bearerAuth: {
+          type: 'http',
+          scheme: 'bearer',
+          bearerFormat: 'JWT',
+          description: 'Access token from POST /api/auth/login or /api/auth/register. Claims are encrypted — the token is opaque even though it is a standard verifiable JWT.',
+        },
+      },
+    },
   },
   apis: ['./src/routes/*.ts'],
 });

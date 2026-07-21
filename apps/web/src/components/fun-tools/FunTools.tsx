@@ -498,7 +498,7 @@ export function FunTools() {
               {/* Dynamic shadow anchor below rolling dice */}
               <div 
                 className={cn(
-                  "w-48 h-2 bg-black/40 blur-sm rounded-full transition-all duration-[1000ms] ease-out absolute bottom-[75px]",
+                  "w-48 h-2 bg-black/40 blur-sm rounded-full transition-all duration-1000 ease-out absolute bottom-[75px]",
                   isDiceRolling ? "scale-75 opacity-15" : "scale-100 opacity-55"
                 )} 
               />
