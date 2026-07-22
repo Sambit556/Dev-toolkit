@@ -15,18 +15,20 @@ if (fs.existsSync(envFilePath)) {
 }
 
 /**
- * Fetch a value strictly from the local .env file.
- * Returns undefined if not defined in the .env file, ignoring host system env variables.
+ * Fetch a value from the host process environment (e.g. variables injected by a PaaS
+ * like Render), falling back to the local .env file for local development.
+ * Returns undefined if not defined in either.
  */
 export function getEnv(key: string): string | undefined {
-  const value = envConfig[key];
-  return value !== undefined ? value : undefined;
+  const value = process.env[key];
+  return value !== undefined ? value : envConfig[key];
 }
 
 /**
- * Fetch a value strictly from the local .env file, falling back to a default value if missing.
+ * Fetch a value from the host process environment, falling back to the local .env file,
+ * then to a default value if missing from both.
  */
 export function getEnvWithDefault(key: string, defaultValue: string): string {
-  const value = envConfig[key];
+  const value = process.env[key] !== undefined ? process.env[key] : envConfig[key];
   return value !== undefined ? value : defaultValue;
 }
