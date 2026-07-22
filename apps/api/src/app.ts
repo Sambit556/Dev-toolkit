@@ -109,6 +109,11 @@ app.use('/api/webhook', webhookRouter);
 // OpenAPI JSON spec
 app.get('/openapi.json', (_req, res) => res.json(swaggerSpec));
 
+// Root — Render's uptime pings and other health probes hit this by default
+app.get('/', (_req, res) => {
+  res.json({ name: 'DevChrono JSONLab API', docs: '/docs', health: '/health' });
+});
+
 // 404 handler
 app.use(notFoundHandler);
 
