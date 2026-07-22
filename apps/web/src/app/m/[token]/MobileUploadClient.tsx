@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Upload, CheckCircle, XCircle, ShieldCheck, File as FileIcon, Image as ImageIcon, Video as VideoIcon } from 'lucide-react';
 
 const CHUNK_SIZE = 10 * 1024 * 1024; // 10MB chunks
@@ -32,9 +32,18 @@ function getApiBase() {
 export default function MobileUploadClient({ token }: { token: string }) {
   const [file, setFile] = useState<File | null>(null);
   const [progress, setProgress] = useState(0);
-  const [status, setStatus] = useState<'idle' | 'uploading' | 'success' | 'error'>('idle');
+  const [status, setStatus] = useState<'idle' | 'uploading' | 'paused' | 'success' | 'error'>('idle');
   const [errorMsg, setErrorMsg] = useState('');
   const [isDragging, setIsDragging] = useState(false);
+
+  // Announce this device to the desktop the moment the link is opened — scanning
+  // the QR is the "connect" moment, not waiting until a file is actually picked.
+  useEffect(() => {
+    fetch(`${getApiBase()}/api/storage/mobile/connect`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+    }).catch(() => {});
+  }, [token]);
 
   const pickFile = (f: File) => {
     setFile(f);
@@ -58,6 +67,8 @@ export default function MobileUploadClient({ token }: { token: string }) {
     setProgress(0);
     const apiBase = getApiBase();
     try {
+      const totalParts = Math.ceil(file.size / CHUNK_SIZE);
+
       // 1. Start Upload
       const startRes = await fetch(`${apiBase}/api/storage/mobile/upload/start`, {
         method: 'POST',
@@ -65,7 +76,7 @@ export default function MobileUploadClient({ token }: { token: string }) {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`
         },
-        body: JSON.stringify({ name: file.name, mimeType: file.type || 'application/octet-stream', size: file.size })
+        body: JSON.stringify({ name: file.name, mimeType: file.type || 'application/octet-stream', size: file.size, totalParts })
       });
       const startData = await startRes.json();
       if (!startData.success) throw new Error(startData.message || 'Failed to start upload');
@@ -73,7 +84,6 @@ export default function MobileUploadClient({ token }: { token: string }) {
       const { uploadId, s3Key } = startData.data;
 
       // 2. Upload Parts
-      const totalParts = Math.ceil(file.size / CHUNK_SIZE);
       const uploadedParts = [];
 
       for (let partNumber = 1; partNumber <= totalParts; partNumber++) {
@@ -81,16 +91,29 @@ export default function MobileUploadClient({ token }: { token: string }) {
         const end = Math.min(start + CHUNK_SIZE, file.size);
         const chunk = file.slice(start, end);
 
-        const partRes = await fetch(`${apiBase}/api/storage/mobile/upload/part`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`
-          },
-          body: JSON.stringify({ uploadId, s3Key, partNumber })
-        });
-        const partData = await partRes.json();
-        if (!partData.success) throw new Error('Failed to get part URL');
+        let partData: any;
+        // The desktop Upload Queue can pause this session mid-transfer (it's polling
+        // the same upload_sessions row) — poll-retry until resumed instead of failing,
+        // since the file bytes only ever live in this tab's memory.
+        while (true) {
+          const partRes = await fetch(`${apiBase}/api/storage/mobile/upload/part`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${token}`
+            },
+            body: JSON.stringify({ uploadId, s3Key, partNumber })
+          });
+          partData = await partRes.json();
+          if (partData.success) break;
+          if (partData.code === 'UPLOAD_PAUSED') {
+            setStatus('paused');
+            await new Promise((resolve) => setTimeout(resolve, 3000));
+            continue;
+          }
+          throw new Error(partData.message || 'Failed to get part URL');
+        }
+        setStatus('uploading');
 
         const putRes = await fetch(partData.data.url, {
           method: 'PUT',
@@ -199,16 +222,21 @@ export default function MobileUploadClient({ token }: { token: string }) {
                   )}
                 </div>
 
-                {status === 'uploading' ? (
+                {status === 'uploading' || status === 'paused' ? (
                   <div className="w-full flex flex-col gap-2">
                     <div className="w-full h-3 bg-slate-800 rounded-full overflow-hidden relative">
-                      <div className="h-full bg-gradient-to-r from-indigo-500 to-cyan-500 transition-all duration-300 relative overflow-hidden" style={{ width: `${progress}%` }}>
-                        <div className="absolute inset-0 bg-white/20 animate-pulse" />
+                      <div
+                        className={`h-full transition-all duration-300 relative overflow-hidden ${status === 'paused' ? 'bg-gradient-to-r from-amber-500 to-amber-400' : 'bg-gradient-to-r from-indigo-500 to-cyan-500'}`}
+                        style={{ width: `${progress}%` }}
+                      >
+                        {status === 'uploading' && <div className="absolute inset-0 bg-white/20 animate-pulse" />}
                       </div>
                     </div>
                     <div className="flex justify-between text-xs text-slate-400 font-medium">
-                      <span>Uploading securely...</span>
-                      <span className="text-indigo-300 font-bold">{progress}%</span>
+                      <span className={status === 'paused' ? 'text-amber-400' : ''}>
+                        {status === 'paused' ? 'Paused from your desktop...' : 'Uploading securely...'}
+                      </span>
+                      <span className={status === 'paused' ? 'text-amber-300 font-bold' : 'text-indigo-300 font-bold'}>{progress}%</span>
                     </div>
                   </div>
                 ) : (

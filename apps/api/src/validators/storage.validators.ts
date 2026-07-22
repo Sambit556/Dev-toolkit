@@ -40,6 +40,9 @@ export const UploadStartSchema = z.object({
   mimeType: z.string().max(100, 'mimeType too long').optional(),
   parentId: z.string().uuid('Invalid parent ID format').nullable().optional(),
   size: z.number().int().nonnegative().optional(),
+  // Total S3 multipart parts the client intends to upload — used to compute a
+  // server-visible progress percentage for uploads another device (desktop) polls for.
+  totalParts: z.number().int().positive().max(10000).optional(),
 });
 
 export const UploadPartSchema = z.object({
@@ -64,6 +67,10 @@ export const UploadCompleteSchema = z.object({
 export const UploadCancelSchema = z.object({
   uploadId: z.string().min(1, 'uploadId is required').max(255),
   s3Key: z.string().min(1, 's3Key is required').max(1024).refine((key) => !key.includes('..'), 'Path traversal disallowed'),
+});
+
+export const UploadSessionIdSchema = z.object({
+  uploadId: z.string().min(1, 'uploadId is required').max(255),
 });
 
 export const MoveItemSchema = z.object({

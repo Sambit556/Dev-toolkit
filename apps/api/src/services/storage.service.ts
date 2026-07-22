@@ -24,7 +24,7 @@ import {
 } from '../utils/s3';
 import { PREVIEW_TEXT_MAX_BYTES, PREVIEW_URL_TTL_SECONDS } from '../config/constants';
 import { getRequestUserAgent, getRequestIp } from '../utils/context';
-import { detectDeviceType } from '../utils/deviceDetect';
+import { detectDeviceType, getMobileDeviceLabel } from '../utils/deviceDetect';
 
 // HTML sanitizer to prevent XSS in stored/rendered names
 export function escapeHtml(str: string): string {
@@ -38,13 +38,14 @@ export function escapeHtml(str: string): string {
 }
 
 async function assertQuotaAvailable(userId: string, additionalBytes: number): Promise<void> {
-  const user = await commonDao.getOneDataByCond<any>(TABLES.USERS, { id: userId }, { fields: ['storage_quota_bytes'] });
+  const [user, usageRows] = await Promise.all([
+    commonDao.getOneDataByCond<any>(TABLES.USERS, { id: userId }, { fields: ['storage_quota_bytes'] }),
+    commonDao.rawQuery(
+      `SELECT COALESCE(SUM(size), 0) AS total_bytes FROM ${TABLES.STORAGE_ITEMS} WHERE user_id = $1 AND is_deleted = false AND type = 'file'`,
+      [userId]
+    ),
+  ]);
   const quota = Number(user?.storage_quota_bytes) || DEFAULT_STORAGE_QUOTA_BYTES;
-
-  const usageRows = await commonDao.rawQuery(
-    `SELECT COALESCE(SUM(size), 0) AS total_bytes FROM ${TABLES.STORAGE_ITEMS} WHERE user_id = $1 AND is_deleted = false AND type = 'file'`,
-    [userId]
-  );
   const used = Number(usageRows[0]?.total_bytes) || 0;
 
   if (used + additionalBytes > quota) {
@@ -315,7 +316,14 @@ export async function deleteNote(userId: string, id: string) {
 }
 
 // --- Multipart file upload ----------------------------------------------------
-export async function startUpload(userId: string, name: string, mimeType: string | undefined, parentId: string | null | undefined, size?: number) {
+export async function startUpload(
+  userId: string,
+  name: string,
+  mimeType: string | undefined,
+  parentId: string | null | undefined,
+  size?: number,
+  opts?: { source?: 'desktop' | 'mobile'; totalParts?: number }
+) {
   const nameSanitized = escapeHtml(name);
   assertSafeUpload({ fileName: nameSanitized, mimeType });
   await assertParentFolderOwned(userId, parentId);
@@ -335,16 +343,30 @@ export async function startUpload(userId: string, name: string, mimeType: string
     s3_key: s3Key,
     status: 'uploading',
     parts_uploaded: '[]',
+    source: opts?.source || 'desktop',
+    file_name: nameSanitized,
+    file_size: typeof size === 'number' ? size : null,
+    total_parts: opts?.totalParts ?? null,
   });
 
-  logger.info('Multipart upload started', { uploadId, s3Key, userId });
+  logger.info('Multipart upload started', { uploadId, s3Key, userId, source: opts?.source || 'desktop' });
   return { sessionId: session.id, uploadId, s3Key };
 }
 
 export async function getUploadPartUrl(userId: string, uploadId: string, requestedS3Key: string, partNumber: number) {
-  const session = await commonDao.getOneDataByCond<any>(TABLES.UPLOAD_SESSIONS, { upload_id: uploadId, user_id: userId, status: 'uploading' });
+  const session = await commonDao.getOneDataByCond<any>(TABLES.UPLOAD_SESSIONS, {
+    upload_id: uploadId,
+    user_id: userId,
+    status: { $in: ['uploading', 'paused'] },
+  });
   if (!session) {
     throw new AppError(HttpStatus.NOT_FOUND, 'Active upload session not found', 'VALIDATION_ERROR');
+  }
+  // Another device (the desktop Upload Queue) can pause a session it doesn't own the
+  // in-flight fetch for — the uploading client must poll-retry rather than treat this
+  // as fatal, since the file bytes only ever live in that client's memory.
+  if (session.status === 'paused') {
+    throw new AppError(HttpStatus.CONFLICT, 'Upload is paused', 'UPLOAD_PAUSED');
   }
   // Broken Access Control guard: the S3 key actually used is always the one this
   // session was created with — a client-supplied key is never trusted, even if it
@@ -354,7 +376,52 @@ export async function getUploadPartUrl(userId: string, uploadId: string, request
     throw new AppError(HttpStatus.FORBIDDEN, 'S3 key does not match this upload session', 'FORBIDDEN');
   }
   assertKeyBelongsToUser(session.s3_key, userId);
+
+  await commonDao.rawQuery(
+    `UPDATE ${TABLES.UPLOAD_SESSIONS} SET parts_requested = GREATEST(parts_requested, $1) WHERE upload_id = $2 AND user_id = $3`,
+    [partNumber, uploadId, userId]
+  );
+
   return getUploadPartPresignedUrl(session.s3_key, uploadId, partNumber);
+}
+
+// --- Remote (cross-device) upload control ---------------------------------------
+// Lets the desktop Upload Queue pause/resume/observe an upload that's actually being
+// driven by another device's browser (a scanned mobile-link session) — the uploading
+// client polls upload/part, which reflects the state change on its very next request.
+export async function pauseUploadSession(userId: string, uploadId: string) {
+  const session = await commonDao.getOneDataByCond<any>(TABLES.UPLOAD_SESSIONS, { upload_id: uploadId, user_id: userId, status: 'uploading' });
+  if (!session) {
+    throw new AppError(HttpStatus.NOT_FOUND, 'Active upload session not found', 'VALIDATION_ERROR');
+  }
+  await commonDao.updateData(TABLES.UPLOAD_SESSIONS, { status: 'paused' }, { upload_id: uploadId });
+}
+
+export async function resumeUploadSession(userId: string, uploadId: string) {
+  const session = await commonDao.getOneDataByCond<any>(TABLES.UPLOAD_SESSIONS, { upload_id: uploadId, user_id: userId, status: 'paused' });
+  if (!session) {
+    throw new AppError(HttpStatus.NOT_FOUND, 'Paused upload session not found', 'VALIDATION_ERROR');
+  }
+  await commonDao.updateData(TABLES.UPLOAD_SESSIONS, { status: 'uploading' }, { upload_id: uploadId });
+}
+
+export async function getUploadQueue(userId: string) {
+  const rows = await commonDao.getAllDataByCond<any>(
+    TABLES.UPLOAD_SESSIONS,
+    { user_id: userId },
+    { orderBy: 'updated_at', orderDir: 'DESC', limit: 50 }
+  );
+  return rows.map((r) => ({
+    uploadId: r.upload_id,
+    s3Key: r.s3_key,
+    name: r.file_name,
+    size: r.file_size !== null && r.file_size !== undefined ? Number(r.file_size) : null,
+    totalParts: r.total_parts,
+    partsRequested: r.parts_requested,
+    status: r.status,
+    source: r.source,
+    updatedAt: r.updated_at,
+  }));
 }
 
 export async function completeUpload(
@@ -533,28 +600,30 @@ export async function deleteFile(userId: string, id: string) {
 
 // --- Usage / Events -------------------------------------------------------------
 export async function getUsage(userId: string) {
-  const usageRows = await commonDao.rawQuery(
-    `SELECT
-      COALESCE(SUM(size), 0) AS total_bytes,
-      COUNT(*) FILTER (WHERE type = 'file') AS total_files,
-      COUNT(*) FILTER (WHERE type = 'folder') AS total_folders,
-      COALESCE(SUM(size) FILTER (WHERE mime_type ILIKE 'image/%'), 0) AS image_bytes,
-      COALESCE(SUM(size) FILTER (WHERE mime_type ILIKE 'video/%'), 0) AS video_bytes,
-      COALESCE(SUM(size) FILTER (WHERE mime_type ILIKE 'audio/%'), 0) AS audio_bytes,
-      COALESCE(SUM(size) FILTER (WHERE mime_type ILIKE 'application/zip' OR mime_type ILIKE 'application/x-tar' OR mime_type ILIKE 'application/x-rar' OR mime_type ILIKE 'application/x-7z' OR mime_type ILIKE 'application/gzip' OR mime_type ILIKE 'application/x-bzip2'), 0) AS archive_bytes,
-      COALESCE(SUM(size) FILTER (WHERE mime_type ILIKE 'application/excalidraw%' OR mime_type ILIKE 'application/drawio%'), 0) AS diagram_bytes,
-      COALESCE(SUM(size) FILTER (WHERE mime_type ILIKE 'application/pdf'), 0) AS pdf_bytes,
-      COALESCE(SUM(size) FILTER (WHERE mime_type ILIKE 'application/msword' OR mime_type ILIKE 'application/vnd.openxmlformats-officedocument.wordprocessingml%'), 0) AS word_bytes,
-      COALESCE(SUM(size) FILTER (WHERE mime_type ILIKE 'application/vnd.ms-excel' OR mime_type ILIKE 'application/vnd.openxmlformats-officedocument.spreadsheetml%'), 0) AS excel_bytes,
-      COALESCE(SUM(size) FILTER (WHERE mime_type ILIKE 'application/vnd.ms-powerpoint' OR mime_type ILIKE 'application/vnd.openxmlformats-officedocument.presentationml%'), 0) AS powerpoint_bytes,
-      COALESCE(SUM(size) FILTER (WHERE mime_type ILIKE 'text/plain' OR mime_type ILIKE 'text/csv' OR mime_type ILIKE 'text/markdown'), 0) AS text_bytes,
-      COALESCE(SUM(size) FILTER (WHERE mime_type ILIKE 'text/javascript' OR mime_type ILIKE 'text/html' OR mime_type ILIKE 'text/css' OR mime_type ILIKE 'application/json' OR mime_type ILIKE 'application/xml' OR mime_type ILIKE 'text/x-%'), 0) AS code_bytes
-    FROM ${TABLES.STORAGE_ITEMS}
-    WHERE user_id = $1 AND is_deleted = false AND type = 'file'`,
-    [userId]
-  );
+  const [usageRows, userRow] = await Promise.all([
+    commonDao.rawQuery(
+      `SELECT
+        COALESCE(SUM(size), 0) AS total_bytes,
+        COUNT(*) FILTER (WHERE type = 'file') AS total_files,
+        COUNT(*) FILTER (WHERE type = 'folder') AS total_folders,
+        COALESCE(SUM(size) FILTER (WHERE mime_type ILIKE 'image/%'), 0) AS image_bytes,
+        COALESCE(SUM(size) FILTER (WHERE mime_type ILIKE 'video/%'), 0) AS video_bytes,
+        COALESCE(SUM(size) FILTER (WHERE mime_type ILIKE 'audio/%'), 0) AS audio_bytes,
+        COALESCE(SUM(size) FILTER (WHERE mime_type ILIKE 'application/zip' OR mime_type ILIKE 'application/x-tar' OR mime_type ILIKE 'application/x-rar' OR mime_type ILIKE 'application/x-7z' OR mime_type ILIKE 'application/gzip' OR mime_type ILIKE 'application/x-bzip2'), 0) AS archive_bytes,
+        COALESCE(SUM(size) FILTER (WHERE mime_type ILIKE 'application/excalidraw%' OR mime_type ILIKE 'application/drawio%'), 0) AS diagram_bytes,
+        COALESCE(SUM(size) FILTER (WHERE mime_type ILIKE 'application/pdf'), 0) AS pdf_bytes,
+        COALESCE(SUM(size) FILTER (WHERE mime_type ILIKE 'application/msword' OR mime_type ILIKE 'application/vnd.openxmlformats-officedocument.wordprocessingml%'), 0) AS word_bytes,
+        COALESCE(SUM(size) FILTER (WHERE mime_type ILIKE 'application/vnd.ms-excel' OR mime_type ILIKE 'application/vnd.openxmlformats-officedocument.spreadsheetml%'), 0) AS excel_bytes,
+        COALESCE(SUM(size) FILTER (WHERE mime_type ILIKE 'application/vnd.ms-powerpoint' OR mime_type ILIKE 'application/vnd.openxmlformats-officedocument.presentationml%'), 0) AS powerpoint_bytes,
+        COALESCE(SUM(size) FILTER (WHERE mime_type ILIKE 'text/plain' OR mime_type ILIKE 'text/csv' OR mime_type ILIKE 'text/markdown'), 0) AS text_bytes,
+        COALESCE(SUM(size) FILTER (WHERE mime_type ILIKE 'text/javascript' OR mime_type ILIKE 'text/html' OR mime_type ILIKE 'text/css' OR mime_type ILIKE 'application/json' OR mime_type ILIKE 'application/xml' OR mime_type ILIKE 'text/x-%'), 0) AS code_bytes
+      FROM ${TABLES.STORAGE_ITEMS}
+      WHERE user_id = $1 AND is_deleted = false AND type = 'file'`,
+      [userId]
+    ),
+    commonDao.getOneDataByCond<any>(TABLES.USERS, { id: userId }, { fields: ['storage_quota_bytes'] }),
+  ]);
 
-  const userRow = await commonDao.getOneDataByCond<any>(TABLES.USERS, { id: userId }, { fields: ['storage_quota_bytes'] });
   const maxBytes = Number(userRow?.storage_quota_bytes) || DEFAULT_STORAGE_QUOTA_BYTES;
 
   const row = usageRows[0];
@@ -588,10 +657,13 @@ export async function getUsage(userId: string) {
 const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
 export async function getEventsTree(userId: string) {
+  // Capped well above any realistic per-user upload history — a hard ceiling so a
+  // single vault can't force an unbounded scan + synchronous JS clustering pass.
   const rows: any[] = await commonDao.rawQuery(
     `SELECT id, name, mime_type, size, created_at FROM ${TABLES.STORAGE_ITEMS}
      WHERE user_id = $1 AND is_deleted = false AND type = 'file'
-     ORDER BY created_at ASC`,
+     ORDER BY created_at ASC
+     LIMIT 20000`,
     [userId]
   );
 
@@ -738,15 +810,24 @@ export async function verifyMobileToken(token: string) {
   if (link.is_revoked) throw new AppError(HttpStatus.UNAUTHORIZED, 'Invalid or expired authentication', 'TOKEN_REVOKED');
   if (new Date(link.expires_at).getTime() < Date.now()) throw new AppError(HttpStatus.UNAUTHORIZED, 'Invalid or expired authentication', 'TOKEN_EXPIRED');
 
-  // Records the IP of whatever device actually scans/uses the link (the phone),
-  // not the desktop that generated it — fire-and-forget so a slow/failed write
-  // never holds up the actual upload this token is authenticating.
+  // Records the IP/device of whatever device actually scans/uses the link (the
+  // phone), not the desktop that generated it — fire-and-forget so a slow/failed
+  // write never holds up the actual upload this token is authenticating.
+  // `connected_at` is set only the first time (the desktop's "device connected"
+  // notification fires off this transition); `last_seen_at` refreshes on every
+  // request so the Active Scans list can show a live "last seen" time.
   const ip = getRequestIp();
-  if (ip) {
-    commonDao.updateData(TABLES.MOBILE_UPLOAD_LINKS, { ip_address: ip }, { token }).catch((err: any) =>
-      logger.error('Failed to record mobile upload link IP', { error: err.message })
-    );
-  }
+  const { label, type } = getMobileDeviceLabel(getRequestUserAgent());
+  commonDao.rawQuery(
+    `UPDATE ${TABLES.MOBILE_UPLOAD_LINKS}
+     SET ip_address = COALESCE($1, ip_address),
+         device_label = $2,
+         device_type = $3,
+         connected_at = COALESCE(connected_at, NOW()),
+         last_seen_at = NOW()
+     WHERE token = $4`,
+    [ip || null, label, type, token]
+  ).catch((err: any) => logger.error('Failed to record mobile upload link device info', { error: err.message }));
 
   return { userId: link.user_id, folderId: link.folder_id };
 }

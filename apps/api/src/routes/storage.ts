@@ -15,6 +15,7 @@ import {
   UploadPartSchema,
   UploadCompleteSchema,
   UploadCancelSchema,
+  UploadSessionIdSchema,
   MoveItemSchema,
   TagSchema,
   isValidUuid,
@@ -342,8 +343,8 @@ router.post('/upload/start', requireAuth, requireS3, async (req: Request, res: R
     if (!parseResult.success) {
       throw new AppError(HttpStatus.BAD_REQUEST, 'Invalid upload start parameters', 'VALIDATION_ERROR', parseResult.error.flatten().fieldErrors);
     }
-    const { name, mimeType, parentId, size } = parseResult.data;
-    const data = await storageService.startUpload(getUser(req).id, name, mimeType, parentId, size);
+    const { name, mimeType, parentId, size, totalParts } = parseResult.data;
+    const data = await storageService.startUpload(getUser(req).id, name, mimeType, parentId, size, { source: 'desktop', totalParts });
     res.json({ success: true, data });
   } catch (err) {
     next(err);
@@ -464,6 +465,83 @@ router.post('/upload/cancel', requireAuth, requireS3, async (req: Request, res: 
     }
     await storageService.cancelUpload(getUser(req).id, parseResult.data.uploadId, parseResult.data.s3Key);
     res.json({ success: true, message: 'Upload cancelled successfully' });
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * @openapi
+ * /api/storage/upload/active:
+ *   get:
+ *     summary: List the caller's recent upload sessions (any device, any status) for the Upload Queue view
+ *     tags: [Storage]
+ *     security: [{ bearerAuth: [] }]
+ *     responses:
+ *       200: { description: "Array of upload sessions with progress, status, and source ('desktop' | 'mobile')" }
+ */
+router.get('/upload/active', requireAuth, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const data = await storageService.getUploadQueue(getUser(req).id);
+    res.json({ success: true, data });
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * @openapi
+ * /api/storage/upload/pause:
+ *   post:
+ *     summary: Remotely pause an in-progress upload session (e.g. one running on a scanned mobile-link device)
+ *     tags: [Storage]
+ *     security: [{ bearerAuth: [] }]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema: { type: object, required: [uploadId], properties: { uploadId: { type: string } } }
+ *     responses:
+ *       200: { description: Upload paused }
+ *       404: { description: No active upload session for this uploadId }
+ */
+router.post('/upload/pause', requireAuth, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const parseResult = UploadSessionIdSchema.safeParse(req.body);
+    if (!parseResult.success) {
+      throw new AppError(HttpStatus.BAD_REQUEST, 'Invalid pause parameters', 'VALIDATION_ERROR', parseResult.error.flatten().fieldErrors);
+    }
+    await storageService.pauseUploadSession(getUser(req).id, parseResult.data.uploadId);
+    res.json({ success: true, message: 'Upload paused' });
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * @openapi
+ * /api/storage/upload/resume:
+ *   post:
+ *     summary: Resume a remotely paused upload session
+ *     tags: [Storage]
+ *     security: [{ bearerAuth: [] }]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema: { type: object, required: [uploadId], properties: { uploadId: { type: string } } }
+ *     responses:
+ *       200: { description: Upload resumed }
+ *       404: { description: No paused upload session for this uploadId }
+ */
+router.post('/upload/resume', requireAuth, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const parseResult = UploadSessionIdSchema.safeParse(req.body);
+    if (!parseResult.success) {
+      throw new AppError(HttpStatus.BAD_REQUEST, 'Invalid resume parameters', 'VALIDATION_ERROR', parseResult.error.flatten().fieldErrors);
+    }
+    await storageService.resumeUploadSession(getUser(req).id, parseResult.data.uploadId);
+    res.json({ success: true, message: 'Upload resumed' });
   } catch (err) {
     next(err);
   }
@@ -716,13 +794,28 @@ router.post('/mobile-links/revoke/:id', requireAuth, async (req: Request, res: R
   } catch (err) { next(err); }
 });
 
+/**
+ * @openapi
+ * /api/storage/mobile/connect:
+ *   post:
+ *     summary: Announce that a device has opened a scanned mobile-upload link
+ *     description: Called by the /m/[token] page on load, before any file is picked — requireMobileAuth's verifyMobileToken call already records device/IP/connected_at/last_seen_at as a side effect, so this route just needs to succeed for that to happen.
+ *     tags: [Storage]
+ *     security: [{ bearerAuth: [] }]
+ *     responses:
+ *       200: { description: Connection recorded }
+ */
+router.post('/mobile/connect', requireMobileAuth, async (req: Request, res: Response) => {
+  res.json({ success: true });
+});
+
 router.post('/mobile/upload/start', requireMobileAuth, requireS3, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const parseResult = UploadStartSchema.safeParse(req.body);
     if (!parseResult.success) throw new AppError(HttpStatus.BAD_REQUEST, 'Invalid upload start parameters', 'VALIDATION_ERROR', parseResult.error.flatten().fieldErrors);
-    const { name, mimeType, size } = parseResult.data;
+    const { name, mimeType, size, totalParts } = parseResult.data;
     const folderId = (req as any).mobileSession.folderId;
-    const data = await storageService.startUpload(getUser(req).id, name, mimeType, folderId, size);
+    const data = await storageService.startUpload(getUser(req).id, name, mimeType, folderId, size, { source: 'mobile', totalParts });
     res.json({ success: true, data });
   } catch (err) { next(err); }
 });

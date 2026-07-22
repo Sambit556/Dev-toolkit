@@ -78,6 +78,7 @@ import {
   Smartphone,
   Link2,
   QrCode,
+  Clock,
 } from 'lucide-react';
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
@@ -98,6 +99,7 @@ import { BackToHomeLink } from '@/components/layout/BackToHomeLink';
 import { AvatarEditorModal } from '@/components/profile/AvatarEditorModal';
 import { getFileColor } from '@/lib/fileColor';
 import { FileViewerModal, type FileViewerItem } from '@/components/storage/FileViewerModal';
+import { CopyButton } from '@/components/ui/copy-button';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
@@ -211,6 +213,11 @@ interface UploadTracker {
     controller?: AbortController;
     etag?: string;
   }[];
+  // 'mobile' trackers are driven by another device's browser (a scanned QR upload
+  // link) — this desktop tab only observes/relays control via the API, since the
+  // file bytes never pass through this tab. `chunks` stays empty for these.
+  source?: 'desktop' | 'mobile';
+  totalParts?: number;
 }
 
 const QUOTA_UNIT_BYTES: Record<'B' | 'KB' | 'MB' | 'GB', number> = { B: 1, KB: 1024, MB: 1024 ** 2, GB: 1024 ** 3 };
@@ -312,6 +319,8 @@ export default function StoragePage() {
   const [activeMobileLinks, setActiveMobileLinks] = useState<any[]>([]);
   const [generatedMobileToken, setGeneratedMobileToken] = useState<string | null>(null);
   const [generatedMobileTTL, setGeneratedMobileTTL] = useState<string | null>(null);
+  const [mobileLinkRemaining, setMobileLinkRemaining] = useState('');
+  const [connectedMobileDevice, setConnectedMobileDevice] = useState<{ label: string; type: string } | null>(null);
   const [generatedToken, setGeneratedToken] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
@@ -1223,6 +1232,56 @@ export default function StoragePage() {
     }
   };
 
+  // Live countdown for the mobile-upload QR link's expiry, shown in the scan modal
+  useEffect(() => {
+    if (!showMobileScanModal || !generatedMobileTTL) return;
+
+    const tick = () => {
+      const msLeft = new Date(generatedMobileTTL).getTime() - Date.now();
+      if (msLeft <= 0) {
+        setMobileLinkRemaining('Expired');
+        return;
+      }
+      const totalSeconds = Math.floor(msLeft / 1000);
+      const minutes = Math.floor(totalSeconds / 60);
+      const seconds = totalSeconds % 60;
+      setMobileLinkRemaining(`${minutes}:${seconds.toString().padStart(2, '0')}`);
+    };
+
+    tick();
+    const interval = setInterval(tick, 1000);
+    return () => clearInterval(interval);
+  }, [showMobileScanModal, generatedMobileTTL]);
+
+  // While the QR scan modal is open, poll for the moment a phone actually opens the
+  // link — flips the modal into a "connected" state and announces it with a toast,
+  // the way a screen-mirroring app would when a device joins.
+  useEffect(() => {
+    if (!showMobileScanModal || !generatedMobileToken) return;
+
+    const poll = async () => {
+      try {
+        const res = await apiFetch(`${API_BASE}/api/storage/mobile-links`, { headers: getHeaders() });
+        const json = await res.json();
+        if (!json.success) return;
+        const link = (json.data || []).find((l: any) => l.token === generatedMobileToken);
+        if (link?.connected_at && link.device_label) {
+          setConnectedMobileDevice((prev) => {
+            if (prev) return prev;
+            toast.success(`${link.device_label} connected`, { description: 'Ready to receive files' });
+            return { label: link.device_label, type: link.device_type || 'mobile' };
+          });
+        }
+      } catch (err) {
+        // Silent — background poll
+      }
+    };
+
+    poll();
+    const interval = setInterval(poll, 2000);
+    return () => clearInterval(interval);
+  }, [showMobileScanModal, generatedMobileToken]);
+
   // Mobile Scan Management
   const generateMobileUploadLink = async () => {
     try {
@@ -1235,6 +1294,7 @@ export default function StoragePage() {
       if (json.success) {
         setGeneratedMobileToken(json.data.token);
         setGeneratedMobileTTL(json.data.expiresAt);
+        setConnectedMobileDevice(null);
         setShowMobileScanModal(true);
       } else {
         toast.error(json.message);
@@ -1669,6 +1729,7 @@ export default function StoragePage() {
       if (json.success) {
         toast.success(json.message || 'Item deleted successfully');
         loadStorageItems();
+        fetchUsage();
       } else {
         toast.error(json.message);
       }
@@ -1690,6 +1751,7 @@ export default function StoragePage() {
       if (json.success) {
         toast.success('Item restored from trash');
         loadStorageItems();
+        fetchUsage();
       } else {
         toast.error(json.message || 'Failed to restore item');
       }
@@ -2105,6 +2167,7 @@ export default function StoragePage() {
         );
         toast.success(`Completed upload: ${file.name}`, { id: trackerId });
         loadStorageItems();
+        fetchUsage();
       } else {
         throw new Error(json.message);
       }
@@ -2188,6 +2251,59 @@ export default function StoragePage() {
     toast.error(`Cancelled upload: ${tracker.name}`);
   };
 
+  // --- Remote (cross-device) upload control ---------------------------------------
+  // A "mobile" tracker's bytes only ever pass through the phone's browser — this tab
+  // can only observe it (via polling) and relay pause/resume/cancel through the API.
+  const mapRemoteStatus = (s: string): UploadTracker['status'] => (s === 'rejected' ? 'failed' : (s as UploadTracker['status']));
+
+  const pauseRemoteUpload = async (trackerId: string) => {
+    const tracker = uploadsList.find((up) => up.id === trackerId);
+    if (!tracker?.uploadId) return;
+    setUploadsList((prev) => prev.map((up) => (up.id === trackerId ? { ...up, status: 'paused' as const } : up)));
+    try {
+      await apiFetch(`${API_BASE}/api/storage/upload/pause`, {
+        method: 'POST',
+        headers: getHeaders(),
+        body: JSON.stringify({ uploadId: tracker.uploadId }),
+      });
+      toast.info(`Paused upload: ${tracker.name}`);
+    } catch (err) {
+      toast.error('Failed to pause upload');
+    }
+  };
+
+  const resumeRemoteUpload = async (trackerId: string) => {
+    const tracker = uploadsList.find((up) => up.id === trackerId);
+    if (!tracker?.uploadId) return;
+    setUploadsList((prev) => prev.map((up) => (up.id === trackerId ? { ...up, status: 'uploading' as const } : up)));
+    try {
+      await apiFetch(`${API_BASE}/api/storage/upload/resume`, {
+        method: 'POST',
+        headers: getHeaders(),
+        body: JSON.stringify({ uploadId: tracker.uploadId }),
+      });
+      toast.info(`Resumed upload: ${tracker.name}`);
+    } catch (err) {
+      toast.error('Failed to resume upload');
+    }
+  };
+
+  const cancelRemoteUpload = async (trackerId: string) => {
+    const tracker = uploadsList.find((up) => up.id === trackerId);
+    if (!tracker?.uploadId || !tracker.s3Key) return;
+    setUploadsList((prev) => prev.map((up) => (up.id === trackerId ? { ...up, status: 'cancelled' as const } : up)));
+    try {
+      await apiFetch(`${API_BASE}/api/storage/upload/cancel`, {
+        method: 'POST',
+        headers: getHeaders(),
+        body: JSON.stringify({ uploadId: tracker.uploadId, s3Key: tracker.s3Key }),
+      });
+      toast.error(`Cancelled upload: ${tracker.name}`);
+    } catch (err) {
+      toast.error('Failed to cancel upload');
+    }
+  };
+
   // On-Demand File download presigned url resolver
   const downloadFile = async (item: StorageItem) => {
     try {
@@ -2224,6 +2340,17 @@ export default function StoragePage() {
     const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
     const i = Math.floor(Math.log(num) / Math.log(k));
     return parseFloat((num / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+  };
+
+  const formatTimeAgo = (iso: string | null | undefined) => {
+    if (!iso) return null;
+    const seconds = Math.max(0, Math.floor((Date.now() - new Date(iso).getTime()) / 1000));
+    if (seconds < 60) return 'just now';
+    const minutes = Math.floor(seconds / 60);
+    if (minutes < 60) return `${minutes}m ago`;
+    const hours = Math.floor(minutes / 60);
+    if (hours < 24) return `${hours}h ago`;
+    return `${Math.floor(hours / 24)}d ago`;
   };
 
   // Verify non-discoverability activation (guarded against StrictMode double-mount)
@@ -2326,14 +2453,23 @@ export default function StoragePage() {
     activeUploadsRef.current = uploadsList;
   }, [uploadsList]);
 
-  // Load items and usage when token or filters change
+  // Load the item list whenever folder/tab/sort/filters change
   useEffect(() => {
     if (token) {
       loadStorageItems();
+    }
+  }, [token, currentFolderId, sidebarTab, sortBy, sortOrder, filterDateFrom, filterDateTo, filterMimeCategories, filterTag]);
+
+  // Usage stats and profile are account-wide, not folder/sort/filter-scoped — only
+  // fetch them once per session instead of on every navigation click. They're
+  // refreshed again after mutations that actually change storage usage (upload,
+  // delete, restore) via the fetchUsage() calls at those call sites.
+  useEffect(() => {
+    if (token) {
       fetchUsage();
       fetchProfile();
     }
-  }, [token, currentFolderId, sidebarTab, sortBy, sortOrder, filterDateFrom, filterDateTo, filterMimeCategories, filterTag]);
+  }, [token]);
 
   // Load event hierarchy when the Events tab is opened
   useEffect(() => {
@@ -2348,6 +2484,57 @@ export default function StoragePage() {
       fetchAdminUsers();
     }
   }, [token, sidebarTab, userRole]);
+
+  // Poll for uploads happening on another device (a scanned mobile-upload QR link)
+  // while the Upload Queue tab is open, merging them into the same tracker list as
+  // this tab's own uploads so progress/pause/cancel show up in one unified place.
+  useEffect(() => {
+    if (!token || sidebarTab !== 'uploads') return;
+
+    const poll = async () => {
+      try {
+        const res = await apiFetch(`${API_BASE}/api/storage/upload/active`, { headers: getHeaders() });
+        const json = await res.json();
+        if (!json.success) return;
+        const remote: any[] = (json.data || []).filter((s: any) => s.source === 'mobile');
+        if (remote.length === 0) return;
+
+        setUploadsList((prev) => {
+          const next = [...prev];
+          for (const s of remote) {
+            const total = s.totalParts || 1;
+            const progress = Math.min(100, Math.round((s.partsRequested / total) * 100));
+            const status = mapRemoteStatus(s.status);
+            const existingIdx = next.findIndex((up) => up.uploadId === s.uploadId && up.source === 'mobile');
+            if (existingIdx >= 0) {
+              next[existingIdx] = { ...next[existingIdx], status, progress, totalParts: total };
+            } else {
+              next.unshift({
+                id: s.uploadId,
+                name: s.name || 'Mobile upload',
+                size: s.size || 0,
+                progress,
+                status,
+                uploadId: s.uploadId,
+                s3Key: s.s3Key,
+                parentId: null,
+                chunks: [],
+                source: 'mobile',
+                totalParts: total,
+              });
+            }
+          }
+          return next;
+        });
+      } catch (err) {
+        // Silent — this is a background poll, not a user-triggered action
+      }
+    };
+
+    poll();
+    const interval = setInterval(poll, 3000);
+    return () => clearInterval(interval);
+  }, [token, sidebarTab]);
 
   // Trigger auto-save for Note Editor
   useEffect(() => {
@@ -2855,12 +3042,12 @@ export default function StoragePage() {
         <div className="relative group/tooltip">
           <button
             onClick={generateMobileUploadLink}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-400 rounded-lg transition-colors border border-indigo-500/20 cursor-pointer text-[10px] font-bold"
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white rounded-lg transition-all shadow-md shadow-indigo-950/50 hover:shadow-indigo-500/30 cursor-pointer text-[10px] font-bold"
           >
             <Smartphone className="h-3.5 w-3.5" /> Mobile Upload
           </button>
           <div className="pointer-events-none absolute top-full left-1/2 -translate-x-1/2 mt-2 opacity-0 group-hover/tooltip:opacity-100 transition-all duration-200 scale-95 group-hover/tooltip:scale-100 z-50">
-            <div className="bg-slate-900/95 dark:bg-slate-950/95 border border-slate-200/10 dark:border-slate-800/40 text-slate-200 dark:text-slate-100 text-[9px] font-semibold px-2 py-1 rounded-md shadow-xl backdrop-blur-md whitespace-nowrap">Scan QR to upload from mobile</div>
+            <div className="bg-slate-900/95 dark:bg-slate-950/95 border border-indigo-500/30 text-slate-100 text-[9px] font-semibold px-2.5 py-1.5 rounded-md shadow-xl shadow-indigo-950/50 backdrop-blur-md whitespace-nowrap">Scan QR to upload from mobile</div>
           </div>
         </div>
         <div className="relative group/tooltip">
@@ -3402,8 +3589,48 @@ export default function StoragePage() {
           <div className="space-y-0.5">
             <div className="text-[9px] text-slate-400 dark:text-slate-600 uppercase tracking-widest font-black px-2 py-2">Workspace</div>
 
+            {/* "All Files" is a split-action button: 70% opens the file list, the
+                diagonally-cut 30% accent tab jumps straight to the upload picker —
+                two affordances that read as one cohesive control. */}
+            <div
+              className={cn(
+                "relative w-full flex items-stretch rounded-xl overflow-hidden transition-all",
+                sidebarTab === 'files'
+                  ? "border border-blue-500/25 shadow-[0_0_12px_rgba(59,130,246,0.1)]"
+                  : "border border-transparent"
+              )}
+            >
+              <button
+                onClick={() => {
+                  setItems([]);
+                  setSidebarTab('files');
+                  setEditorNote(null);
+                  setSelectedItems(new Set());
+                  setIsSelecting(false);
+                }}
+                title="View Files"
+                style={{ flex: '0 0 70%' }}
+                className={cn(
+                  "flex items-center gap-2.5 pl-3 pr-2 py-2.5 min-w-0 text-left transition-all cursor-pointer font-bold text-xs focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-500/50",
+                  sidebarTab === 'files'
+                    ? "bg-gradient-to-r from-blue-600/20 to-violet-600/10 text-blue-600 dark:text-blue-400"
+                    : "text-slate-500 dark:text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 hover:bg-slate-200/50 dark:hover:bg-slate-800/50"
+                )}
+              >
+                <Folder className="h-3.5 w-3.5 shrink-0" />
+                <span className="flex-1 truncate">All Files</span>
+              </button>
+              <label
+                title="Upload File"
+                style={{ flex: '0 0 calc(30% + 16px)', marginLeft: '-16px', clipPath: 'polygon(16px 0, 100% 0, 100% 100%, 0 100%)' }}
+                className="flex items-center justify-center pl-5 bg-gradient-to-br from-blue-600 to-violet-600 hover:from-blue-500 hover:to-violet-500 active:from-blue-700 active:to-violet-700 text-white transition-all cursor-pointer focus-within:ring-2 focus-within:ring-inset focus-within:ring-blue-300"
+              >
+                <Upload className="h-3.5 w-3.5 shrink-0" />
+                <input type="file" multiple className="hidden" onChange={handleFileUpload} />
+              </label>
+            </div>
+
             {[
-              { tab: 'files' as const, icon: Folder, label: 'All Files', badge: null },
               { tab: 'events' as const, icon: Calendar, label: 'Events', badge: null },
               { tab: 'notes' as const, icon: FileText, label: 'Text Notes', badge: null },
               { tab: 'diagrams' as const, icon: Palette, label: 'Diagrams', badge: null },
@@ -4037,24 +4264,36 @@ export default function StoragePage() {
                   <span>No active S3 uploads queued.</span>
                 </div>
               ) : (
-                uploadsList.map((up) => (
+                uploadsList.map((up) => {
+                  const isMobile = up.source === 'mobile';
+                  return (
                   <div
                     key={up.id}
-                    className="p-4 border border-slate-200/80 dark:border-slate-800/80 bg-slate-100/20 dark:bg-slate-900/20 rounded-xl space-y-3 relative overflow-hidden"
+                    className={cn(
+                      "p-4 border rounded-xl space-y-3 relative overflow-hidden transition-colors",
+                      isMobile
+                        ? "border-indigo-500/25 bg-gradient-to-br from-indigo-500/[0.06] to-violet-500/[0.03] shadow-[0_0_16px_rgba(99,102,241,0.06)]"
+                        : "border-slate-200/80 dark:border-slate-800/80 bg-slate-100/20 dark:bg-slate-900/20"
+                    )}
                   >
                     <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <FileIcon className="h-4 w-4 text-blue-600 dark:text-blue-400" />
-                        <span className="font-bold text-slate-800 dark:text-slate-200">{up.name}</span>
-                        <span className="text-[10px] text-slate-500 dark:text-slate-500">({formatSize(up.size)})</span>
+                      <div className="flex items-center gap-2 min-w-0">
+                        <FileIcon className={cn("h-4 w-4 shrink-0", isMobile ? "text-indigo-500 dark:text-indigo-400" : "text-blue-600 dark:text-blue-400")} />
+                        <span className="font-bold text-slate-800 dark:text-slate-200 truncate">{up.name}</span>
+                        <span className="text-[10px] text-slate-500 dark:text-slate-500 shrink-0">({formatSize(up.size)})</span>
+                        {isMobile && (
+                          <span className="flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-gradient-to-r from-indigo-500/15 to-violet-500/15 border border-indigo-500/30 text-indigo-500 dark:text-indigo-400 text-[9px] font-bold uppercase tracking-wide shrink-0">
+                            <Smartphone className="h-2.5 w-2.5" /> Mobile
+                          </span>
+                        )}
                       </div>
 
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 shrink-0">
                         <span
                           className={cn(
                             "px-2 py-0.5 rounded text-[10px] font-bold uppercase",
                             up.status === 'completed' && "bg-emerald-500/10 text-emerald-450",
-                            up.status === 'uploading' && "bg-blue-500/10 text-blue-450 animate-pulse",
+                            up.status === 'uploading' && (isMobile ? "bg-indigo-500/10 text-indigo-500 dark:text-indigo-400 animate-pulse" : "bg-blue-500/10 text-blue-450 animate-pulse"),
                             up.status === 'paused' && "bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-400",
                             up.status === 'failed' && "bg-red-500/10 text-red-450"
                           )}
@@ -4066,7 +4305,7 @@ export default function StoragePage() {
                           {up.status === 'uploading' && (
                             <div className="relative group/pause">
                               <button
-                                onClick={() => pauseUpload(up.id)}
+                                onClick={() => isMobile ? pauseRemoteUpload(up.id) : pauseUpload(up.id)}
                                 className="p-1 rounded bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 cursor-pointer"
                               >
                                 <Pause className="h-3 w-3" />
@@ -4080,7 +4319,11 @@ export default function StoragePage() {
                             <div className="relative group/resume">
                               <button
                                 onClick={() => {
-                                  toast.error('To resume, re-add the file to re-initiate chunk sequence.');
+                                  if (isMobile) {
+                                    resumeRemoteUpload(up.id);
+                                  } else {
+                                    toast.error('To resume, re-add the file to re-initiate chunk sequence.');
+                                  }
                                 }}
                                 className="p-1 rounded bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 cursor-pointer"
                               >
@@ -4094,7 +4337,7 @@ export default function StoragePage() {
                           {up.status !== 'completed' && up.status !== 'cancelled' && (
                             <div className="relative group/cancel">
                               <button
-                                onClick={() => cancelUpload(up.id)}
+                                onClick={() => isMobile ? cancelRemoteUpload(up.id) : cancelUpload(up.id)}
                                 className="p-1 rounded bg-red-500/10 hover:bg-red-500/20 text-red-600 dark:text-red-400 cursor-pointer"
                               >
                                 <X className="h-3 w-3" />
@@ -4112,17 +4355,18 @@ export default function StoragePage() {
                     <div className="space-y-1">
                       <div className="w-full h-2 bg-slate-100 dark:bg-slate-900 border border-slate-100 dark:border-slate-900 rounded-full overflow-hidden">
                         <div
-                          className="h-full bg-blue-500 rounded-full transition-all duration-300"
+                          className={cn("h-full rounded-full transition-all duration-300", isMobile ? "bg-gradient-to-r from-indigo-500 to-violet-500" : "bg-blue-500")}
                           style={{ width: `${up.progress}%` }}
                         ></div>
                       </div>
                       <div className="flex justify-between text-[9px] text-slate-500 dark:text-slate-500">
-                        <div>Chunks: {up.chunks.length} parts</div>
+                        <div>{isMobile ? `Parts: ${up.totalParts ?? '?'}` : `Chunks: ${up.chunks.length} parts`}</div>
                         <div>Progress: {up.progress}%</div>
                       </div>
                     </div>
                   </div>
-                ))
+                  );
+                })
               )}
             </div>
           </main>
@@ -4914,26 +5158,97 @@ export default function StoragePage() {
 
       {/* Mobile Scan Modal */}
       {showMobileScanModal && (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/70 backdrop-blur-sm" onClick={() => setShowMobileScanModal(false)}>
-          <div className="bg-[#0b1120] border border-indigo-500/30 rounded-2xl p-8 w-96 shadow-2xl flex flex-col items-center" onClick={e => e.stopPropagation()}>
-            <div className="w-16 h-16 rounded-full bg-indigo-500/20 flex items-center justify-center mb-4">
-              <QrCode className="h-8 w-8 text-indigo-400" />
-            </div>
-            <h3 className="text-xl font-black text-white mb-2 text-center">Mobile Upload Scan</h3>
-            <p className="text-slate-400 text-xs text-center mb-6">Scan this QR code with your mobile device to securely upload files directly into your vault.</p>
-            
-            <div className="bg-white p-4 rounded-xl shadow-inner mb-6">
-              {generatedMobileToken && <QRCodeSVG value={`${window.location.origin}/m/${generatedMobileToken}`} size={200} />}
-            </div>
-            
-            <div className="w-full bg-slate-900/50 border border-slate-800 rounded-lg p-3 text-center mb-6">
-              {/* <div className="text-[10px] text-slate-500 uppercase tracking-wider font-bold mb-1">Time To Live</div>
-              <div className="text-indigo-400 font-mono text-sm font-bold">120 Minutes</div> */}
-            </div>
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4" onClick={() => setShowMobileScanModal(false)}>
+          <div
+            className="relative w-full max-w-sm rounded-2xl p-px bg-gradient-to-br from-indigo-500/60 via-violet-500/30 to-transparent shadow-2xl shadow-indigo-950/60"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="relative bg-[#0b1120] rounded-[15px] p-8 flex flex-col items-center overflow-hidden">
+              {/* Ambient glow */}
+              <div className="absolute -top-16 -right-16 w-40 h-40 bg-indigo-500/20 rounded-full blur-3xl pointer-events-none" />
+              <div className="absolute -bottom-16 -left-16 w-40 h-40 bg-violet-500/10 rounded-full blur-3xl pointer-events-none" />
 
-            <button onClick={() => setShowMobileScanModal(false)} className="w-full py-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold transition-colors cursor-pointer text-sm">
-              Close
-            </button>
+              <button
+                onClick={() => setShowMobileScanModal(false)}
+                className="absolute top-4 right-4 text-slate-500 hover:text-white transition-colors cursor-pointer"
+                title="Close"
+              >
+                <X className="h-4 w-4" />
+              </button>
+
+              <div className="relative z-10 flex flex-col items-center w-full">
+                {connectedMobileDevice ? (
+                  <div className="relative w-16 h-16 rounded-2xl bg-gradient-to-br from-emerald-500/30 to-emerald-500/10 border border-emerald-500/30 flex items-center justify-center mb-4 shadow-lg shadow-emerald-950/50">
+                    <span className="absolute inset-0 rounded-2xl border-2 border-emerald-400/50 animate-ping" />
+                    <Smartphone className="h-8 w-8 text-emerald-400" />
+                  </div>
+                ) : (
+                  <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-indigo-500/30 to-violet-500/20 border border-indigo-500/30 flex items-center justify-center mb-4 shadow-lg shadow-indigo-950/50">
+                    <QrCode className="h-8 w-8 text-indigo-400" />
+                  </div>
+                )}
+
+                <h3 className="text-xl font-black text-white mb-1.5 text-center flex items-center gap-1.5">
+                  {connectedMobileDevice ? 'Device Connected' : 'Mobile Upload Scan'}
+                  <Sparkles className={cn("h-4 w-4", connectedMobileDevice ? "text-emerald-400" : "text-indigo-400")} />
+                </h3>
+                <p className="text-slate-400 text-xs text-center mb-6 max-w-[16rem]">
+                  {connectedMobileDevice
+                    ? 'The connected device can now upload files directly into your vault.'
+                    : 'Scan this QR code with your mobile device to securely upload files directly into your vault.'}
+                </p>
+
+                {connectedMobileDevice ? (
+                  <div className="w-full flex flex-col items-center gap-3 mb-6 py-6 px-4 rounded-xl bg-emerald-500/5 border border-emerald-500/20">
+                    <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/30">
+                      <span className="relative flex h-2 w-2">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                        <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
+                      </span>
+                      <span className="text-emerald-400 text-[10px] font-bold uppercase tracking-wider">Live</span>
+                    </div>
+                    <span className="text-white font-bold text-sm text-center">{connectedMobileDevice.label}</span>
+                    <span className="text-slate-500 text-[10px]">Waiting for a file to be selected...</span>
+                  </div>
+                ) : (
+                  <div className="relative mb-6">
+                    <div className="absolute -top-2 -left-2 w-5 h-5 border-t-2 border-l-2 border-indigo-500 rounded-tl-md" />
+                    <div className="absolute -top-2 -right-2 w-5 h-5 border-t-2 border-r-2 border-indigo-500 rounded-tr-md" />
+                    <div className="absolute -bottom-2 -left-2 w-5 h-5 border-b-2 border-l-2 border-indigo-500 rounded-bl-md" />
+                    <div className="absolute -bottom-2 -right-2 w-5 h-5 border-b-2 border-r-2 border-indigo-500 rounded-br-md" />
+                    <div className="bg-white p-4 rounded-xl shadow-inner">
+                      {generatedMobileToken && <QRCodeSVG value={`${window.location.origin}/m/${generatedMobileToken}`} size={180} />}
+                    </div>
+                  </div>
+                )}
+
+                <div className="w-full flex items-center justify-between gap-2 bg-slate-900/60 border border-slate-800 rounded-lg px-3.5 py-2.5 mb-3">
+                  <div className="flex items-center gap-1.5 text-slate-400 text-[10px] uppercase tracking-wider font-bold">
+                    <Clock className="h-3 w-3" /> Expires In
+                  </div>
+                  <span className="text-indigo-400 font-mono text-sm font-bold tabular-nums">{mobileLinkRemaining || '—'}</span>
+                </div>
+
+                <div className="w-full flex items-center justify-between gap-2 bg-slate-900/60 border border-slate-800 rounded-lg pl-3.5 pr-1.5 py-1.5 mb-6">
+                  <span className="text-slate-500 text-[10px] font-mono truncate">
+                    {generatedMobileToken ? `${window.location.origin}/m/${generatedMobileToken}`.replace(/^https?:\/\//, '') : ''}
+                  </span>
+                  <CopyButton
+                    value={generatedMobileToken ? `${window.location.origin}/m/${generatedMobileToken}` : ''}
+                    tooltip="Copy link"
+                    toastMessage="Link copied!"
+                    className="shrink-0 text-slate-400 hover:text-indigo-400"
+                  />
+                </div>
+
+                <button
+                  onClick={() => setShowMobileScanModal(false)}
+                  className="w-full py-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold transition-all cursor-pointer text-sm hover:scale-[1.01] active:scale-[0.99]"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}
@@ -4952,16 +5267,37 @@ export default function StoragePage() {
                 <div className="text-center py-10 text-slate-500 text-sm">No active mobile upload links found.</div>
               ) : (
                 activeMobileLinks.map(link => (
-                  <div key={link.id} className="bg-slate-900/50 border border-slate-800 rounded-xl p-4 flex items-center justify-between group hover:border-slate-700 transition-colors">
-                    <div>
-                      <div className="text-slate-200 font-mono text-xs mb-1">Token: {link.token.substring(0, 16)}...</div>
-                      <div className="text-slate-500 text-[10px] font-bold uppercase tracking-wider">
-                        Expires: {new Date(link.expires_at).toLocaleString()}
+                  <div key={link.id} className={cn(
+                    "border rounded-xl p-4 flex items-center justify-between gap-3 group transition-colors",
+                    link.connected_at ? "bg-emerald-500/[0.04] border-emerald-500/20 hover:border-emerald-500/40" : "bg-slate-900/50 border-slate-800 hover:border-slate-700"
+                  )}>
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className={cn(
+                        "relative h-9 w-9 shrink-0 rounded-xl border flex items-center justify-center",
+                        link.connected_at ? "bg-emerald-500/10 border-emerald-500/30" : "bg-slate-800/60 border-slate-700"
+                      )}>
+                        {link.connected_at && (
+                          <span className="absolute -top-0.5 -right-0.5 flex h-2 w-2">
+                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                            <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
+                          </span>
+                        )}
+                        <Smartphone className={cn("h-4 w-4", link.connected_at ? "text-emerald-400" : "text-slate-500")} />
+                      </div>
+                      <div className="min-w-0">
+                        <div className={cn("text-xs font-bold truncate", link.connected_at ? "text-slate-100" : "text-slate-400")}>
+                          {link.device_label || 'Not connected yet'}
+                        </div>
+                        <div className="text-slate-500 text-[9px] font-bold uppercase tracking-wider flex items-center gap-2 flex-wrap">
+                          {link.last_seen_at && <span>Seen {formatTimeAgo(link.last_seen_at)}</span>}
+                          {link.ip_address && <span>&middot; {link.ip_address}</span>}
+                          <span>&middot; Expires {new Date(link.expires_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                        </div>
                       </div>
                     </div>
                     <button
                       onClick={() => revokeMobileLink(link.id)}
-                      className="p-2 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-400 opacity-0 group-hover:opacity-100 transition-all cursor-pointer border border-red-500/20"
+                      className="p-2 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-400 opacity-0 group-hover:opacity-100 transition-all cursor-pointer border border-red-500/20 shrink-0"
                       title="Revoke Link"
                     >
                       <Trash2 className="h-4 w-4" />

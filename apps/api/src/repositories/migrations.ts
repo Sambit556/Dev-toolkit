@@ -206,6 +206,29 @@ const MIGRATIONS = [
   {
     name: `add_last_ip_to_${TABLES.USERS}`,
     sql: `ALTER TABLE ${TABLES.USERS} ADD COLUMN IF NOT EXISTS last_ip VARCHAR(45)`
+  },
+  {
+    // Lets the desktop Upload Queue surface uploads started from a scanned mobile
+    // link (source='mobile') alongside its own, with enough to render a progress
+    // bar (total_parts vs parts_requested) and support remote pause/resume.
+    name: `add_progress_tracking_to_${TABLES.UPLOAD_SESSIONS}`,
+    sql: `ALTER TABLE ${TABLES.UPLOAD_SESSIONS}
+      ADD COLUMN IF NOT EXISTS source VARCHAR(20) DEFAULT 'desktop' NOT NULL,
+      ADD COLUMN IF NOT EXISTS file_name VARCHAR(255),
+      ADD COLUMN IF NOT EXISTS file_size BIGINT,
+      ADD COLUMN IF NOT EXISTS total_parts INTEGER,
+      ADD COLUMN IF NOT EXISTS parts_requested INTEGER DEFAULT 0 NOT NULL`
+  },
+  {
+    // Device-connect tracking for the mobile-upload QR flow: lets the desktop
+    // announce "<device> connected" the moment the link is opened (not just when an
+    // upload starts), and shows device info in the Active Scans history list.
+    name: `add_device_tracking_to_${TABLES.MOBILE_UPLOAD_LINKS}`,
+    sql: `ALTER TABLE ${TABLES.MOBILE_UPLOAD_LINKS}
+      ADD COLUMN IF NOT EXISTS device_label VARCHAR(255),
+      ADD COLUMN IF NOT EXISTS device_type VARCHAR(20),
+      ADD COLUMN IF NOT EXISTS connected_at TIMESTAMP WITH TIME ZONE,
+      ADD COLUMN IF NOT EXISTS last_seen_at TIMESTAMP WITH TIME ZONE`
   }
 ];
 
