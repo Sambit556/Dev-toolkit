@@ -2614,55 +2614,103 @@ export default function StoragePage() {
     }
   }, [token, sidebarTab, userRole]);
 
-  // Poll for uploads happening on another device (a scanned mobile-upload QR link)
-  // while the Upload Queue tab is open, merging them into the same tracker list as
-  // this tab's own uploads so progress/pause/cancel show up in one unified place.
+  // Stream uploads happening on another device (a scanned mobile-upload QR link) while
+  // the Upload Queue tab is open, merging them into the same tracker list as this tab's
+  // own uploads so progress/pause/cancel show up in one unified place. Backed by an SSE
+  // connection (GET /upload/stream) rather than a fixed-interval poll — the server only
+  // pushes a frame when an upload session actually changes, so an idle queue produces no
+  // repeated requests.
   useEffect(() => {
     if (!token || sidebarTab !== 'uploads') return;
 
-    const poll = async () => {
-      try {
-        const res = await apiFetch(`${API_BASE}/api/storage/upload/active`, { headers: getHeaders() });
-        const json = await res.json();
-        if (!json.success) return;
-        const remote: any[] = (json.data || []).filter((s: any) => s.source === 'mobile');
-        if (remote.length === 0) return;
+    let active = true;
+    let abortController: AbortController | null = null;
+    let retryTimer: ReturnType<typeof setTimeout> | null = null;
 
-        setUploadsList((prev) => {
-          const next = [...prev];
-          for (const s of remote) {
-            const total = s.totalParts || 1;
-            const progress = Math.min(100, Math.round((s.partsRequested / total) * 100));
-            const status = mapRemoteStatus(s.status);
-            const existingIdx = next.findIndex((up) => up.uploadId === s.uploadId && up.source === 'mobile');
-            if (existingIdx >= 0) {
-              next[existingIdx] = { ...next[existingIdx], status, progress, totalParts: total };
-            } else {
-              next.unshift({
-                id: s.uploadId,
-                name: s.name || 'Mobile upload',
-                size: s.size || 0,
-                progress,
-                status,
-                uploadId: s.uploadId,
-                s3Key: s.s3Key,
-                parentId: null,
-                chunks: [],
-                source: 'mobile',
-                totalParts: total,
-              });
+    const applyRemoteSessions = (sessions: any[]) => {
+      const remote = sessions.filter((s: any) => s.source === 'mobile');
+      if (remote.length === 0) return;
+
+      setUploadsList((prev) => {
+        const next = [...prev];
+        for (const s of remote) {
+          const total = s.totalParts || 1;
+          const progress = Math.min(100, Math.round((s.partsRequested / total) * 100));
+          const status = mapRemoteStatus(s.status);
+          const existingIdx = next.findIndex((up) => up.uploadId === s.uploadId && up.source === 'mobile');
+          if (existingIdx >= 0) {
+            next[existingIdx] = { ...next[existingIdx], status, progress, totalParts: total };
+          } else {
+            next.unshift({
+              id: s.uploadId,
+              name: s.name || 'Mobile upload',
+              size: s.size || 0,
+              progress,
+              status,
+              uploadId: s.uploadId,
+              s3Key: s.s3Key,
+              parentId: null,
+              chunks: [],
+              source: 'mobile',
+              totalParts: total,
+            });
+          }
+        }
+        return next;
+      });
+    };
+
+    const connect = async () => {
+      while (active) {
+        abortController = new AbortController();
+        try {
+          const res = await apiFetch(`${API_BASE}/api/storage/upload/stream`, {
+            headers: getHeaders(),
+            signal: abortController.signal,
+          });
+          if (!res.ok || !res.body) throw new Error(`Upload stream failed: ${res.status}`);
+
+          const reader = res.body.getReader();
+          const decoder = new TextDecoder();
+          let buffer = '';
+
+          while (active) {
+            const { value, done } = await reader.read();
+            if (done) break;
+            buffer += decoder.decode(value, { stream: true });
+
+            let sepIdx: number;
+            while ((sepIdx = buffer.indexOf('\n\n')) >= 0) {
+              const frame = buffer.slice(0, sepIdx);
+              buffer = buffer.slice(sepIdx + 2);
+              const dataLine = frame.split('\n').find((l) => l.startsWith('data: '));
+              if (!dataLine) continue;
+              try {
+                const json = JSON.parse(dataLine.slice(6));
+                if (json.success) applyRemoteSessions(json.data || []);
+              } catch (err) {
+                // Malformed frame — skip it, the next one will resync.
+              }
             }
           }
-          return next;
+        } catch (err) {
+          // Network blip or server restart — reconnected below, silent since this is a background stream.
+        }
+
+        if (!active) break;
+        await new Promise<void>((resolve) => {
+          retryTimer = setTimeout(resolve, 3000);
         });
-      } catch (err) {
-        // Silent — this is a background poll, not a user-triggered action
       }
     };
 
-    poll();
-    const interval = setInterval(poll, 2000);
-    return () => clearInterval(interval);
+    connect();
+
+    return () => {
+      active = false;
+      abortController?.abort();
+      if (retryTimer) clearTimeout(retryTimer);
+    };
   }, [token, sidebarTab]);
 
   // Trigger auto-save for Note Editor

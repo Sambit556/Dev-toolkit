@@ -25,6 +25,7 @@ import {
 import { PREVIEW_TEXT_MAX_BYTES, PREVIEW_URL_TTL_SECONDS } from '../config/constants';
 import { getRequestUserAgent, getRequestIp } from '../utils/context';
 import { detectDeviceType, getMobileDeviceLabel } from '../utils/deviceDetect';
+import { publishUploadQueue } from '../utils/uploadEvents';
 
 // HTML sanitizer to prevent XSS in stored/rendered names
 export function escapeHtml(str: string): string {
@@ -316,6 +317,18 @@ export async function deleteNote(userId: string, id: string) {
 }
 
 // --- Multipart file upload ----------------------------------------------------
+// Pushes a fresh upload queue snapshot to any open SSE stream (see
+// GET /upload/stream) for this user — called after every upload_sessions mutation
+// below so the Upload Queue view updates in real time instead of polling.
+async function notifyUploadQueueChanged(userId: string): Promise<void> {
+  try {
+    const data = await getUploadQueue(userId);
+    publishUploadQueue(userId, data);
+  } catch (err: any) {
+    logger.error('Failed to broadcast upload queue update', { userId, error: err.message });
+  }
+}
+
 export async function startUpload(
   userId: string,
   name: string,
@@ -350,6 +363,7 @@ export async function startUpload(
   });
 
   logger.info('Multipart upload started', { uploadId, s3Key, userId, source: opts?.source || 'desktop' });
+  void notifyUploadQueueChanged(userId);
   return { sessionId: session.id, uploadId, s3Key };
 }
 
@@ -381,6 +395,7 @@ export async function getUploadPartUrl(userId: string, uploadId: string, request
     `UPDATE ${TABLES.UPLOAD_SESSIONS} SET parts_requested = GREATEST(parts_requested, $1) WHERE upload_id = $2 AND user_id = $3`,
     [partNumber, uploadId, userId]
   );
+  void notifyUploadQueueChanged(userId);
 
   return getUploadPartPresignedUrl(session.s3_key, uploadId, partNumber);
 }
@@ -395,6 +410,7 @@ export async function pauseUploadSession(userId: string, uploadId: string) {
     throw new AppError(HttpStatus.NOT_FOUND, 'Active upload session not found', 'VALIDATION_ERROR');
   }
   await commonDao.updateData(TABLES.UPLOAD_SESSIONS, { status: 'paused' }, { upload_id: uploadId });
+  void notifyUploadQueueChanged(userId);
 }
 
 export async function resumeUploadSession(userId: string, uploadId: string) {
@@ -403,6 +419,7 @@ export async function resumeUploadSession(userId: string, uploadId: string) {
     throw new AppError(HttpStatus.NOT_FOUND, 'Paused upload session not found', 'VALIDATION_ERROR');
   }
   await commonDao.updateData(TABLES.UPLOAD_SESSIONS, { status: 'uploading' }, { upload_id: uploadId });
+  void notifyUploadQueueChanged(userId);
 }
 
 export async function getUploadQueue(userId: string) {
@@ -460,6 +477,7 @@ export async function completeUpload(
     );
     await commonDao.updateData(TABLES.UPLOAD_SESSIONS, { status: 'rejected' }, { upload_id: params.uploadId });
     await commonDao.addData(TABLES.ACTIVITY_LOGS, { user_id: userId, action: ACTIVITY_ACTIONS.UPLOAD_REJECTED_SECURITY_SCAN, resource: s3Key });
+    void notifyUploadQueueChanged(userId);
     throw err;
   }
 
@@ -486,6 +504,7 @@ export async function completeUpload(
   });
 
   logger.info('Multipart upload completed successfully', { uploadId: params.uploadId, fileId: dbItem.id });
+  void notifyUploadQueueChanged(userId);
   return dbItem;
 }
 
@@ -502,6 +521,7 @@ export async function cancelUpload(userId: string, uploadId: string, requestedS3
   assertKeyBelongsToUser(session.s3_key, userId);
   await abortMultipartUpload(session.s3_key, uploadId);
   await commonDao.updateData(TABLES.UPLOAD_SESSIONS, { status: 'cancelled' }, { upload_id: uploadId });
+  void notifyUploadQueueChanged(userId);
   logger.info('Multipart upload aborted and cancelled', { uploadId });
 }
 

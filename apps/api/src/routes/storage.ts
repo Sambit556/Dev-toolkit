@@ -4,6 +4,7 @@ import { requireAuth } from '../middleware/auth';
 import { AppError } from '../middleware/errorHandler';
 import { s3Client, isS3Healthy, ensureS3Initialized } from '../utils/s3';
 import * as storageService from '../services/storage.service';
+import { subscribeUploadQueue } from '../utils/uploadEvents';
 import { HttpStatus } from '../utils/httpStatus';
 import {
   CreateFolderSchema,
@@ -487,6 +488,47 @@ router.get('/upload/active', requireAuth, async (req: Request, res: Response, ne
   } catch (err) {
     next(err);
   }
+});
+
+/**
+ * @openapi
+ * /api/storage/upload/stream:
+ *   get:
+ *     summary: Server-Sent Events stream of the caller's upload queue — pushes a fresh snapshot whenever an upload session changes
+ *     description: Same payload shape as GET /upload/active, delivered as `data:` frames instead of being polled. Replaces the Upload Queue tab's old fixed-interval poll so an idle queue produces no repeated requests.
+ *     tags: [Storage]
+ *     security: [{ bearerAuth: [] }]
+ *     responses:
+ *       200: { description: "text/event-stream of { success: true, data: [...] } frames" }
+ */
+router.get('/upload/stream', requireAuth, async (req: Request, res: Response) => {
+  const userId = getUser(req).id;
+
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache, no-transform');
+  res.setHeader('Connection', 'keep-alive');
+  // Nginx-specific: disable proxy buffering so frames aren't held back before delivery.
+  res.setHeader('X-Accel-Buffering', 'no');
+  res.flushHeaders();
+
+  const send = (data: unknown) => {
+    res.write(`data: ${JSON.stringify({ success: true, data })}\n\n`);
+  };
+
+  try {
+    send(await storageService.getUploadQueue(userId));
+  } catch (err) {
+    // Initial snapshot failed to load; the client still gets updates once something changes.
+  }
+
+  const unsubscribe = subscribeUploadQueue(userId, send);
+  const heartbeat = setInterval(() => res.write(': heartbeat\n\n'), 20000);
+
+  req.on('close', () => {
+    clearInterval(heartbeat);
+    unsubscribe();
+    res.end();
+  });
 });
 
 /**
