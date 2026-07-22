@@ -398,23 +398,11 @@ export function Header() {
       // Set the flag immediately so it's ready when the page loads
       sessionStorage.setItem('hidden_storage_activated', 'true');
       
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
-      fetch(`${apiUrl}/health/api`, { method: 'POST' })
-        .then(() => {
-          setTimeout(() => {
-            setSecretClicks(0);
-            setIsSecretActivating(false);
-            router.push('/storage');
-          }, 1000);
-        })
-        .catch(() => {
-          // Fallback if the request fails
-          setTimeout(() => {
-            setSecretClicks(0);
-            setIsSecretActivating(false);
-            router.push('/storage');
-          }, 1500);
-        });
+      setTimeout(() => {
+        setSecretClicks(0);
+        setIsSecretActivating(false);
+        router.push('/storage');
+      }, 1000);
     } else {
       clickResetTimeout.current = setTimeout(() => {
         setSecretClicks(0);
