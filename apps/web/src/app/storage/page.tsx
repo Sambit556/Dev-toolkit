@@ -82,6 +82,8 @@ import {
   Mail,
   Phone,
   Crown,
+  ZoomIn,
+  ZoomOut,
 } from 'lucide-react';
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
@@ -89,6 +91,12 @@ import TextAlign from '@tiptap/extension-text-align';
 import { TextStyle } from '@tiptap/extension-text-style';
 import Color from '@tiptap/extension-color';
 import dynamic from 'next/dynamic';
+
+// Excalidraw ships its own stylesheet separately from the JS bundle (required
+// since v0.17) — without it every panel/button renders with no sizing or
+// positioning of its own, which is what made the whole diagram editor look
+// giant, unstyled, and effectively unusable (icons untouchable/misaligned).
+import '@excalidraw/excalidraw/index.css';
 
 const Excalidraw = dynamic(
   () => import('@excalidraw/excalidraw').then((mod) => mod.Excalidraw),
@@ -241,6 +249,12 @@ const OAUTH_ERROR_MESSAGES: Record<string, string> = {
 
 interface UsageCategory { key: string; label: string; bytes: number; color: string; }
 interface UsageData { used: number; max: number; percent: string; files: number; folders: number; categories: UsageCategory[]; }
+
+// TipTap/ProseMirror's schema requires the doc to always contain at least one
+// block node — feeding editor.commands.setContent() a bare '' (rather than an
+// empty paragraph) produces a doc with no valid block for the cursor to land
+// in, which is what a freshly created (empty-content) note hit.
+const EMPTY_NOTE_DOC = '<p></p>';
 
 // Colors drawn from a validated categorical palette (adjacent pairs in this fixed
 // order clear colorblind-safe and normal-vision separation floors — see the
@@ -468,7 +482,7 @@ export default function StoragePage() {
       TextStyle,
       Color,
     ],
-    content: editorContent,
+    content: editorContent || EMPTY_NOTE_DOC,
     onUpdate: ({ editor }) => {
       setEditorContent(editor.getHTML());
       setEditorCharCount(editor.getText().replace(/\n/g, '').length);
@@ -478,7 +492,12 @@ export default function StoragePage() {
   useEffect(() => {
     if (editorNote && editor) {
       if (editor.getHTML() !== editorContent) {
-        editor.commands.setContent(editorContent);
+        // A brand-new note's content is '' (both the DB row and this state) —
+        // ProseMirror's schema requires at least one block node, so handing
+        // setContent a bare empty string parses to a doc with no paragraph at
+        // all, leaving no valid place for the cursor to land. That's what
+        // showed up as an uneditable blank box right after creating a note.
+        editor.commands.setContent(editorContent || EMPTY_NOTE_DOC);
       }
     }
   }, [editorNote, editor]);
@@ -1932,7 +1951,7 @@ export default function StoragePage() {
         setEditorContent(text);
         setEditorCharCount(text.replace(/<[^>]*>/g, '').length);
         setEditorVersionTime(new Date(note.updated_at).toLocaleString());
-        editor?.commands.setContent(text);
+        editor?.commands.setContent(text || EMPTY_NOTE_DOC);
         toast.dismiss('note-load');
       } else {
         toast.error(json.message, { id: 'note-load' });
@@ -2539,6 +2558,29 @@ export default function StoragePage() {
   useEffect(() => {
     activeUploadsRef.current = uploadsList;
   }, [uploadsList]);
+
+  // Active Upload Sessions should only show transfers still in progress —
+  // once one reaches 'completed' (100%, whether finished here or on a linked
+  // mobile-upload session polled in above) it's cleared out shortly after
+  // instead of sitting in the list indefinitely. The brief delay just lets
+  // the completed state actually be seen before it disappears.
+  const completedRemovalTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
+  useEffect(() => {
+    uploadsList.forEach((up) => {
+      const isDone = up.status === 'completed' || up.progress >= 100;
+      if (!isDone || completedRemovalTimers.current.has(up.id)) return;
+      const timer = setTimeout(() => {
+        completedRemovalTimers.current.delete(up.id);
+        setUploadsList((prev) => prev.filter((p) => p.id !== up.id));
+      }, 1500);
+      completedRemovalTimers.current.set(up.id, timer);
+    });
+  }, [uploadsList]);
+
+  useEffect(() => {
+    const timers = completedRemovalTimers.current;
+    return () => timers.forEach((timer) => clearTimeout(timer));
+  }, []);
 
   // Load the item list whenever folder/tab/sort/filters change
   useEffect(() => {
@@ -4193,6 +4235,29 @@ export default function StoragePage() {
                 </div>
               </div>
               <div className="flex items-center gap-2">
+                <div className="flex items-center gap-0.5 bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg px-1 py-1 shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => adjustDiagramUiScale(-0.05)}
+                    disabled={diagramUiScale <= 0.5}
+                    title="Shrink diagram toolbar & icons"
+                    className="p-1 rounded text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-slate-200 dark:hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer transition-colors"
+                  >
+                    <ZoomOut className="h-3.5 w-3.5" />
+                  </button>
+                  <span className="text-[10px] font-bold text-slate-600 dark:text-slate-400 w-9 text-center tabular-nums select-none">
+                    {Math.round(diagramUiScale * 100)}%
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => adjustDiagramUiScale(0.05)}
+                    disabled={diagramUiScale >= 1}
+                    title="Grow diagram toolbar & icons"
+                    className="p-1 rounded text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-slate-200 dark:hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer transition-colors"
+                  >
+                    <ZoomIn className="h-3.5 w-3.5" />
+                  </button>
+                </div>
                 <input
                   type="text"
                   placeholder="Diagram Name..."
@@ -4222,17 +4287,33 @@ export default function StoragePage() {
 
             {/* Drawing Canvas Area */}
             <div className="flex-1 rounded-2xl border border-slate-300 dark:border-slate-800/80 overflow-hidden relative shadow-inner h-[calc(100vh-140px)] w-full">
-              <Excalidraw
-                excalidrawAPI={(api) => setExcalidrawAPI(api)}
-                theme={isDarkMode ? 'dark' : 'light'}
-                viewModeEnabled={!isDiagramEditing}
-                UIOptions={{
-                  canvasActions: {
-                    toggleTheme: true,
-                    export: { saveFileToDisk: true },
-                  }
+              {/* Excalidraw's own toolbar/icons are sized for a full desktop app and
+                  read as oversized inside this embedded panel — diagramUiScale (set via
+                  the zoom controls above) shrinks the whole thing with CSS zoom rather
+                  than transform, since transform would leave Excalidraw's internal
+                  pointer math reading the pre-scale layout rect, misaligning clicks/draws
+                  from what's visually shown. The width/height compensate so the zoomed-out
+                  result still fills the frame instead of leaving dead space bottom-right. */}
+              <div
+                className="h-full w-full"
+                style={{
+                  zoom: diagramUiScale,
+                  width: `${100 / diagramUiScale}%`,
+                  height: `${100 / diagramUiScale}%`,
                 }}
-              />
+              >
+                <Excalidraw
+                  excalidrawAPI={(api) => setExcalidrawAPI(api)}
+                  theme={isDarkMode ? 'dark' : 'light'}
+                  viewModeEnabled={!isDiagramEditing}
+                  UIOptions={{
+                    canvasActions: {
+                      toggleTheme: true,
+                      export: { saveFileToDisk: true },
+                    }
+                  }}
+                />
+              </div>
             </div>
           </main>
         ) : sidebarTab === 'events' ? (
@@ -4395,10 +4476,27 @@ export default function StoragePage() {
                                 )}
                                 <div className="min-w-0">
                                   <div className="font-bold text-slate-800 dark:text-slate-200 truncate max-w-[160px]">{u.name || u.email}</div>
-                                  <div className="text-[9px] text-slate-500 dark:text-slate-500 truncate max-w-[160px]">{u.email}</div>
+                                  <div className="flex items-center gap-1 text-[9px] text-slate-500 dark:text-slate-500">
+                                    <span className="break-all">{u.email}</span>
+                                    <CopyButton
+                                      value={u.email}
+                                      tooltip="Copy email"
+                                      toastMessage={false}
+                                      className="h-4 w-4 p-0 shrink-0"
+                                      iconClassName="h-2.5 w-2.5"
+                                    />
+                                  </div>
                                   {u.mobileNumber && (
-                                    <div className="text-[9px] text-slate-400 dark:text-slate-600 truncate max-w-[160px] flex items-center gap-1">
-                                      <Smartphone className="h-2.5 w-2.5 shrink-0" /> {u.mobileNumber}
+                                    <div className="flex items-center gap-1 text-[9px] text-slate-400 dark:text-slate-600">
+                                      <Smartphone className="h-2.5 w-2.5 shrink-0" />
+                                      <span className="break-all">{u.mobileNumber}</span>
+                                      <CopyButton
+                                        value={u.mobileNumber}
+                                        tooltip="Copy mobile number"
+                                        toastMessage={false}
+                                        className="h-4 w-4 p-0 shrink-0"
+                                        iconClassName="h-2.5 w-2.5"
+                                      />
                                     </div>
                                   )}
                                 </div>
