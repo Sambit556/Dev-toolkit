@@ -17,6 +17,11 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://www.devkits.space';
+// The header's live status badge and a few tools hit this API on every page —
+// preconnecting lets the browser finish the DNS/TLS handshake with it during
+// the initial page load instead of paying that round trip only once one of
+// those requests actually fires.
+const API_ORIGIN = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 const APP_NAME = 'DevKits';
 const APP_DESCRIPTION =
   'Fast, privacy-first developer tools — all processing runs client-side in your browser. Convert Unix timestamps, format & validate JSON, decode JWT tokens, calculate EMIs, generate UUIDs & ULIDs, convert YAML, pick colors, test internet speed, and more.';
@@ -167,6 +172,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       className={`${inter.variable} ${jetbrainsMono.variable}`}
     >
       <head>
+        <link rel="preconnect" href={API_ORIGIN} crossOrigin="anonymous" />
+        <link rel="dns-prefetch" href={API_ORIGIN} />
         <link rel="manifest" href="/manifest.json" />
         <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
         <link rel="icon" type="image/svg+xml" href="/icon.svg" />

@@ -334,6 +334,7 @@ export function StickyNotes() {
             <button
               onMouseDown={startDragTrigger}
               onTouchStart={startTouchDragTrigger}
+              aria-label="Toggle Sticky Notes"
               className={cn(
                 "flex items-center gap-2 pl-2 pr-3 py-2 bg-primary text-primary-foreground font-semibold rounded-l-xl shadow-2xl transition-all duration-300 border-y border-l border-primary/20 cursor-ns-resize select-none",
                 isOpen ? "translate-x-0" : "hover:-translate-x-1"
