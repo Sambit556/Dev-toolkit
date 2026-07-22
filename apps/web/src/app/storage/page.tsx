@@ -2628,7 +2628,12 @@ export default function StoragePage() {
     let retryTimer: ReturnType<typeof setTimeout> | null = null;
 
     const applyRemoteSessions = (sessions: any[]) => {
-      const remote = sessions.filter((s: any) => s.source === 'mobile');
+      // getUploadQueue returns the last 50 sessions of any status (including old,
+      // long-dead ones) so history views can use it too — but this merge is only for
+      // *live* cross-device activity, so a cancelled/rejected row from a past session
+      // must never be (re-)added here or it'll sit in the list forever with nothing to
+      // prune it (the only auto-removal is the 1.5s completed-status timer below).
+      const remote = sessions.filter((s: any) => s.source === 'mobile' && s.status !== 'cancelled' && s.status !== 'rejected');
       if (remote.length === 0) return;
 
       setUploadsList((prev) => {
