@@ -72,6 +72,13 @@
     "zod": "^3.22.4",
     "zustand": "^4.4.7"
   },
+  "browserslist": [
+    "chrome 64",
+    "edge 79",
+    "firefox 67",
+    "opera 51",
+    "safari 12"
+  ],
   "devDependencies": {
     "@playwright/test": "^1.41.1",
     "@testing-library/jest-dom": "^6.2.0",

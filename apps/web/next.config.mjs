@@ -8,10 +8,13 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 // the network, e.g. scanning the mobile-upload QR code from a phone. Comma-separated,
 // since a laptop that moves between networks (home WiFi, office, a VPN adapter) picks
 // up a different LAN IP each time — listing all of them avoids re-editing this on
-// every switch.
+// every switch. Stripped of any accidental scheme (e.g. someone pastes a full
+// "https://host" here instead of a bare IP) — the CSP below always prepends its own
+// "http://", so a leftover scheme would otherwise produce an invalid
+// "http://https://host:3001" source that browsers silently drop.
 const lanHosts = (process.env.NEXT_PUBLIC_LAN_HOST || '')
   .split(',')
-  .map((h) => h.trim())
+  .map((h) => h.trim().replace(/^\w+:\/\//, ''))
   .filter(Boolean);
 
 /** @type {import('next').NextConfig} */

@@ -110,7 +110,7 @@ function LanguageSwitcher() {
   return (
     <div className="flex items-center gap-1">
       <Select value={language} onValueChange={setLanguageManual}>
-        <SelectTrigger className="h-7 text-[10px] w-[118px] bg-card border font-medium">
+        <SelectTrigger aria-label="Select language" className="h-7 text-[10px] w-[118px] bg-card border font-medium">
           <SelectValue>
             <span className="inline-flex items-center gap-1 min-w-0">
               <Globe className="h-3 w-3 text-muted-foreground/60 shrink-0" />
