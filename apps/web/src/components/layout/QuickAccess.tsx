@@ -102,6 +102,12 @@ export function QuickAccess() {
   const [isDraggingDock, setIsDraggingDock] = useState(false);
   const dockDragOffsetRef = useRef<PanelPos>({ x: 0, y: 0 });
   const dockRef = useRef<HTMLDivElement>(null);
+  // The glow handle at the top of the dock both drags (move) and clicks
+  // (collapse/expand) — these track whether the pointer actually moved since
+  // mousedown so a plain click doesn't get swallowed by the drag system, and
+  // a real drag doesn't accidentally toggle collapse on release.
+  const dockPointerStartRef = useRef<PanelPos>({ x: 0, y: 0 });
+  const dockDidDragRef = useRef(false);
 
   // Reads localStorage, so this must run client-only: this page is statically prerendered,
   // and lazy useState initializers would run again (with real data) during the client's
@@ -191,6 +197,8 @@ export function QuickAccess() {
 
   const handleDockMouseDown = (e: React.MouseEvent, dockEl: HTMLElement) => {
     setIsDraggingDock(true);
+    dockDidDragRef.current = false;
+    dockPointerStartRef.current = { x: e.clientX, y: e.clientY };
     const rect = dockEl.getBoundingClientRect();
     dockDragOffsetRef.current = {
       x: e.clientX - rect.left,
@@ -201,7 +209,9 @@ export function QuickAccess() {
   const handleDockTouchStart = (e: React.TouchEvent, dockEl: HTMLElement) => {
     if (e.touches.length === 0) return;
     setIsDraggingDock(true);
+    dockDidDragRef.current = false;
     const touch = e.touches[0];
+    dockPointerStartRef.current = { x: touch.clientX, y: touch.clientY };
     const rect = dockEl.getBoundingClientRect();
     dockDragOffsetRef.current = {
       x: touch.clientX - rect.left,
@@ -320,6 +330,9 @@ export function QuickAccess() {
         if (draggingTool === 'epoch') setEpochPos({ x: newX, y: newY });
         if (draggingTool === 'json') setJsonPos({ x: newX, y: newY });
       } else if (isDraggingDock) {
+        if (Math.hypot(e.clientX - dockPointerStartRef.current.x, e.clientY - dockPointerStartRef.current.y) > 4) {
+          dockDidDragRef.current = true;
+        }
         const rect = dockRef.current?.getBoundingClientRect();
         const { x: newX, y: newY } = clampToViewport(
           e.clientX - dockDragOffsetRef.current.x,
@@ -345,6 +358,9 @@ export function QuickAccess() {
         if (draggingTool === 'epoch') setEpochPos({ x: newX, y: newY });
         if (draggingTool === 'json') setJsonPos({ x: newX, y: newY });
       } else if (isDraggingDock) {
+        if (Math.hypot(touch.clientX - dockPointerStartRef.current.x, touch.clientY - dockPointerStartRef.current.y) > 4) {
+          dockDidDragRef.current = true;
+        }
         const rect = dockRef.current?.getBoundingClientRect();
         const { x: newX, y: newY } = clampToViewport(
           touch.clientX - dockDragOffsetRef.current.x,
@@ -361,8 +377,13 @@ export function QuickAccess() {
     const handleDragEnd = () => {
       if (isDraggingDock) {
         setIsDraggingDock(false);
-        // Persist dock position
-        localStorage.setItem('devkits-quick-dock-pos', JSON.stringify(dockPos));
+        if (dockDidDragRef.current) {
+          // Persist dock position — only a real drag moved it
+          localStorage.setItem('devkits-quick-dock-pos', JSON.stringify(dockPos));
+        } else {
+          // No meaningful movement — treat it as a click on the glow handle
+          toggleCollapsed();
+        }
       }
       setDraggingTool(null);
       setResizingTool(null);
@@ -405,35 +426,35 @@ export function QuickAccess() {
           }}
           className="flex flex-col gap-3.5 bg-background/70 dark:bg-slate-900/80 backdrop-blur-md border border-border/80 p-2 rounded-2xl shadow-2xl animate-fade-in select-none"
         >
+          {/* One glowing handle does both jobs: drag it to move the whole dock,
+              click it (no drag) to collapse/expand — see dockDidDragRef. */}
           <Tooltip>
             <TooltipTrigger asChild>
               <div
                 onMouseDown={(e) => handleDockMouseDown(e, dockRef.current!)}
                 onTouchStart={(e) => handleDockTouchStart(e, dockRef.current!)}
                 className={cn(
-                  "cursor-move flex flex-col items-center gap-1 px-1 hover:text-primary transition-colors text-muted-foreground/80",
+                  "cursor-move flex flex-col items-center gap-1 px-1 pt-0.5 pb-1.5 hover:text-primary transition-colors text-muted-foreground/80 select-none",
                   !collapsed && "border-b pb-2",
                 )}
               >
-                <GripHorizontal className="h-3.5 w-3.5" />
+                <div className="relative h-6 w-6 flex items-center justify-center">
+                  <GripHorizontal className="relative h-3.5 w-3.5 text-primary" />
+                </div>
                 <div className="text-[8px] uppercase tracking-widest font-black text-center">
                   Quick
                 </div>
+                <div className="relative h-3.5 w-3.5 flex items-center justify-center">
+                  <span className="absolute inset-0 rounded-full bg-primary/40 blur-[5px] animate-pulse" />
+                  {collapsed ? (
+                    <ChevronDown className="relative h-3 w-3 text-primary animate-bounce" />
+                  ) : (
+                    <ChevronUp className="relative h-3 w-3 text-primary animate-bounce" />
+                  )}
+                </div>
               </div>
             </TooltipTrigger>
-            <TooltipContent side="right">Drag to reposition toolbar</TooltipContent>
-          </Tooltip>
-
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <button
-                onClick={toggleCollapsed}
-                className="h-5 w-10 flex items-center justify-center text-muted-foreground/70 hover:text-primary transition-colors"
-              >
-                {collapsed ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronUp className="h-3.5 w-3.5" />}
-              </button>
-            </TooltipTrigger>
-            <TooltipContent side="right">{collapsed ? 'Expand toolbar' : 'Collapse toolbar'}</TooltipContent>
+            <TooltipContent side="right">Drag to move &middot; Click to {collapsed ? 'expand' : 'collapse'}</TooltipContent>
           </Tooltip>
 
           {!collapsed && (
@@ -504,6 +525,7 @@ export function QuickAccess() {
             title="Calculator"
             icon={<Calculator className="h-4 w-4 text-primary" />}
             onClose={() => setActiveTool(null)}
+            onNavigate={() => router.push('/calculator')}
             onMouseDown={(e) => handleMouseDown('calc', e, e.currentTarget.parentElement!)}
             onTouchStart={(e) => {
               if (e.touches.length > 0) {
@@ -538,6 +560,7 @@ export function QuickAccess() {
             title="Epoch Converter"
             icon={<Clock className="h-4 w-4 text-primary" />}
             onClose={() => setActiveTool(null)}
+            onNavigate={() => router.push('/epoch')}
             onMouseDown={(e) => handleMouseDown('epoch', e, e.currentTarget.parentElement!)}
             onTouchStart={(e) => {
               if (e.touches.length > 0) {
@@ -576,6 +599,7 @@ export function QuickAccess() {
             title="JSON Formatter"
             icon={<Braces className="h-4 w-4 text-primary" />}
             onClose={() => setActiveTool(null)}
+            onNavigate={() => router.push('/json')}
             onMouseDown={(e) => handleMouseDown('json', e, e.currentTarget.parentElement!)}
             onTouchStart={(e) => {
               if (e.touches.length > 0) {
@@ -601,15 +625,18 @@ interface MiniHeaderProps {
   title: string;
   icon: React.ReactNode;
   onClose: () => void;
+  onNavigate: () => void;
   onMouseDown: (e: React.MouseEvent) => void;
   onTouchStart: (e: React.TouchEvent) => void;
 }
 
-function MiniPanelHeader({ title, icon, onClose, onMouseDown, onTouchStart }: MiniHeaderProps) {
+function MiniPanelHeader({ title, icon, onClose, onNavigate, onMouseDown, onTouchStart }: MiniHeaderProps) {
   return (
     <div
       onMouseDown={onMouseDown}
       onTouchStart={onTouchStart}
+      onDoubleClick={onNavigate}
+      title="Double-click to open the full page"
       className="flex items-center justify-between px-3.5 py-2.5 bg-muted/40 cursor-move border-b select-none font-bold text-xs"
     >
       <div className="flex items-center gap-1.5 min-w-0">

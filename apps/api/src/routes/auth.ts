@@ -12,6 +12,7 @@ import {
   ForgotPasswordSchema,
   ResetPasswordSchema,
   ChangePasswordSchema,
+  SuperadminChangePasswordOtpSchema,
   RefreshTokenSchema,
   UpdateProfileSchema,
   GoogleCallbackSchema,
@@ -272,6 +273,65 @@ router.post('/change-password', requireAuth, async (req: Request, res: Response,
     }
     const { currentPassword, newPassword } = parseResult.data;
     await authService.changePassword((req as any).user, currentPassword, newPassword);
+    res.json({ success: true, message: 'Password updated successfully. Logged out of all devices.' });
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * @openapi
+ * /api/auth/superadmin/request-password-otp:
+ *   post:
+ *     summary: Email a one-time code to the superadmin's own address, to authorize a password change
+ *     description: Superadmin-only — the regular change-password and forgot/reset-password flows both reject the superadmin account by design; this OTP flow is the only way its password can be changed.
+ *     tags: [Auth]
+ *     security: [{ bearerAuth: [] }]
+ *     responses:
+ *       200: { description: OTP sent }
+ *       403: { description: Caller is not the superadmin account }
+ *       429: { description: Rate limited }
+ */
+router.post('/superadmin/request-password-otp', requireAuth, authRateLimit, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    await authService.requestSuperadminPasswordOtp((req as any).user);
+    res.json({ success: true, message: 'A verification code has been sent to your email.' });
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * @openapi
+ * /api/auth/superadmin/change-password-otp:
+ *   post:
+ *     summary: Complete a superadmin password change using the emailed OTP
+ *     tags: [Auth]
+ *     security: [{ bearerAuth: [] }]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [otp, newPassword]
+ *             properties:
+ *               otp: { type: string, pattern: '^\\d{6}$' }
+ *               newPassword: { type: string, minLength: 8 }
+ *     responses:
+ *       200: { description: Password changed; all sessions revoked }
+ *       401: { description: Incorrect, expired, or never-requested OTP }
+ *       403: { description: Caller is not the superadmin account }
+ *       429: { description: Too many incorrect attempts — request a new code }
+ */
+router.post('/superadmin/change-password-otp', requireAuth, authRateLimit, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const parseResult = SuperadminChangePasswordOtpSchema.safeParse(req.body);
+    if (!parseResult.success) {
+      throw new AppError(HttpStatus.BAD_REQUEST, 'Invalid OTP or password parameters', 'VALIDATION_ERROR', parseResult.error.flatten().fieldErrors);
+    }
+    const { otp, newPassword } = parseResult.data;
+    await authService.changeSuperadminPasswordWithOtp((req as any).user, otp, newPassword);
     res.json({ success: true, message: 'Password updated successfully. Logged out of all devices.' });
   } catch (err) {
     next(err);

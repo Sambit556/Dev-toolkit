@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { Upload, CheckCircle, XCircle, ShieldCheck, File as FileIcon, Image as ImageIcon, Video as VideoIcon } from 'lucide-react';
+import { Upload, CheckCircle, XCircle, ShieldCheck, File as FileIcon, Image as ImageIcon, Video as VideoIcon, Pause, Play } from 'lucide-react';
 
 const CHUNK_SIZE = 10 * 1024 * 1024; // 10MB chunks
 
@@ -35,6 +35,10 @@ export default function MobileUploadClient({ token }: { token: string }) {
   const [status, setStatus] = useState<'idle' | 'uploading' | 'paused' | 'success' | 'error'>('idle');
   const [errorMsg, setErrorMsg] = useState('');
   const [isDragging, setIsDragging] = useState(false);
+  // Lifted out of uploadFile() so the Pause/Continue buttons (rendered separately)
+  // can reach the in-progress session — this is the same session row the desktop
+  // Upload Queue polls, so pausing here is what the desktop sees too, and vice versa.
+  const [uploadSession, setUploadSession] = useState<{ uploadId: string; s3Key: string } | null>(null);
 
   // Announce this device to the desktop the moment the link is opened — scanning
   // the QR is the "connect" moment, not waiting until a file is actually picked.
@@ -82,6 +86,7 @@ export default function MobileUploadClient({ token }: { token: string }) {
       if (!startData.success) throw new Error(startData.message || 'Failed to start upload');
 
       const { uploadId, s3Key } = startData.data;
+      setUploadSession({ uploadId, s3Key });
 
       // 2. Upload Parts
       const uploadedParts = [];
@@ -108,7 +113,7 @@ export default function MobileUploadClient({ token }: { token: string }) {
           if (partData.success) break;
           if (partData.code === 'UPLOAD_PAUSED') {
             setStatus('paused');
-            await new Promise((resolve) => setTimeout(resolve, 3000));
+            await new Promise((resolve) => setTimeout(resolve, 2000));
             continue;
           }
           throw new Error(partData.message || 'Failed to get part URL');
@@ -146,6 +151,26 @@ export default function MobileUploadClient({ token }: { token: string }) {
       setStatus('error');
       setErrorMsg(err.message || 'An unknown error occurred');
     }
+  };
+
+  const pauseUpload = () => {
+    if (!uploadSession) return;
+    setStatus('paused'); // instant local feedback — the loop's own retry-wait picks up the server flip
+    fetch(`${getApiBase()}/api/storage/mobile/upload/pause`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ uploadId: uploadSession.uploadId }),
+    }).catch(() => {});
+  };
+
+  const resumeUpload = () => {
+    if (!uploadSession) return;
+    setStatus('uploading');
+    fetch(`${getApiBase()}/api/storage/mobile/upload/resume`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ uploadId: uploadSession.uploadId }),
+    }).catch(() => {});
   };
 
   const typeMeta = file ? fileTypeMeta(file.type || '') : null;
@@ -223,7 +248,7 @@ export default function MobileUploadClient({ token }: { token: string }) {
                 </div>
 
                 {status === 'uploading' || status === 'paused' ? (
-                  <div className="w-full flex flex-col gap-2">
+                  <div className="w-full flex flex-col gap-3">
                     <div className="w-full h-3 bg-slate-800 rounded-full overflow-hidden relative">
                       <div
                         className={`h-full transition-all duration-300 relative overflow-hidden ${status === 'paused' ? 'bg-gradient-to-r from-amber-500 to-amber-400' : 'bg-gradient-to-r from-indigo-500 to-cyan-500'}`}
@@ -234,10 +259,19 @@ export default function MobileUploadClient({ token }: { token: string }) {
                     </div>
                     <div className="flex justify-between text-xs text-slate-400 font-medium">
                       <span className={status === 'paused' ? 'text-amber-400' : ''}>
-                        {status === 'paused' ? 'Paused from your desktop...' : 'Uploading securely...'}
+                        {status === 'paused' ? 'Paused — synced across your devices' : 'Uploading securely...'}
                       </span>
                       <span className={status === 'paused' ? 'text-amber-300 font-bold' : 'text-indigo-300 font-bold'}>{progress}%</span>
                     </div>
+                    {status === 'uploading' ? (
+                      <button onClick={pauseUpload} className="w-full py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl font-semibold text-sm transition-all active:scale-95 flex items-center justify-center gap-2 cursor-pointer">
+                        <Pause className="w-3.5 h-3.5" /> Pause
+                      </button>
+                    ) : (
+                      <button onClick={resumeUpload} className="w-full py-2.5 bg-gradient-to-r from-amber-500 to-amber-400 hover:from-amber-400 hover:to-amber-300 text-slate-950 rounded-xl font-bold text-sm transition-all active:scale-95 flex items-center justify-center gap-2 cursor-pointer shadow-lg shadow-amber-900/30">
+                        <Play className="w-3.5 h-3.5" /> Continue
+                      </button>
+                    )}
                   </div>
                 ) : (
                   <button onClick={uploadFile} className="w-full py-3.5 bg-gradient-to-r from-indigo-600 to-cyan-600 hover:from-indigo-500 hover:to-cyan-500 text-white rounded-xl font-bold shadow-lg shadow-indigo-900/50 transition-all transform active:scale-95 flex items-center justify-center gap-2 cursor-pointer">

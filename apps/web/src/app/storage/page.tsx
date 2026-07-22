@@ -79,6 +79,9 @@ import {
   Link2,
   QrCode,
   Clock,
+  Mail,
+  Phone,
+  Crown,
 } from 'lucide-react';
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
@@ -296,6 +299,16 @@ export default function StoragePage() {
   const [profileNewPassword, setProfileNewPassword] = useState('');
   const [profileConfirmPassword, setProfileConfirmPassword] = useState('');
   const [isChangingPassword, setIsChangingPassword] = useState(false);
+  const [showProfileCurrentPassword, setShowProfileCurrentPassword] = useState(false);
+  const [showProfileNewPassword, setShowProfileNewPassword] = useState(false);
+  const [showProfileConfirmPassword, setShowProfileConfirmPassword] = useState(false);
+  // Superadmin-only OTP password-change flow — the regular current-password
+  // flow above is rejected server-side for the superadmin account by design.
+  const [profileOtp, setProfileOtp] = useState('');
+  const [otpSentAt, setOtpSentAt] = useState<number | null>(null);
+  const [isSendingOtp, setIsSendingOtp] = useState(false);
+  const [isVerifyingOtp, setIsVerifyingOtp] = useState(false);
+  const [otpCooldownRemaining, setOtpCooldownRemaining] = useState(0);
   const [showDeactivateConfirm, setShowDeactivateConfirm] = useState(false);
   const [isDeactivating, setIsDeactivating] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
@@ -333,6 +346,11 @@ export default function StoragePage() {
   const [folderPath, setFolderPath] = useState<{ id: string; name: string }[]>([]);
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [sidebarTab, setSidebarTab] = useState<'files' | 'notes' | 'uploads' | 'trash' | 'events' | 'admin' | 'diagrams'>('files');
+  // Drives the "All Files" split-button tooltips imperatively — the diagonal-cut
+  // segment relies on overflow-hidden for its clip-path, which would silently clip
+  // a CSS group-hover tooltip nested inside it, so hover state is tracked here and
+  // the tooltips render outside that clipped container instead.
+  const [hoveredSplitSegment, setHoveredSplitSegment] = useState<'view' | 'upload' | null>(null);
   const [sortBy, setSortBy] = useState('created_at');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [searchQuery, setSearchQuery] = useState('');
@@ -1058,6 +1076,9 @@ export default function StoragePage() {
     setProfileCurrentPassword('');
     setProfileNewPassword('');
     setProfileConfirmPassword('');
+    setProfileOtp('');
+    setOtpSentAt(null);
+    setOtpCooldownRemaining(0);
     setShowProfileModal(true);
     fetchProfile();
   };
@@ -1176,6 +1197,63 @@ export default function StoragePage() {
     }
   };
 
+  const sendSuperadminPasswordOtp = async () => {
+    setIsSendingOtp(true);
+    try {
+      const res = await apiFetch(`${API_BASE}/api/auth/superadmin/request-password-otp`, {
+        method: 'POST',
+        headers: getHeaders(),
+      });
+      const json = await res.json();
+      if (json.success) {
+        toast.success('Verification code sent to your email');
+        setOtpSentAt(Date.now());
+        setOtpCooldownRemaining(30);
+      } else if (res.status === 429) {
+        toast.error(json.message || 'Too many requests — please wait before trying again');
+        setOtpCooldownRemaining(30);
+      } else {
+        toast.error(json.message || 'Failed to send verification code');
+      }
+    } catch (e) {
+      toast.error('Failed to send verification code');
+    } finally {
+      setIsSendingOtp(false);
+    }
+  };
+
+  const changeSuperadminPasswordWithOtp = async () => {
+    if (!profileOtp || profileOtp.length !== 6) { toast.error('Enter the 6-digit code from your email'); return; }
+    if (!profileNewPassword) { toast.error('Enter a new password'); return; }
+    if (profileNewPassword !== profileConfirmPassword) { toast.error('New passwords do not match'); return; }
+    if (profileNewPassword.length < 8) { toast.error('New password must be at least 8 characters'); return; }
+
+    setIsVerifyingOtp(true);
+    try {
+      const res = await apiFetch(`${API_BASE}/api/auth/superadmin/change-password-otp`, {
+        method: 'POST',
+        headers: getHeaders(),
+        body: JSON.stringify({ otp: profileOtp, newPassword: profileNewPassword }),
+      });
+      const json = await res.json();
+      if (json.success) {
+        toast.success('Password updated. Please log in again.');
+        setProfileOtp('');
+        setProfileNewPassword('');
+        setProfileConfirmPassword('');
+        setOtpSentAt(null);
+        setShowProfileModal(false);
+        silentLocalLogout();
+      } else {
+        toast.error(json.message || 'Failed to change password');
+      }
+    } catch (e) {
+      toast.error('Failed to change password');
+    } finally {
+      setIsVerifyingOtp(false);
+    }
+  };
+
   const deactivateOwnAccount = async () => {
     setIsDeactivating(true);
     try {
@@ -1231,6 +1309,15 @@ export default function StoragePage() {
       toast.error('Failed to update user status');
     }
   };
+
+  // Client-side cooldown on the superadmin OTP "Resend code" button — the server
+  // already rate-limits the endpoint itself (authRateLimit), this just keeps the
+  // button from firing requests it knows will be rejected in the meantime.
+  useEffect(() => {
+    if (otpCooldownRemaining <= 0) return;
+    const t = setTimeout(() => setOtpCooldownRemaining((s) => s - 1), 1000);
+    return () => clearTimeout(t);
+  }, [otpCooldownRemaining]);
 
   // Live countdown for the mobile-upload QR link's expiry, shown in the scan modal
   useEffect(() => {
@@ -2532,7 +2619,7 @@ export default function StoragePage() {
     };
 
     poll();
-    const interval = setInterval(poll, 3000);
+    const interval = setInterval(poll, 2000);
     return () => clearInterval(interval);
   }, [token, sidebarTab]);
 
@@ -3031,8 +3118,12 @@ export default function StoragePage() {
   // Holographic Diagnostic Panel — shown at the top of every /storage view (files, notes, diagrams, events, admin, uploads).
   // `insetMargin` negates padding on <main> containers that pad their own content, so the bar still sits flush.
   const renderDiagnosticBar = (insetMargin = '') => (
-    <div className={cn("bg-[#0c152d]/95 dark:bg-[#070e1f]/95 border-b border-blue-900/30 dark:border-blue-950/40 px-5 py-3 flex flex-wrap items-center justify-between gap-4 font-mono text-[10px] text-slate-350 dark:text-slate-400 relative overflow-hidden backdrop-blur-md shrink-0", insetMargin)}>
-      <div className="absolute -left-12 top-0 w-32 h-32 bg-blue-500/5 rounded-full blur-2xl pointer-events-none" />
+    <div className={cn("bg-[#0c152d]/95 dark:bg-[#070e1f]/95 border-b border-blue-900/30 dark:border-blue-950/40 px-5 py-3 flex flex-wrap items-center justify-between gap-4 font-mono text-[10px] text-slate-350 dark:text-slate-400 relative backdrop-blur-md shrink-0", insetMargin)}>
+      {/* Decorative glow gets its own clipped layer — the bar itself must stay
+          overflow-visible so hover tooltips positioned below its buttons aren't cut off. */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute -left-12 top-0 w-32 h-32 bg-blue-500/5 rounded-full blur-2xl" />
+      </div>
       <div className="flex items-center gap-6 relative z-10">
         <div className="flex items-center gap-2">
           <Shield className="h-3.5 w-3.5 text-blue-400" />
@@ -3328,122 +3419,274 @@ export default function StoragePage() {
 
       {/* Profile Modal */}
       {showProfileModal && (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/70 backdrop-blur-sm" onClick={() => setShowProfileModal(false)}>
-          <div className="bg-white dark:bg-[#0d1526] border border-slate-300/60 dark:border-slate-700/60 rounded-2xl p-6 w-96 shadow-2xl max-h-[85vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
-            <div className="flex items-center justify-between mb-5">
-              <h3 className="font-bold text-slate-900 dark:text-slate-100 text-sm flex items-center gap-1.5"><User className="h-4 w-4 text-blue-600 dark:text-blue-400" /> Profile Settings</h3>
-              <button onClick={() => setShowProfileModal(false)} className="text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 cursor-pointer"><X className="h-4 w-4" /></button>
-            </div>
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4" onClick={() => setShowProfileModal(false)}>
+          <div
+            className="relative w-full max-w-sm rounded-2xl p-px bg-gradient-to-br from-blue-500/50 via-violet-500/25 to-transparent shadow-2xl shadow-blue-950/20 dark:shadow-blue-950/60"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="relative bg-white dark:bg-[#0d1526] rounded-[15px] max-h-[85vh] overflow-y-auto">
+              {/* Ambient glow */}
+              <div className="absolute inset-0 overflow-hidden pointer-events-none rounded-[15px]">
+                <div className="absolute -top-10 -right-10 w-40 h-40 bg-blue-500/10 dark:bg-blue-500/15 rounded-full blur-3xl" />
+                <div className="absolute -bottom-10 -left-10 w-40 h-40 bg-violet-500/10 dark:bg-violet-500/10 rounded-full blur-3xl" />
+              </div>
 
-            {/* Avatar */}
-            <div className="flex flex-col items-center gap-3 mb-6">
-              <div className="relative">
-                {avatarUrl ? (
-                  <img src={avatarUrl} alt="" className="h-20 w-20 rounded-full object-cover border-2 border-slate-300 dark:border-slate-700" />
+              <div className="relative p-6">
+                <div className="flex items-center justify-between mb-6">
+                  <div className="flex items-center gap-2.5">
+                    <div className="h-8 w-8 rounded-xl bg-gradient-to-br from-blue-500/20 to-violet-500/20 border border-blue-500/30 flex items-center justify-center shrink-0">
+                      <User className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                    </div>
+                    <div>
+                      <h3 className="font-black text-slate-900 dark:text-slate-100 text-sm leading-tight">Profile Settings</h3>
+                      <div className="text-[9px] text-slate-500 dark:text-slate-500 uppercase tracking-widest font-bold">Vault Identity</div>
+                    </div>
+                  </div>
+                  <button onClick={() => setShowProfileModal(false)} className="text-slate-500 hover:text-slate-900 dark:hover:text-slate-100 cursor-pointer transition-colors shrink-0"><X className="h-4 w-4" /></button>
+                </div>
+
+                {/* Avatar */}
+                <div className="flex flex-col items-center gap-3 mb-6">
+                  <div className="relative">
+                    <div className="absolute -inset-1 rounded-full bg-gradient-to-br from-blue-500/40 to-violet-500/40 blur-md" />
+                    {avatarUrl ? (
+                      <img src={avatarUrl} alt="" className="relative h-20 w-20 rounded-full object-cover border-2 border-white dark:border-[#0d1526] shadow-lg" />
+                    ) : (
+                      <div className="relative h-20 w-20 rounded-full bg-gradient-to-br from-blue-500 to-violet-600 flex items-center justify-center text-white text-2xl font-black shadow-lg">
+                        {(userName || userEmail).charAt(0).toUpperCase()}
+                      </div>
+                    )}
+                    <button
+                      onClick={() => setShowAvatarEditor(true)}
+                      disabled={isUploadingAvatar}
+                      className="absolute bottom-0 right-0 h-7 w-7 rounded-full bg-blue-600 hover:bg-blue-500 border-2 border-white dark:border-[#0d1526] flex items-center justify-center cursor-pointer transition-colors disabled:opacity-60 shadow-lg"
+                    >
+                      {isUploadingAvatar ? <Loader2 className="h-3.5 w-3.5 text-white animate-spin" /> : <Camera className="h-3.5 w-3.5 text-white" />}
+                    </button>
+                  </div>
+                  <div className="flex items-center gap-2 text-[10px]">
+                    <button onClick={() => setShowAvatarEditor(true)} className="px-2.5 py-1 rounded-full bg-blue-500/10 hover:bg-blue-500/20 text-blue-600 dark:text-blue-400 cursor-pointer font-bold transition-colors">Change Picture</button>
+                    {avatarUrl && (
+                      <button onClick={removeAvatar} className="px-2.5 py-1 rounded-full bg-red-500/10 hover:bg-red-500/20 text-red-600 dark:text-red-400 cursor-pointer font-bold transition-colors">Remove</button>
+                    )}
+                  </div>
+                </div>
+
+                {/* Identity details */}
+                <div className="mb-4 p-3.5 rounded-xl bg-slate-50 dark:bg-slate-900/40 border border-slate-200 dark:border-slate-800 space-y-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-1.5 text-[10px] text-slate-500 dark:text-slate-500 font-semibold min-w-0">
+                      <Mail className="h-3 w-3 shrink-0" /> <span className="truncate">{userEmail}</span>
+                    </div>
+                    <span className={cn(
+                      "flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[9px] font-bold uppercase tracking-wide shrink-0 border",
+                      userRole === 'superadmin'
+                        ? "bg-gradient-to-r from-amber-500/15 to-orange-500/15 border-amber-500/30 text-amber-600 dark:text-amber-400"
+                        : "bg-slate-200/60 dark:bg-slate-800/60 border-slate-300 dark:border-slate-700 text-slate-600 dark:text-slate-400"
+                    )}>
+                      {userRole === 'superadmin' ? <Crown className="h-2.5 w-2.5" /> : <User className="h-2.5 w-2.5" />}
+                      {userRole === 'superadmin' ? 'Superadmin' : 'User'}
+                    </span>
+                  </div>
+
+                  <div>
+                    <label className="text-[10px] uppercase tracking-widest font-black text-slate-400 dark:text-slate-600 mb-1.5 block">Display Name</label>
+                    <div className="relative">
+                      <User className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400 dark:text-slate-600" />
+                      <input
+                        type="text"
+                        value={profileNameInput}
+                        onChange={(e) => setProfileNameInput(e.target.value)}
+                        className="w-full bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg pl-8 pr-3 py-2 text-slate-800 dark:text-slate-200 focus:outline-none focus:border-blue-500/60 focus:ring-2 focus:ring-blue-500/15 transition-all text-xs"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="text-[10px] uppercase tracking-widest font-black text-slate-400 dark:text-slate-600 mb-1.5 block">Mobile Number</label>
+                    <div className="flex gap-2">
+                      <div className="relative flex-1">
+                        <Phone className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400 dark:text-slate-600" />
+                        <input
+                          type="text"
+                          placeholder="+1234567890"
+                          value={profileMobileInput}
+                          onChange={(e) => setProfileMobileInput(e.target.value)}
+                          className="w-full bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg pl-8 pr-3 py-2 text-slate-800 dark:text-slate-200 placeholder-slate-400 dark:placeholder-slate-600 focus:outline-none focus:border-blue-500/60 focus:ring-2 focus:ring-blue-500/15 transition-all text-xs"
+                        />
+                      </div>
+                      <button
+                        onClick={saveProfileName}
+                        disabled={isSavingName}
+                        className="px-3.5 py-2 rounded-lg bg-gradient-to-r from-blue-600 to-violet-600 hover:from-blue-500 hover:to-violet-500 text-white font-bold cursor-pointer transition-all disabled:opacity-50 text-xs shrink-0 shadow-md shadow-blue-950/20"
+                      >
+                        {isSavingName ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : 'Save'}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Password */}
+                {userRole === 'superadmin' ? (
+                  <div className="mb-4 p-3.5 rounded-xl bg-amber-50/60 dark:bg-amber-950/10 border border-amber-200 dark:border-amber-900/40 space-y-2.5">
+                    <div className="text-[10px] uppercase tracking-widest font-black text-amber-600 dark:text-amber-400 flex items-center gap-1.5">
+                      <KeyRound className="h-3 w-3" /> Change Password &middot; Email Verification Required
+                    </div>
+                    <div className="text-[9px] text-slate-500 dark:text-slate-500">
+                      For security, the Superadmin password can only be changed with a one-time code sent to <span className="font-semibold text-slate-700 dark:text-slate-300">{userEmail}</span>.
+                    </div>
+
+                    {!otpSentAt ? (
+                      <button
+                        onClick={sendSuperadminPasswordOtp}
+                        disabled={isSendingOtp}
+                        className="w-full flex items-center justify-center gap-1.5 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-white rounded-lg py-2 font-bold cursor-pointer transition-all disabled:opacity-50 text-xs shadow-md shadow-amber-950/20"
+                      >
+                        {isSendingOtp ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Mail className="h-3.5 w-3.5" />}
+                        Send Verification Code
+                      </button>
+                    ) : (
+                      <>
+                        <input
+                          type="text"
+                          inputMode="numeric"
+                          maxLength={6}
+                          placeholder="6-digit code"
+                          value={profileOtp}
+                          onChange={(e) => setProfileOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                          className="w-full bg-white dark:bg-slate-950 border border-amber-300 dark:border-amber-800/60 rounded-lg px-3 py-2 text-slate-800 dark:text-slate-200 placeholder-slate-400 dark:placeholder-slate-600 focus:outline-none focus:border-amber-500/60 focus:ring-2 focus:ring-amber-500/15 transition-all text-sm font-mono tracking-[0.3em] text-center"
+                        />
+                        <div className="relative">
+                          <input
+                            type={showProfileNewPassword ? "text" : "password"}
+                            placeholder="New password (min. 8 characters)"
+                            value={profileNewPassword}
+                            onChange={(e) => setProfileNewPassword(e.target.value)}
+                            className="w-full bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg pl-3 pr-10 py-2 text-slate-800 dark:text-slate-200 placeholder-slate-400 dark:placeholder-slate-600 focus:outline-none focus:border-amber-500/60 focus:ring-2 focus:ring-amber-500/15 transition-all text-xs"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setShowProfileNewPassword((v) => !v)}
+                            className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 bg-transparent border-0 outline-none p-0.5 cursor-pointer"
+                          >
+                            {showProfileNewPassword ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+                          </button>
+                        </div>
+                        <PasswordStrengthBar password={profileNewPassword} />
+                        <div className="relative">
+                          <input
+                            type={showProfileConfirmPassword ? "text" : "password"}
+                            placeholder="Confirm new password"
+                            value={profileConfirmPassword}
+                            onChange={(e) => setProfileConfirmPassword(e.target.value)}
+                            className="w-full bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg pl-3 pr-10 py-2 text-slate-800 dark:text-slate-200 placeholder-slate-400 dark:placeholder-slate-600 focus:outline-none focus:border-amber-500/60 focus:ring-2 focus:ring-amber-500/15 transition-all text-xs"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setShowProfileConfirmPassword((v) => !v)}
+                            className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 bg-transparent border-0 outline-none p-0.5 cursor-pointer"
+                          >
+                            {showProfileConfirmPassword ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+                          </button>
+                        </div>
+                        <button
+                          onClick={changeSuperadminPasswordWithOtp}
+                          disabled={isVerifyingOtp}
+                          className="w-full bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-white rounded-lg py-2 font-bold cursor-pointer transition-all disabled:opacity-50 text-xs shadow-md shadow-amber-950/20"
+                        >
+                          {isVerifyingOtp ? <Loader2 className="h-3.5 w-3.5 animate-spin mx-auto" /> : 'Verify & Update Password'}
+                        </button>
+                        <button
+                          onClick={sendSuperadminPasswordOtp}
+                          disabled={isSendingOtp || otpCooldownRemaining > 0}
+                          className="w-full text-amber-600 dark:text-amber-400 hover:text-amber-700 dark:hover:text-amber-300 cursor-pointer font-bold text-[10px] disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          {isSendingOtp ? 'Resending...' : otpCooldownRemaining > 0 ? `Resend code in ${otpCooldownRemaining}s` : 'Resend code'}
+                        </button>
+                      </>
+                    )}
+                    <div className="text-[9px] text-slate-400 dark:text-slate-600">Changing your password logs you out of all devices.</div>
+                  </div>
                 ) : (
-                  <div className="h-20 w-20 rounded-full bg-gradient-to-br from-blue-500 to-violet-600 flex items-center justify-center text-white text-2xl font-black">
-                    {(userName || userEmail).charAt(0).toUpperCase()}
+                  <div className="mb-4 p-3.5 rounded-xl bg-slate-50 dark:bg-slate-900/40 border border-slate-200 dark:border-slate-800 space-y-2.5">
+                    <div className="text-[10px] uppercase tracking-widest font-black text-slate-500 dark:text-slate-400 flex items-center gap-1.5"><KeyRound className="h-3 w-3" /> Change Password</div>
+                    <div className="relative">
+                      <input
+                        type={showProfileCurrentPassword ? "text" : "password"}
+                        placeholder="Current password"
+                        value={profileCurrentPassword}
+                        onChange={(e) => setProfileCurrentPassword(e.target.value)}
+                        className="w-full bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg pl-3 pr-10 py-2 text-slate-800 dark:text-slate-200 placeholder-slate-400 dark:placeholder-slate-600 focus:outline-none focus:border-blue-500/60 focus:ring-2 focus:ring-blue-500/15 transition-all text-xs"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowProfileCurrentPassword((v) => !v)}
+                        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 bg-transparent border-0 outline-none p-0.5 cursor-pointer"
+                      >
+                        {showProfileCurrentPassword ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+                      </button>
+                    </div>
+                    <div className="relative">
+                      <input
+                        type={showProfileNewPassword ? "text" : "password"}
+                        placeholder="New password (min. 8 characters)"
+                        value={profileNewPassword}
+                        onChange={(e) => setProfileNewPassword(e.target.value)}
+                        className="w-full bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg pl-3 pr-10 py-2 text-slate-800 dark:text-slate-200 placeholder-slate-400 dark:placeholder-slate-600 focus:outline-none focus:border-blue-500/60 focus:ring-2 focus:ring-blue-500/15 transition-all text-xs"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowProfileNewPassword((v) => !v)}
+                        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 bg-transparent border-0 outline-none p-0.5 cursor-pointer"
+                      >
+                        {showProfileNewPassword ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+                      </button>
+                    </div>
+                    <PasswordStrengthBar password={profileNewPassword} />
+                    <div className="relative">
+                      <input
+                        type={showProfileConfirmPassword ? "text" : "password"}
+                        placeholder="Confirm new password"
+                        value={profileConfirmPassword}
+                        onChange={(e) => setProfileConfirmPassword(e.target.value)}
+                        className="w-full bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg pl-3 pr-10 py-2 text-slate-800 dark:text-slate-200 placeholder-slate-400 dark:placeholder-slate-600 focus:outline-none focus:border-blue-500/60 focus:ring-2 focus:ring-blue-500/15 transition-all text-xs"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowProfileConfirmPassword((v) => !v)}
+                        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 bg-transparent border-0 outline-none p-0.5 cursor-pointer"
+                      >
+                        {showProfileConfirmPassword ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+                      </button>
+                    </div>
+                    <button
+                      onClick={changeProfilePassword}
+                      disabled={isChangingPassword}
+                      className="w-full bg-gradient-to-r from-blue-600 to-violet-600 hover:from-blue-500 hover:to-violet-500 text-white rounded-lg py-2 font-bold cursor-pointer transition-all disabled:opacity-50 text-xs shadow-md shadow-blue-950/20"
+                    >
+                      {isChangingPassword ? <Loader2 className="h-3.5 w-3.5 animate-spin mx-auto" /> : 'Update Password'}
+                    </button>
+                    <div className="text-[9px] text-slate-400 dark:text-slate-600">Changing your password logs you out of all devices.</div>
                   </div>
                 )}
-                <button
-                  onClick={() => setShowAvatarEditor(true)}
-                  disabled={isUploadingAvatar}
-                  className="absolute bottom-0 right-0 h-7 w-7 rounded-full bg-blue-600 hover:bg-blue-500 border-2 border-slate-200 dark:border-[#0d1526] flex items-center justify-center cursor-pointer transition-colors disabled:opacity-60"
-                >
-                  {isUploadingAvatar ? <Loader2 className="h-3.5 w-3.5 text-white animate-spin" /> : <Camera className="h-3.5 w-3.5 text-white" />}
-                </button>
-              </div>
-              <div className="flex items-center gap-3 text-[10px]">
-                <button onClick={() => setShowAvatarEditor(true)} className="text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 cursor-pointer font-semibold">Change Picture</button>
-                {avatarUrl && (
-                  <button onClick={removeAvatar} className="text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 cursor-pointer font-semibold">Remove</button>
+
+                {/* Danger Zone — self-service, reversible only. Permanent deletion stays a
+                    superadmin-only action; the superadmin's own account can't deactivate itself
+                    (also enforced server-side by a DB trigger), so this section is hidden for it. */}
+                {userRole !== 'superadmin' && (
+                  <div className="p-3.5 rounded-xl bg-red-50/60 dark:bg-red-950/10 border border-red-200 dark:border-red-900/40">
+                    <div className="text-[10px] uppercase tracking-widest font-black text-red-500/80 mb-2 flex items-center gap-1.5">
+                      <AlertTriangle className="h-3 w-3" /> Danger Zone
+                    </div>
+                    <button
+                      onClick={() => setShowDeactivateConfirm(true)}
+                      className="w-full border border-red-300 dark:border-red-900/50 text-red-600 dark:text-red-400 hover:bg-red-100/60 dark:hover:bg-red-950/30 rounded-lg py-2 font-bold cursor-pointer transition-colors text-xs"
+                    >Deactivate My Account</button>
+                    <div className="text-[9px] text-slate-500 dark:text-slate-500 mt-2">Reversible — your files are kept. Contact an administrator to reactivate.</div>
+                  </div>
                 )}
               </div>
             </div>
-
-            {/* Details */}
-            <div className="mb-5">
-              <label className="text-[10px] uppercase tracking-widest font-black text-slate-400 dark:text-slate-600 mb-1.5 block">Display Name</label>
-              <div className="flex gap-2 mb-3">
-                <input
-                  type="text"
-                  value={profileNameInput}
-                  onChange={(e) => setProfileNameInput(e.target.value)}
-                  className="flex-1 bg-slate-100 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2 text-slate-800 dark:text-slate-200 focus:outline-none focus:border-blue-500/50 text-xs"
-                />
-              </div>
-              <label className="text-[10px] uppercase tracking-widest font-black text-slate-400 dark:text-slate-600 mb-1.5 block">Mobile Number</label>
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  placeholder="+1234567890"
-                  value={profileMobileInput}
-                  onChange={(e) => setProfileMobileInput(e.target.value)}
-                  className="flex-1 bg-slate-100 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2 text-slate-800 dark:text-slate-200 focus:outline-none focus:border-blue-500/50 text-xs"
-                />
-                <button
-                  onClick={saveProfileName}
-                  disabled={isSavingName}
-                  className="px-3 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-bold cursor-pointer transition-colors disabled:opacity-50 text-xs shrink-0"
-                >
-                  {isSavingName ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : 'Save'}
-                </button>
-              </div>
-              <div className="text-[9px] text-slate-400 dark:text-slate-600 mt-2">{userEmail} · {userRole === 'superadmin' ? 'Superadmin' : 'User'}</div>
-            </div>
-
-            {/* Password */}
-            <div className="border-t border-slate-200 dark:border-slate-800 pt-4">
-              <label className="text-[10px] uppercase tracking-widest font-black text-slate-400 dark:text-slate-600 mb-2 flex items-center gap-1.5"><KeyRound className="h-3 w-3" /> Change Password</label>
-              <div className="space-y-2">
-                <input
-                  type="password"
-                  placeholder="Current password"
-                  value={profileCurrentPassword}
-                  onChange={(e) => setProfileCurrentPassword(e.target.value)}
-                  className="w-full bg-slate-100 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2 text-slate-800 dark:text-slate-200 placeholder-slate-400 dark:placeholder-slate-600 focus:outline-none focus:border-blue-500/50 text-xs"
-                />
-                <input
-                  type="password"
-                  placeholder="New password (min. 8 characters)"
-                  value={profileNewPassword}
-                  onChange={(e) => setProfileNewPassword(e.target.value)}
-                  className="w-full bg-slate-100 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2 text-slate-800 dark:text-slate-200 placeholder-slate-400 dark:placeholder-slate-600 focus:outline-none focus:border-blue-500/50 text-xs"
-                />
-                <PasswordStrengthBar password={profileNewPassword} />
-                <input
-                  type="password"
-                  placeholder="Confirm new password"
-                  value={profileConfirmPassword}
-                  onChange={(e) => setProfileConfirmPassword(e.target.value)}
-                  className="w-full bg-slate-100 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2 text-slate-800 dark:text-slate-200 placeholder-slate-400 dark:placeholder-slate-600 focus:outline-none focus:border-blue-500/50 text-xs"
-                />
-                <button
-                  onClick={changeProfilePassword}
-                  disabled={isChangingPassword}
-                  className="w-full bg-slate-200 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-800 dark:text-slate-200 rounded-lg py-2 font-bold cursor-pointer transition-colors disabled:opacity-50 text-xs"
-                >
-                  {isChangingPassword ? <Loader2 className="h-3.5 w-3.5 animate-spin mx-auto" /> : 'Update Password'}
-                </button>
-                <div className="text-[9px] text-slate-400 dark:text-slate-600">Changing your password logs you out of all devices.</div>
-              </div>
-            </div>
-
-            {/* Danger Zone — self-service, reversible only. Permanent deletion stays a
-                superadmin-only action; the superadmin's own account can't deactivate itself
-                (also enforced server-side by a DB trigger), so this section is hidden for it. */}
-            {userRole !== 'superadmin' && (
-              <div className="border-t border-red-200 dark:border-red-900/40 pt-4 mt-4">
-                <label className="text-[10px] uppercase tracking-widest font-black text-red-500/80 mb-2 flex items-center gap-1.5">
-                  <AlertTriangle className="h-3 w-3" /> Danger Zone
-                </label>
-                <button
-                  onClick={() => setShowDeactivateConfirm(true)}
-                  className="w-full border border-red-300 dark:border-red-900/50 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/20 rounded-lg py-2 font-bold cursor-pointer transition-colors text-xs"
-                >Deactivate My Account</button>
-                <div className="text-[9px] text-slate-400 dark:text-slate-600 mt-2">Reversible — your files are kept. Contact an administrator to reactivate.</div>
-              </div>
-            )}
           </div>
         </div>
       )}
@@ -3591,43 +3834,66 @@ export default function StoragePage() {
 
             {/* "All Files" is a split-action button: 70% opens the file list, the
                 diagonally-cut 30% accent tab jumps straight to the upload picker —
-                two affordances that read as one cohesive control. */}
-            <div
-              className={cn(
-                "relative w-full flex items-stretch rounded-xl overflow-hidden transition-all",
-                sidebarTab === 'files'
-                  ? "border border-blue-500/25 shadow-[0_0_12px_rgba(59,130,246,0.1)]"
-                  : "border border-transparent"
-              )}
-            >
-              <button
-                onClick={() => {
-                  setItems([]);
-                  setSidebarTab('files');
-                  setEditorNote(null);
-                  setSelectedItems(new Set());
-                  setIsSelecting(false);
-                }}
-                title="View Files"
-                style={{ flex: '0 0 70%' }}
+                two affordances that read as one cohesive control. Tooltips live
+                outside the clipped inner container (see hoveredSplitSegment) so
+                the diagonal cut's overflow-hidden can't clip them. */}
+            <div className="relative">
+              <div
                 className={cn(
-                  "flex items-center gap-2.5 pl-3 pr-2 py-2.5 min-w-0 text-left transition-all cursor-pointer font-bold text-xs focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-500/50",
+                  "relative w-full flex items-stretch rounded-xl overflow-hidden transition-all",
                   sidebarTab === 'files'
-                    ? "bg-gradient-to-r from-blue-600/20 to-violet-600/10 text-blue-600 dark:text-blue-400"
-                    : "text-slate-500 dark:text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 hover:bg-slate-200/50 dark:hover:bg-slate-800/50"
+                    ? "border border-blue-500/25 shadow-[0_0_12px_rgba(59,130,246,0.1)]"
+                    : "border border-transparent"
                 )}
               >
-                <Folder className="h-3.5 w-3.5 shrink-0" />
-                <span className="flex-1 truncate">All Files</span>
-              </button>
-              <label
-                title="Upload File"
-                style={{ flex: '0 0 calc(30% + 16px)', marginLeft: '-16px', clipPath: 'polygon(16px 0, 100% 0, 100% 100%, 0 100%)' }}
-                className="flex items-center justify-center pl-5 bg-gradient-to-br from-blue-600 to-violet-600 hover:from-blue-500 hover:to-violet-500 active:from-blue-700 active:to-violet-700 text-white transition-all cursor-pointer focus-within:ring-2 focus-within:ring-inset focus-within:ring-blue-300"
+                <button
+                  onClick={() => {
+                    setItems([]);
+                    setSidebarTab('files');
+                    setEditorNote(null);
+                    setSelectedItems(new Set());
+                    setIsSelecting(false);
+                  }}
+                  onMouseEnter={() => setHoveredSplitSegment('view')}
+                  onMouseLeave={() => setHoveredSplitSegment(null)}
+                  style={{ flex: '0 0 70%' }}
+                  className={cn(
+                    "flex items-center gap-2.5 pl-3 pr-2 py-2.5 min-w-0 text-left transition-all cursor-pointer font-bold text-xs focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-500/50",
+                    sidebarTab === 'files'
+                      ? "bg-gradient-to-r from-blue-600/20 to-violet-600/10 text-blue-600 dark:text-blue-400"
+                      : "text-slate-500 dark:text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 hover:bg-slate-200/50 dark:hover:bg-slate-800/50"
+                  )}
+                >
+                  <Folder className="h-3.5 w-3.5 shrink-0" />
+                  <span className="flex-1 truncate">All Files</span>
+                </button>
+                <label
+                  onMouseEnter={() => setHoveredSplitSegment('upload')}
+                  onMouseLeave={() => setHoveredSplitSegment(null)}
+                  style={{ flex: '0 0 calc(30% + 16px)', marginLeft: '-16px', clipPath: 'polygon(16px 0, 100% 0, 100% 100%, 0 100%)' }}
+                  className="flex items-center justify-center pl-5 bg-gradient-to-br from-blue-600 to-violet-600 hover:from-blue-500 hover:to-violet-500 active:from-blue-700 active:to-violet-700 text-white transition-all cursor-pointer focus-within:ring-2 focus-within:ring-inset focus-within:ring-blue-300"
+                >
+                  <Upload className="h-3.5 w-3.5 shrink-0" />
+                  <input type="file" multiple className="hidden" onChange={handleFileUpload} />
+                </label>
+              </div>
+
+              <div
+                className={cn(
+                  "pointer-events-none absolute top-full left-[32%] -translate-x-1/2 mt-2 transition-all duration-200 z-50",
+                  hoveredSplitSegment === 'view' ? "opacity-100 scale-100" : "opacity-0 scale-95"
+                )}
               >
-                <Upload className="h-3.5 w-3.5 shrink-0" />
-                <input type="file" multiple className="hidden" onChange={handleFileUpload} />
-              </label>
+                <div className="bg-slate-900/95 dark:bg-slate-950/95 border border-blue-500/30 text-slate-100 text-[9px] font-semibold px-2.5 py-1.5 rounded-md shadow-xl shadow-blue-950/50 backdrop-blur-md whitespace-nowrap">View Files</div>
+              </div>
+              <div
+                className={cn(
+                  "pointer-events-none absolute top-full right-0 mt-2 transition-all duration-200 z-50",
+                  hoveredSplitSegment === 'upload' ? "opacity-100 scale-100" : "opacity-0 scale-95"
+                )}
+              >
+                <div className="bg-slate-900/95 dark:bg-slate-950/95 border border-indigo-500/30 text-slate-100 text-[9px] font-semibold px-2.5 py-1.5 rounded-md shadow-xl shadow-indigo-950/50 backdrop-blur-md whitespace-nowrap">Upload File</div>
+              </div>
             </div>
 
             {[

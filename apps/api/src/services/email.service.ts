@@ -6,6 +6,7 @@ import {
   accountDeactivatedEmail,
   accountDeletedEmail,
   passwordChangedEmail,
+  passwordChangeOtpEmail,
   forgotPasswordEmail,
   type SecurityEventContext,
   type EmailContent,
@@ -70,4 +71,8 @@ export function sendPasswordChangedEmail(to: string, name: string, context?: Sec
 
 export function sendForgotPasswordEmail(to: string, name: string, resetUrl: string, token: string, expiresInMinutes: number): void {
   sendFireAndForget(to, forgotPasswordEmail({ name, email: to, resetUrl, token, expiresInMinutes }));
+}
+
+export function sendPasswordChangeOtpEmail(to: string, name: string, otp: string, expiresInMinutes: number): void {
+  sendFireAndForget(to, passwordChangeOtpEmail({ name, email: to, otp, expiresInMinutes }));
 }

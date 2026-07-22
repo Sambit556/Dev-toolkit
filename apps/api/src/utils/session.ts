@@ -225,6 +225,102 @@ export async function consumeOAuthExchange<T>(code: string): Promise<T | null> {
   return entry.data as T;
 }
 
+// --- Superadmin password-change OTP ------------------------------------------
+// Short-lived, attempt-limited one-time codes. `expiresAt` is embedded in the
+// stored record (not just relied on via the store's own TTL) so an attempt
+// increment can safely re-persist the record without needing to read back
+// Redis's remaining TTL first — it just recomputes seconds-until-expiresAt.
+export interface PasswordOtpRecord {
+  otpHash: string;
+  attempts: number;
+  expiresAt: number; // epoch ms
+}
+
+const memoryPasswordOtps = new Map<string, { data: PasswordOtpRecord; timeout: ReturnType<typeof setTimeout> }>();
+
+function passwordOtpKey(userId: string): string {
+  return `otp:password-change:${userId}`;
+}
+
+export async function setPasswordChangeOtp(userId: string, otpHash: string, ttlSeconds: number): Promise<void> {
+  const key = passwordOtpKey(userId);
+  const record: PasswordOtpRecord = { otpHash, attempts: 0, expiresAt: Date.now() + ttlSeconds * 1000 };
+
+  if (isRedisHealthy && redisClient) {
+    try {
+      await redisClient.setEx(key, ttlSeconds, JSON.stringify(record));
+      return;
+    } catch (err: any) {
+      logger.error('Redis setPasswordChangeOtp failed, using memory fallback', { error: err.message });
+    }
+  }
+
+  const existing = memoryPasswordOtps.get(key);
+  if (existing) clearTimeout(existing.timeout);
+  const timeout = setTimeout(() => memoryPasswordOtps.delete(key), ttlSeconds * 1000);
+  memoryPasswordOtps.set(key, { data: record, timeout });
+}
+
+export async function getPasswordChangeOtp(userId: string): Promise<PasswordOtpRecord | null> {
+  const key = passwordOtpKey(userId);
+  let record: PasswordOtpRecord | null = null;
+
+  if (isRedisHealthy && redisClient) {
+    try {
+      const data = await redisClient.get(key);
+      record = data ? (JSON.parse(data) as PasswordOtpRecord) : null;
+    } catch (err: any) {
+      logger.error('Redis getPasswordChangeOtp failed, checking memory fallback', { error: err.message });
+    }
+  }
+  if (!record) record = memoryPasswordOtps.get(key)?.data ?? null;
+
+  if (record && record.expiresAt < Date.now()) return null;
+  return record;
+}
+
+// Re-persists the record with the incremented attempt count, preserving the
+// original expiry (recomputed as remaining seconds) rather than resetting the TTL.
+export async function recordFailedPasswordChangeOtpAttempt(userId: string): Promise<number> {
+  const record = await getPasswordChangeOtp(userId);
+  if (!record) return 0;
+
+  record.attempts += 1;
+  const key = passwordOtpKey(userId);
+  const remainingSeconds = Math.max(1, Math.ceil((record.expiresAt - Date.now()) / 1000));
+
+  if (isRedisHealthy && redisClient) {
+    try {
+      await redisClient.setEx(key, remainingSeconds, JSON.stringify(record));
+      return record.attempts;
+    } catch (err: any) {
+      logger.error('Redis recordFailedPasswordChangeOtpAttempt failed, using memory fallback', { error: err.message });
+    }
+  }
+
+  const existing = memoryPasswordOtps.get(key);
+  if (existing) clearTimeout(existing.timeout);
+  const timeout = setTimeout(() => memoryPasswordOtps.delete(key), remainingSeconds * 1000);
+  memoryPasswordOtps.set(key, { data: record, timeout });
+  return record.attempts;
+}
+
+export async function clearPasswordChangeOtp(userId: string): Promise<void> {
+  const key = passwordOtpKey(userId);
+  if (isRedisHealthy && redisClient) {
+    try {
+      await redisClient.del(key);
+    } catch (err: any) {
+      logger.error('Redis clearPasswordChangeOtp failed', { error: err.message });
+    }
+  }
+  const existing = memoryPasswordOtps.get(key);
+  if (existing) {
+    clearTimeout(existing.timeout);
+    memoryPasswordOtps.delete(key);
+  }
+}
+
 export async function closeRedis(): Promise<void> {
   if (redisClient && isRedisHealthy) {
     logger.info('Disconnecting Redis client...');

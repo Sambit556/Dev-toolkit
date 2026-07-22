@@ -3,10 +3,16 @@ import { fileURLToPath } from 'url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-// Optional LAN IP (set via NEXT_PUBLIC_LAN_HOST in .env.local, machine-specific — not
-// hardcoded here since this file is committed) for testing from other devices on the
-// network, e.g. scanning the mobile-upload QR code from a phone.
-const lanHost = process.env.NEXT_PUBLIC_LAN_HOST;
+// Optional LAN IP(s) (set via NEXT_PUBLIC_LAN_HOST in .env.local, machine-specific —
+// not hardcoded here since this file is committed) for testing from other devices on
+// the network, e.g. scanning the mobile-upload QR code from a phone. Comma-separated,
+// since a laptop that moves between networks (home WiFi, office, a VPN adapter) picks
+// up a different LAN IP each time — listing all of them avoids re-editing this on
+// every switch.
+const lanHosts = (process.env.NEXT_PUBLIC_LAN_HOST || '')
+  .split(',')
+  .map((h) => h.trim())
+  .filter(Boolean);
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
@@ -16,8 +22,8 @@ const nextConfig = {
   output: process.env.DOCKER_BUILD === '1' ? 'standalone' : undefined,
 
   // Allows the Next.js dev server (HMR websocket, etc.) to accept requests when the
-  // app is loaded via the LAN IP instead of localhost.
-  ...(lanHost ? { allowedDevOrigins: [lanHost] } : {}),
+  // app is loaded via a LAN IP instead of localhost.
+  ...(lanHosts.length ? { allowedDevOrigins: lanHosts } : {}),
 
   // Security headers
   async headers() {
@@ -42,7 +48,7 @@ const nextConfig = {
               "img-src 'self' data: blob: https://images.unsplash.com https://*.amazonaws.com",
               "font-src 'self'",
               "connect-src 'self' " + (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001') +
-              (lanHost ? ` http://${lanHost}:3001 http://${lanHost}:4001` : '') +
+              lanHosts.map((h) => ` http://${h}:3001 http://${h}:4001`).join('') +
               " https://ipapi.co" +
               " https://ipwho.is" +
               " https://api.ipify.org" +

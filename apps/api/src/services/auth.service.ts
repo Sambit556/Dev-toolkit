@@ -3,7 +3,10 @@ import { AppError } from '../middleware/errorHandler';
 import { generateId } from '../utils/ids';
 import { commonDao, transaction } from '../repositories/commonDao';
 import { TABLES } from '../repositories/migrations';
-import { setSession, getSession, revokeSession, revokeUserSessions } from '../utils/session';
+import {
+  setSession, getSession, revokeSession, revokeUserSessions,
+  setPasswordChangeOtp, getPasswordChangeOtp, recordFailedPasswordChangeOtpAttempt, clearPasswordChangeOtp,
+} from '../utils/session';
 import { logger } from '../utils/logger';
 import { ACTIVITY_ACTIONS, ROLES } from '../constants/activityActions';
 import { ACCESS_TOKEN_TTL_SECONDS, REFRESH_TOKEN_TTL_MS, WEB_APP_ORIGIN, PASSWORD_RESET_TOKEN_TTL_MINUTES } from '../config/constants';
@@ -16,7 +19,7 @@ import {
   generatePasswordResetToken,
   verifyPasswordResetToken,
 } from './token.service';
-import { sendWelcomeEmail, sendPasswordChangedEmail, sendForgotPasswordEmail } from './email.service';
+import { sendWelcomeEmail, sendPasswordChangedEmail, sendForgotPasswordEmail, sendPasswordChangeOtpEmail } from './email.service';
 import { updateUserGeoAndIp } from './geo.service';
 import { getRequestIp, getRequestUserAgent } from '../utils/context';
 import { detectDeviceType } from '../utils/deviceDetect';
@@ -353,6 +356,82 @@ export async function changePassword(user: { id: string; role: string; email: st
   sendPasswordChangedEmail(user.email, user.name || user.email, {
     ip: getRequestIp(),
     country: dbUser.country,
+    deviceType: detectDeviceType(getRequestUserAgent()),
+  });
+}
+
+// --- Superadmin password change (OTP-only) ------------------------------------
+// The superadmin account is deliberately locked out of the regular
+// current-password flow above and the pre-auth forgot/reset-password flow
+// (both explicitly reject it) — a compromised session or a public "forgot
+// password" form typed with the superadmin's email are both weaker guarantees
+// than requiring a live, single-use code delivered to the account's own inbox
+// on top of an already-authenticated session. This is the only path by which
+// the superadmin's password can ever be changed.
+const SUPERADMIN_OTP_TTL_SECONDS = 600; // 10 minutes
+const SUPERADMIN_OTP_MAX_ATTEMPTS = 5;
+
+function generateOtp(): string {
+  return crypto.randomInt(0, 1000000).toString().padStart(6, '0');
+}
+
+export async function requestSuperadminPasswordOtp(user: { id: string; role: string; email: string; name?: string }) {
+  if (!isSuperAdmin(user)) {
+    throw new AppError(HttpStatus.FORBIDDEN, 'OTP-based password change is only available for the superadmin account.', 'FORBIDDEN');
+  }
+
+  const otp = generateOtp();
+  // Hashed (bcrypt + the same server-side pepper as real passwords) rather than
+  // stored raw — even a compromised Redis/memory store never reveals the code.
+  const otpHash = await hashPassword(otp);
+  await setPasswordChangeOtp(user.id, otpHash, SUPERADMIN_OTP_TTL_SECONDS);
+
+  await commonDao.addData(TABLES.ACTIVITY_LOGS, { user_id: user.id, action: ACTIVITY_ACTIONS.REQUEST_SUPERADMIN_PASSWORD_OTP, resource: 'auth' });
+  sendPasswordChangeOtpEmail(user.email, user.name || user.email, otp, SUPERADMIN_OTP_TTL_SECONDS / 60);
+
+  logger.info('Superadmin password-change OTP issued', { userId: user.id });
+}
+
+export async function changeSuperadminPasswordWithOtp(user: { id: string; role: string; email: string; name?: string }, otp: string, newPassword: string) {
+  if (!isSuperAdmin(user)) {
+    throw new AppError(HttpStatus.FORBIDDEN, 'OTP-based password change is only available for the superadmin account.', 'FORBIDDEN');
+  }
+
+  const record = await getPasswordChangeOtp(user.id);
+  if (!record) {
+    throw new AppError(HttpStatus.UNAUTHORIZED, 'This code has expired or was never requested. Request a new one.', 'OTP_EXPIRED');
+  }
+  if (record.attempts >= SUPERADMIN_OTP_MAX_ATTEMPTS) {
+    await clearPasswordChangeOtp(user.id);
+    throw new AppError(HttpStatus.TOO_MANY_REQUESTS, 'Too many incorrect attempts. Request a new code.', 'OTP_LOCKED');
+  }
+
+  const isValid = await verifyPassword(otp, record.otpHash);
+  if (!isValid) {
+    const attempts = await recordFailedPasswordChangeOtpAttempt(user.id);
+    const remaining = Math.max(0, SUPERADMIN_OTP_MAX_ATTEMPTS - attempts);
+    logger.warn('Security alert: Incorrect superadmin password-change OTP submitted', { userId: user.id, attempts });
+    throw new AppError(HttpStatus.UNAUTHORIZED, `Incorrect code. ${remaining} attempt(s) remaining.`, 'INVALID_OTP');
+  }
+
+  await clearPasswordChangeOtp(user.id);
+
+  const dbUser = await commonDao.getOneDataByCond<any>(TABLES.USERS, { id: user.id }, { fields: ['country'] });
+  const newHash = await hashPassword(newPassword);
+
+  await transaction(async (trx) => {
+    await trx.updateData(TABLES.USERS, { password_hash: newHash, password_changed_at: new Date() }, { id: user.id });
+    await trx.updateData(TABLES.REFRESH_TOKENS, { revoked: true }, { user_id: user.id });
+    await trx.addData(TABLES.ACTIVITY_LOGS, { user_id: user.id, action: ACTIVITY_ACTIONS.SUPERADMIN_PASSWORD_CHANGE_OTP, resource: 'auth' });
+  });
+
+  await revokeUserSessions(user.id);
+
+  logger.info('Superadmin password changed via OTP, all sessions revoked', { userId: user.id });
+
+  sendPasswordChangedEmail(user.email, user.name || user.email, {
+    ip: getRequestIp(),
+    country: dbUser?.country,
     deviceType: detectDeviceType(getRequestUserAgent()),
   });
 }

@@ -1,5 +1,7 @@
 import { PoolClient } from 'pg';
 import { logger } from '../utils/logger';
+import { getEnv, getEnvWithDefault } from '../utils/env';
+import { hashPassword } from '../services/password.service';
 
 export const TABLES = {
   USERS: "users",
@@ -232,6 +234,13 @@ const MIGRATIONS = [
   }
 ];
 
+// Table/migration/index/trigger setup always runs (dev and production alike) —
+// that's the actual schema, and this function is the only thing that ever
+// creates it. Only the developer seed-user block below is dev-only: it's a
+// local convenience, not something that should touch a production database
+// even if DEV_SEED_PASSWORD were ever accidentally set there.
+const isDevelopment = getEnvWithDefault('NODE_ENV', 'development') !== 'production';
+
 export async function createContainers(client: PoolClient): Promise<void> {
   logger.info('Verifying database schemas and tables (createContainers)...');
 
@@ -311,29 +320,30 @@ export async function createContainers(client: PoolClient): Promise<void> {
     EXECUTE FUNCTION protect_superadmin_account()
   `);
 
-  // 6. Default Developer Seed User Setup
-  const email = 'developer@space.io';
-  const userCheck = await client.query(`SELECT id FROM ${TABLES.USERS} WHERE email = $1`, [email]);
-  if (userCheck.rows.length === 0) {
-    logger.info(`Seeding default developer user: ${email}`);
-    // password is: password123
-    // Hashed with the current PASSWORD_PEPPER + BCRYPT_SALT_ROUNDS (see services/password.service.ts).
-    // Regenerate via that service if the pepper is ever rotated.
-    const passwordHash = '$2b$12$F/K34H57po1vP3cKtjWJOOMDWyTYqfrT62rQUZYD9knHPKWc9NLrS';
-    await client.query(
-      `INSERT INTO ${TABLES.USERS} (email, password_hash, name, role, created_at, updated_at)
-       VALUES ($1, $2, 'Lead Developer', 'superadmin', NOW(), NOW())`,
-      [email, passwordHash]
-    );
+  if (isDevelopment) {
+    const devSeedPassword = getEnv('DEV_SEED_PASSWORD');
+    if (devSeedPassword) {
+      const email = getEnv('DEV_SEED_EMAIL');
+      const passwordHash = await hashPassword(devSeedPassword);
+      const userCheck = await client.query(`SELECT id FROM ${TABLES.USERS} WHERE email = $1`, [email]);
+      if (userCheck.rows.length === 0) {
+        logger.info(`Seeding default developer user: ${email}`);
+        await client.query(
+          `INSERT INTO ${TABLES.USERS} (email, password_hash, name, role, created_at, updated_at)
+           VALUES ($1, $2, 'Lead Developer', 'superadmin', NOW(), NOW())`,
+          [email, passwordHash]
+        );
+      } else {
+        // Ensure the existing developer user has superadmin role and a password hash
+        // in sync with the current DEV_SEED_PASSWORD/pepper/salt-rounds config.
+        await client.query(
+          `UPDATE ${TABLES.USERS} SET role = 'superadmin', password_hash = $2 WHERE email = $1`,
+          [email, passwordHash]
+        );
+      }
+    }
   } else {
-    // Ensure existing developer user has superadmin role and valid password hash assigned
-    // Hashed with the current PASSWORD_PEPPER + BCRYPT_SALT_ROUNDS (see services/password.service.ts).
-    // Regenerate via that service if the pepper is ever rotated.
-    const passwordHash = '$2b$12$F/K34H57po1vP3cKtjWJOOMDWyTYqfrT62rQUZYD9knHPKWc9NLrS';
-    await client.query(
-      `UPDATE ${TABLES.USERS} SET role = 'superadmin', password_hash = $2 WHERE email = $1`,
-      [email, passwordHash]
-    );
+    logger.info('Production environment — skipping developer seed-user setup.');
   }
 
   logger.info('Database container checks completed successfully.');

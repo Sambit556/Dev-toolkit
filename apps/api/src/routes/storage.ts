@@ -840,6 +840,27 @@ router.post('/mobile/upload/complete', requireMobileAuth, requireS3, async (req:
   } catch (err) { next(err); }
 });
 
+// Lets the phone pause/resume its own upload (not just react to a desktop-issued
+// pause) — same session-status flip the desktop's /upload/pause|resume use, just
+// authenticated via the mobile-link bearer token instead of a full user session.
+router.post('/mobile/upload/pause', requireMobileAuth, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const parseResult = UploadSessionIdSchema.safeParse(req.body);
+    if (!parseResult.success) throw new AppError(HttpStatus.BAD_REQUEST, 'Invalid pause parameters', 'VALIDATION_ERROR', parseResult.error.flatten().fieldErrors);
+    await storageService.pauseUploadSession(getUser(req).id, parseResult.data.uploadId);
+    res.json({ success: true, message: 'Upload paused' });
+  } catch (err) { next(err); }
+});
+
+router.post('/mobile/upload/resume', requireMobileAuth, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const parseResult = UploadSessionIdSchema.safeParse(req.body);
+    if (!parseResult.success) throw new AppError(HttpStatus.BAD_REQUEST, 'Invalid resume parameters', 'VALIDATION_ERROR', parseResult.error.flatten().fieldErrors);
+    await storageService.resumeUploadSession(getUser(req).id, parseResult.data.uploadId);
+    res.json({ success: true, message: 'Upload resumed' });
+  } catch (err) { next(err); }
+});
+
 
 export default router;
 

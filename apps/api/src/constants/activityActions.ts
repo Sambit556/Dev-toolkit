@@ -11,6 +11,8 @@ export const ACTIVITY_ACTIONS = {
   REQUEST_PASSWORD_RESET: 'request_password_reset',
   RESET_PASSWORD_COMPLETED: 'reset_password_completed',
   PASSWORD_CHANGE: 'password_change',
+  REQUEST_SUPERADMIN_PASSWORD_OTP: 'request_superadmin_password_otp',
+  SUPERADMIN_PASSWORD_CHANGE_OTP: 'superadmin_password_change_otp',
   SECURITY_ALERT_TOKEN_REUSE: 'security_alert_token_reuse',
 
   CREATE_FOLDER: 'create_folder',

@@ -40,6 +40,11 @@ export const ChangePasswordSchema = z.object({
   newPassword: strictPassword,
 });
 
+export const SuperadminChangePasswordOtpSchema = z.object({
+  otp: z.string().regex(/^\d{6}$/, 'OTP must be a 6-digit code'),
+  newPassword: strictPassword,
+});
+
 export const RefreshTokenSchema = z.object({
   refreshToken: z.string().min(1, 'Refresh token is required'),
 });

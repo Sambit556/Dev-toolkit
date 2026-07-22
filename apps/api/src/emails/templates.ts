@@ -107,6 +107,26 @@ export function passwordChangedEmail(params: { name: string; email: string; cont
   };
 }
 
+export function passwordChangeOtpEmail(params: { name: string; email: string; otp: string; expiresInMinutes: number }): EmailContent {
+  const displayName = params.name || params.email;
+  const body =
+    paragraph(`Hi ${escapeHtml(displayName)},`) +
+    paragraph('A password change was requested for your DevKits Vault <strong style="color:#f8fafc;">Superadmin</strong> account. Enter this code in the Change Password form to continue:') +
+    codeBlock(params.otp) +
+    paragraph(`This code expires in ${params.expiresInMinutes} minutes and can only be used a few times before it's invalidated.`) +
+    paragraph("<strong style=\"color:#f87171;\">Didn't request this?</strong> Ignore this email — your password will not be changed without the code above — and consider rotating the account's credentials as a precaution.");
+  return {
+    subject: 'Your DevKits Vault Superadmin password-change code',
+    html: renderEmailLayout({
+      preheader: 'Use this code to confirm your Superadmin password change.',
+      accentFrom: AMBER.from,
+      accentTo: AMBER.to,
+      heading: 'Password Change Verification',
+      bodyHtml: body,
+    }),
+  };
+}
+
 export function forgotPasswordEmail(params: { name: string; email: string; resetUrl: string; token: string; expiresInMinutes: number }): EmailContent {
   const displayName = params.name || params.email;
   const body =
