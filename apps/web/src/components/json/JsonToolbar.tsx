@@ -137,7 +137,7 @@ export function JsonToolbar({
         <ToolBtn
           icon={CheckCircle}
           label="Auto Fix"
-          tooltip="Validate, Fix & Format (not raw)"
+          tooltip="Validate, Fix & Format"
           onClick={onAutoFix}
           tone="emerald"
         />
