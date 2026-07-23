@@ -2865,13 +2865,13 @@ export default function StoragePage() {
               <form onSubmit={handleLogin} noValidate className="space-y-5 font-mono text-sm">
                 <div className="space-y-1.5">
                   <div className="flex justify-between items-center">
-                    <label className="text-[10px] text-slate-800 dark:text-slate-200 uppercase tracking-widest font-black">Email or Mobile Number</label>
+                    <label className="text-[10px] text-slate-800 dark:text-slate-200 uppercase tracking-widest font-black">Identity</label>
                   </div>
                   <input
                     type="text"
                     required
                     className="w-full rounded-xl bg-slate-50/70 dark:bg-slate-950/70 border border-slate-200 dark:border-slate-800 px-3.5 py-3 text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-600 focus:outline-none focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/25 transition-all text-xs"
-                    placeholder="user@space.io or +1234567890"
+                    placeholder="your identity"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                   />
