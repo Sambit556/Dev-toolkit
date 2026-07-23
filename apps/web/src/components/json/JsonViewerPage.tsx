@@ -55,21 +55,6 @@ export function JsonViewerPage() {
     addHistoryEntry({ tool: 'json', input: value, output: `${count.toLocaleString()} nodes · ${sizeLabel}` });
   }, [addHistoryEntry, lastHistoryEntry]);
 
-  const handleFormat = useCallback(() => {
-    if (!input.trim()) {
-      toast.info('Please enter some JSON to format');
-      return;
-    }
-    try {
-      const formatted = formatJson(input);
-      setInput(formatted);
-      saveJsonToHistory(formatted);
-      toast.success('JSON formatted');
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Invalid JSON');
-    }
-  }, [input, saveJsonToHistory]);
-
   const handleMinify = useCallback(() => {
     if (!input.trim()) {
       toast.info('Please enter some JSON to minify');
@@ -85,24 +70,27 @@ export function JsonViewerPage() {
     }
   }, [input, saveJsonToHistory]);
 
-  const handleValidate = useCallback(() => {
+  const handleAutoFix = useCallback(() => {
     if (!input.trim()) {
-      toast.info('Please enter some JSON to validate');
+      toast.info('Please enter some JSON to fix');
       return;
     }
     const result = parseJsonSafe(input);
     if (!result.error) {
-      saveJsonToHistory(input);
-      toast.success(`Valid JSON · ${nodeCount.toLocaleString()} nodes · ${(inputSize / 1024).toFixed(1)} KB`);
+      const formatted = formatJson(input);
+      setInput(formatted);
+      saveJsonToHistory(formatted);
+      toast.success(`Valid JSON · formatted · ${nodeCount.toLocaleString()} nodes · ${(inputSize / 1024).toFixed(1)} KB`);
       return;
     }
 
     const repaired = tryRepairJson(input);
     if (repaired) {
+      // tryRepairJson already pretty-prints its output, so no separate format pass is needed here.
       setInput(repaired.fixed);
       saveJsonToHistory(repaired.fixed);
       const count = repaired.fixCount;
-      toast.success(`Fixed ${count} issue${count === 1 ? '' : 's'} automatically — review the updated JSON`);
+      toast.success(`Fixed ${count} issue${count === 1 ? '' : 's'} and formatted — review the updated JSON`);
       return;
     }
 
@@ -193,9 +181,8 @@ export function JsonViewerPage() {
 
       {/* Toolbar */}
       <JsonToolbar
-        onFormat={handleFormat}
         onMinify={handleMinify}
-        onValidate={handleValidate}
+        onAutoFix={handleAutoFix}
         onClear={handleClear}
         onCopy={handleCopy}
         onDownload={handleDownload}

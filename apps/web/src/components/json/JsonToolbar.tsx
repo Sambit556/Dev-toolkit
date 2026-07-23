@@ -2,7 +2,7 @@
 
 import React, { useRef } from 'react';
 import {
-  Code2, Minimize2, CheckCircle, Trash2, Download,
+  Minimize2, CheckCircle, Trash2, Download,
   Upload, ChevronDown, ChevronUp, Search, X, History,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -15,15 +15,13 @@ import { CopyButton } from '@/components/ui/copy-button';
 import { cn } from '@/lib/utils';
 
 const TONE_STYLES = {
-  blue: 'border border-blue-600/90 bg-blue-600 text-white shadow-sm hover:bg-blue-700 hover:border-blue-700 dark:bg-blue-600 dark:hover:bg-blue-500 dark:border-blue-500',
   emerald: 'border border-emerald-600/90 bg-emerald-600 text-white shadow-sm hover:bg-emerald-700 hover:border-emerald-700 dark:bg-emerald-600 dark:hover:bg-emerald-500 dark:border-emerald-500',
   amber: 'border border-amber-600/90 bg-amber-600 text-white shadow-sm hover:bg-amber-700 hover:border-amber-700 dark:bg-amber-600 dark:hover:bg-amber-500 dark:border-amber-500',
 } as const;
 
 interface JsonToolbarProps {
-  onFormat: () => void;
   onMinify: () => void;
-  onValidate: () => void;
+  onAutoFix: () => void;
   onClear: () => void;
   onCopy: () => void;
   onDownload: () => void;
@@ -40,6 +38,7 @@ interface JsonToolbarProps {
 function ToolBtn({
   icon: Icon,
   label,
+  tooltip,
   onClick,
   variant = 'outline',
   tone,
@@ -47,6 +46,7 @@ function ToolBtn({
 }: {
   icon: React.ElementType;
   label: string;
+  tooltip?: string;
   onClick: () => void;
   variant?: 'ghost' | 'outline' | 'default';
   tone?: keyof typeof TONE_STYLES;
@@ -66,15 +66,14 @@ function ToolBtn({
           <span className="hidden sm:inline">{label}</span>
         </Button>
       </TooltipTrigger>
-      <TooltipContent side="bottom">{label}</TooltipContent>
+      <TooltipContent side="bottom">{tooltip ?? label}</TooltipContent>
     </Tooltip>
   );
 }
 
 export function JsonToolbar({
-  onFormat,
   onMinify,
-  onValidate,
+  onAutoFix,
   onClear,
   onCopy,
   onDownload,
@@ -135,8 +134,13 @@ export function JsonToolbar({
     <TooltipProvider delayDuration={300}>
       <div className="flex flex-wrap items-center gap-1.5 px-3 py-2 border-b bg-muted/20">
         {/* Primary actions */}
-        <ToolBtn icon={Code2} label="Format" onClick={onFormat} tone="blue" />
-        <ToolBtn icon={CheckCircle} label="Validate & Fix" onClick={onValidate} tone="emerald" />
+        <ToolBtn
+          icon={CheckCircle}
+          label="Auto Fix"
+          tooltip="Validate, Fix & Format (not raw)"
+          onClick={onAutoFix}
+          tone="emerald"
+        />
         <ToolBtn icon={Minimize2} label="Minify" onClick={onMinify} />
 
         <Separator orientation="vertical" className="h-6 mx-0.5" />
