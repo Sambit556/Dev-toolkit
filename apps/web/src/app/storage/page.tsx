@@ -473,6 +473,12 @@ export default function StoragePage() {
   const [editorCharCount, setEditorCharCount] = useState(0);
   const [editorVersionTime, setEditorVersionTime] = useState('');
   const [isSavingNote, setIsSavingNote] = useState(false);
+  // The note's `updated_at` as last confirmed with the server (on load, or after a
+  // successful save) — sent back as `expectedUpdatedAt` on every save so the server can
+  // tell whether another tab/device saved this same note in between (see NOTE_CONFLICT
+  // handling below). This is what makes concurrent editing of the same note safe.
+  const [editorBaseVersion, setEditorBaseVersion] = useState<string | null>(null);
+  const [noteConflict, setNoteConflict] = useState<{ serverName: string; serverContent: string; serverUpdatedAt: string } | null>(null);
   const autoSaveTimer = useRef<ReturnType<typeof setInterval> | null>(null);
   const editor = useEditor({
     immediatelyRender: false,
@@ -1573,6 +1579,7 @@ export default function StoragePage() {
         toast.success('Tags saved');
         setShowTagModal(false);
         setTagModalItem(null);
+        setTagInput('');
         loadStorageItems();
       } else {
         toast.error(json.message);
@@ -1945,12 +1952,17 @@ export default function StoragePage() {
       if (json.success) {
         // We now get the content directly from the backend
         const text = json.data.content || '';
+        // Use the freshly-fetched row (not the possibly-stale list item passed in) so
+        // the concurrency check below starts from the real current version.
+        const freshItem = json.data.item || note;
 
-        setEditorNote(note);
-        setEditorTitle(note.name);
+        setNoteConflict(null);
+        setEditorNote(freshItem);
+        setEditorTitle(freshItem.name);
         setEditorContent(text);
         setEditorCharCount(text.replace(/<[^>]*>/g, '').length);
-        setEditorVersionTime(new Date(note.updated_at).toLocaleString());
+        setEditorBaseVersion(freshItem.updated_at);
+        setEditorVersionTime(new Date(freshItem.updated_at).toLocaleString());
         editor?.commands.setContent(text || EMPTY_NOTE_DOC);
         toast.dismiss('note-load');
       } else {
@@ -1961,8 +1973,10 @@ export default function StoragePage() {
     }
   };
 
-  const saveNoteContent = async (isAuto = false) => {
-    if (!editorNote) return;
+  // Returns false on failure/conflict so callers (e.g. closeNoteEditor) know not to
+  // navigate away and discard unsaved edits.
+  const saveNoteContent = async (isAuto = false): Promise<boolean> => {
+    if (!editorNote) return true;
     setIsSavingNote(true);
 
     try {
@@ -1973,29 +1987,74 @@ export default function StoragePage() {
           id: editorNote.id,
           content: editorContent,
           name: editorTitle,
+          expectedUpdatedAt: editorBaseVersion,
         }),
       });
 
       const json = await res.json();
       if (json.success) {
-        setEditorVersionTime(new Date().toLocaleString());
+        setEditorBaseVersion(json.data.updated_at);
+        setEditorVersionTime(new Date(json.data.updated_at).toLocaleString());
         if (!isAuto) {
           toast.success('Note saved successfully');
         }
+        return true;
       }
+
+      if (json.code === 'NOTE_CONFLICT') {
+        // Someone else (another tab/device) saved this note in between — don't clobber
+        // their edits. Surface both versions and let the user pick instead of erroring.
+        setNoteConflict({
+          serverName: json.details.item.name,
+          serverContent: json.details.content || '',
+          serverUpdatedAt: json.details.item.updated_at,
+        });
+        return false;
+      }
+
+      if (!isAuto) {
+        toast.error(json.message);
+      }
+      return false;
     } catch (err) {
       if (!isAuto) {
         toast.error('Failed to save note');
       }
+      return false;
     } finally {
       setIsSavingNote(false);
     }
   };
 
-  const closeNoteEditor = () => {
+  // "Keep mine": re-save under the server's latest version so the conflict check
+  // passes this time, without touching the content the user is looking at.
+  const resolveConflictKeepMine = async () => {
+    if (!noteConflict) return;
+    setEditorBaseVersion(noteConflict.serverUpdatedAt);
+    setNoteConflict(null);
+    await saveNoteContent(false);
+  };
+
+  // "Use theirs": discard local edits and load the other session's version instead.
+  const resolveConflictUseTheirs = () => {
+    if (!noteConflict) return;
+    const { serverContent, serverName, serverUpdatedAt } = noteConflict;
+    setEditorContent(serverContent);
+    setEditorTitle(serverName);
+    setEditorCharCount(serverContent.replace(/<[^>]*>/g, '').length);
+    setEditorBaseVersion(serverUpdatedAt);
+    setEditorVersionTime(new Date(serverUpdatedAt).toLocaleString());
+    editor?.commands.setContent(serverContent || EMPTY_NOTE_DOC);
+    setNoteConflict(null);
+  };
+
+  const closeNoteEditor = async () => {
+    if (noteConflict) return; // Resolve the conflict first — don't discard either version.
     if (autoSaveTimer.current) clearInterval(autoSaveTimer.current);
-    saveNoteContent(true); // Final save
+    const saved = await saveNoteContent(true); // Final save
+    if (!saved) return; // Conflict (modal now showing) or a real error — stay open.
     setEditorNote(null);
+    setEditorBaseVersion(null);
     loadStorageItems();
   };
 
@@ -2718,18 +2777,21 @@ export default function StoragePage() {
     };
   }, [token, sidebarTab]);
 
-  // Trigger auto-save for Note Editor
+  // Trigger auto-save for Note Editor. This 5s tick is also what makes a concurrent
+  // edit on another tab/device show up promptly: each tick re-sends this session's
+  // known version, so a stale one surfaces the conflict modal within ~5s even if the
+  // user hasn't touched this note themselves.
   useEffect(() => {
     if (editorNote) {
       if (autoSaveTimer.current) clearInterval(autoSaveTimer.current);
       autoSaveTimer.current = setInterval(() => {
-        saveNoteContent(true);
+        if (!noteConflict) saveNoteContent(true);
       }, 5000);
     }
     return () => {
       if (autoSaveTimer.current) clearInterval(autoSaveTimer.current);
     };
-  }, [editorNote, editorContent, editorTitle]);
+  }, [editorNote, editorContent, editorTitle, noteConflict]);
 
   // Redirect unactivated users safely inside useEffect.
   // A hard navigation (not router.replace) is deliberate here: this is an auth-gate exit for
@@ -3412,13 +3474,60 @@ export default function StoragePage() {
         </div>
       )}
 
+      {/* Note Conflict Modal — shown when another tab/device saved this same note
+          since this session last loaded it (see saveNoteContent's NOTE_CONFLICT branch) */}
+      {noteConflict && (
+        <div className="fixed inset-0 z-[300] flex items-center justify-center bg-black/70 backdrop-blur-sm">
+          <div className="bg-white dark:bg-[#0d1526] border border-amber-500/40 rounded-2xl p-6 w-[32rem] max-w-[92vw] shadow-2xl">
+            <div className="flex items-center gap-2 mb-2 text-amber-600 dark:text-amber-400 font-bold text-sm">
+              <AlertTriangle className="h-4 w-4 shrink-0" /> This note was changed elsewhere
+            </div>
+            <p className="text-[11px] text-slate-600 dark:text-slate-400 mb-4">
+              Another tab or device saved changes to this note while you were editing it. Pick which version to keep — the one you don&apos;t pick will be discarded.
+            </p>
+            <div className="grid grid-cols-2 gap-3 mb-4 text-xs">
+              <div className="border border-blue-500/30 bg-blue-500/5 rounded-lg p-2.5 flex flex-col min-h-0">
+                <div className="font-bold mb-1.5 text-blue-700 dark:text-blue-300 shrink-0">Your version (unsaved)</div>
+                <div
+                  className="prose prose-slate dark:prose-invert prose-xs max-w-none overflow-y-auto max-h-40 text-[11px]"
+                  dangerouslySetInnerHTML={{ __html: editorContent || EMPTY_NOTE_DOC }}
+                />
+              </div>
+              <div className="border border-slate-300 dark:border-slate-700 rounded-lg p-2.5 flex flex-col min-h-0">
+                <div className="font-bold mb-1.5 text-slate-700 dark:text-slate-300 shrink-0">
+                  Their version ({new Date(noteConflict.serverUpdatedAt).toLocaleTimeString()})
+                </div>
+                <div
+                  className="prose prose-slate dark:prose-invert prose-xs max-w-none overflow-y-auto max-h-40 text-[11px]"
+                  dangerouslySetInnerHTML={{ __html: noteConflict.serverContent || EMPTY_NOTE_DOC }}
+                />
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={resolveConflictUseTheirs}
+                className="flex-1 bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 rounded-lg py-2 font-bold text-xs cursor-pointer transition-colors"
+              >
+                Use Their Version
+              </button>
+              <button
+                onClick={resolveConflictKeepMine}
+                className="flex-1 bg-blue-600 hover:bg-blue-500 text-white rounded-lg py-2 font-bold text-xs cursor-pointer transition-colors"
+              >
+                Keep My Version
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Tag Modal */}
       {showTagModal && tagModalItem && (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/70 backdrop-blur-sm" onClick={() => { setShowTagModal(false); setTagModalItem(null); }}>
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/70 backdrop-blur-sm" onClick={() => { setShowTagModal(false); setTagModalItem(null); setTagInput(''); }}>
           <div className="bg-white dark:bg-[#0d1526] border border-slate-300/60 dark:border-slate-700/60 rounded-2xl p-6 w-80 shadow-2xl" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-4">
               <h3 className="font-bold text-slate-900 dark:text-slate-100 text-sm">Manage Tags</h3>
-              <button onClick={() => { setShowTagModal(false); setTagModalItem(null); }} className="text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 cursor-pointer"><X className="h-4 w-4" /></button>
+              <button onClick={() => { setShowTagModal(false); setTagModalItem(null); setTagInput(''); }} className="text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 cursor-pointer"><X className="h-4 w-4" /></button>
             </div>
             <div className="text-[10px] text-slate-600 dark:text-slate-400 mb-3 truncate">{tagModalItem.name}</div>
             <div className="flex flex-wrap gap-1.5 mb-3 min-h-8">
@@ -4117,7 +4226,7 @@ export default function StoragePage() {
 
         {/* Note Editor Workspace overlay */}
         {editorNote ? (
-          <main className="flex-1 flex flex-col bg-slate-50/60 dark:bg-black/45 backdrop-blur-md overflow-hidden relative">
+          <main key="note-editor" className="flex-1 flex flex-col bg-slate-50/60 dark:bg-black/45 backdrop-blur-md overflow-hidden relative animate-scale-in">
             {renderDiagnosticBar()}
             <div className="h-14 border-b border-slate-200/80 dark:border-slate-800/80 px-4 flex items-center justify-between shrink-0 bg-slate-100/30 dark:bg-slate-900/30">
               <div className="flex items-center gap-2">
@@ -4262,7 +4371,7 @@ export default function StoragePage() {
           </main>
         ) : sidebarTab === 'diagrams' ? (
           /* Whiteboard Diagram Workspace */
-          <main className="flex-1 flex flex-col overflow-hidden bg-white/60 dark:bg-black/45 backdrop-blur-md p-5 relative">
+          <main key="diagrams" className="flex-1 flex flex-col overflow-hidden bg-white/60 dark:bg-black/45 backdrop-blur-md p-5 relative animate-scale-in">
             {renderDiagnosticBar('-mx-5 -mt-5 mb-4')}
             <div className="flex items-center justify-between mb-4 border-b border-slate-200 dark:border-slate-800 pb-3 shrink-0">
               <div className="flex items-center gap-3">
@@ -4371,7 +4480,7 @@ export default function StoragePage() {
           </main>
         ) : sidebarTab === 'events' ? (
           /* Events tab: auto date-clustered upload hierarchy */
-          <main className="flex-1 flex flex-col overflow-hidden bg-white/60 dark:bg-black/45 backdrop-blur-md p-4">
+          <main key="events" className="flex-1 flex flex-col overflow-hidden bg-white/60 dark:bg-black/45 backdrop-blur-md p-4 animate-scale-in">
             {renderDiagnosticBar('-mx-4 -mt-4 mb-4')}
             <div className="flex items-center justify-between mb-4 border-b border-slate-200 dark:border-slate-800 pb-3 shrink-0">
               <div>
@@ -4478,7 +4587,7 @@ export default function StoragePage() {
              logout/re-login as a different user in the same tab, and without this check a
              regular user landing back on a stale sidebarTab==='admin' would render whatever
              admin data (other users' emails, quotas, etc.) was last fetched into memory. */
-          <main className="flex-1 flex flex-col overflow-hidden bg-white/60 dark:bg-black/45 backdrop-blur-md p-4">
+          <main key="admin" className="flex-1 flex flex-col overflow-hidden bg-white/60 dark:bg-black/45 backdrop-blur-md p-4 animate-scale-in">
             {renderDiagnosticBar('-mx-4 -mt-4 mb-4')}
             <div className="flex items-center justify-between mb-4 border-b border-slate-200 dark:border-slate-800 pb-3 shrink-0">
               <div>
@@ -4667,7 +4776,7 @@ export default function StoragePage() {
           </main>
         ) : sidebarTab === 'uploads' ? (
           /* Upload list management tab */
-          <main className="flex-1 flex flex-col overflow-hidden bg-white/60 dark:bg-black/45 backdrop-blur-md p-4">
+          <main key="uploads" className="flex-1 flex flex-col overflow-hidden bg-white/60 dark:bg-black/45 backdrop-blur-md p-4 animate-scale-in">
             {renderDiagnosticBar('-mx-4 -mt-4 mb-4')}
             <div className="flex items-center justify-between mb-4 border-b border-slate-200 dark:border-slate-800 pb-3 shrink-0">
               <h2 className="text-sm font-bold text-slate-900 dark:text-slate-100">Active Upload Sessions</h2>
@@ -4790,7 +4899,8 @@ export default function StoragePage() {
         ) : (
           /* Main Explorer layout */
           <main
-            className="flex-1 flex flex-col overflow-hidden bg-white/60 dark:bg-black/45 backdrop-blur-md relative"
+            key={sidebarTab}
+            className="flex-1 flex flex-col overflow-hidden bg-white/60 dark:bg-black/45 backdrop-blur-md relative animate-scale-in"
             onDragEnter={handlePageDragEnter}
             onDragOver={handlePageDragOver}
             onDragLeave={handlePageDragLeave}
@@ -5186,7 +5296,7 @@ export default function StoragePage() {
                               <div className="relative group/tag">
                                 <button
                                   aria-label={`Tags for ${item.name}`}
-                                  onClick={(e) => { e.stopPropagation(); setTagModalItem(item); setShowTagModal(true); }}
+                                  onClick={(e) => { e.stopPropagation(); setTagInput(''); setTagModalItem(item); setShowTagModal(true); }}
                                   className="p-1 rounded bg-slate-100 dark:bg-slate-900 text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-slate-100 cursor-pointer"
                                 >
                                   <Tag className="h-3 w-3" />
@@ -5401,7 +5511,7 @@ export default function StoragePage() {
                                 <div className="relative group/tag">
                                   <button
                                     aria-label={`Tags for ${item.name}`}
-                                    onClick={(e) => { e.stopPropagation(); setTagModalItem(item); setShowTagModal(true); }}
+                                    onClick={(e) => { e.stopPropagation(); setTagInput(''); setTagModalItem(item); setShowTagModal(true); }}
                                     className="p-1.5 rounded bg-slate-200 dark:bg-slate-800 hover:bg-slate-350 text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-slate-105 cursor-pointer"
                                   >
                                     <Tag className="h-3.5 w-3.5" />

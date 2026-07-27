@@ -221,6 +221,7 @@ router.delete('/folder', requireAuth, async (req: Request, res: Response, next: 
  *       413: { description: Would exceed storage quota }
  *   put:
  *     summary: Overwrite an existing note's content and/or name
+ *     description: Pass `expectedUpdatedAt` (the note's `updated_at` as last loaded by the caller) to detect a concurrent edit from another tab/device — a mismatch returns 409 instead of silently overwriting.
  *     tags: [Storage]
  *     security: [{ bearerAuth: [] }]
  *     requestBody:
@@ -234,9 +235,11 @@ router.delete('/folder', requireAuth, async (req: Request, res: Response, next: 
  *               id: { type: string, format: uuid }
  *               content: { type: string }
  *               name: { type: string }
+ *               expectedUpdatedAt: { type: string, format: date-time }
  *     responses:
  *       200: { description: Note updated }
  *       404: { description: Note not found or not owned by caller }
+ *       409: { description: "Conflict — the note was changed elsewhere; response `details` includes the current `item` and `content`" }
  */
 router.post('/text', requireAuth, requireS3, async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -258,8 +261,8 @@ router.put('/text', requireAuth, requireS3, async (req: Request, res: Response, 
     if (!parseResult.success) {
       throw new AppError(HttpStatus.BAD_REQUEST, 'Invalid update parameters', 'VALIDATION_ERROR', parseResult.error.flatten().fieldErrors);
     }
-    const { id, content, name, mimeType } = parseResult.data;
-    const updated = await storageService.updateNote(getUser(req).id, id, content, name, mimeType);
+    const { id, content, name, mimeType, expectedUpdatedAt } = parseResult.data;
+    const updated = await storageService.updateNote(getUser(req).id, id, content, name, mimeType, expectedUpdatedAt);
     res.json({ success: true, data: updated });
   } catch (err) {
     next(err);

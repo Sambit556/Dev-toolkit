@@ -94,9 +94,15 @@ export async function login(identifier: string, password: string) {
 
   const { accessToken, refreshToken } = await issueSession(user);
 
-  await transaction(async (trx) => {
+  // Bookkeeping only (last_login + audit log) — neither is needed to answer this
+  // request, so it shouldn't cost the caller a second pool.connect()+transaction
+  // round-trip on the critical path. Fire-and-forget, same pattern as
+  // updateUserGeoAndIp below.
+  transaction(async (trx) => {
     await trx.updateData(TABLES.USERS, { last_login: new Date() }, { id: user.id });
     await trx.addData(TABLES.ACTIVITY_LOGS, { user_id: user.id, action: ACTIVITY_ACTIONS.LOGIN, resource: 'auth' });
+  }).catch((err: any) => {
+    logger.error('Failed to record last_login/activity log after login', { userId: user.id, error: err.message });
   });
 
   logger.info('User logged in successfully', { userId: user.id, identifier });

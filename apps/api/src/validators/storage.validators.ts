@@ -33,6 +33,10 @@ export const UpdateNoteSchema = z.object({
   content: z.string().max(10 * 1024 * 1024, 'Content size too large (max 10MB)'),
   name: z.string().min(1, 'Name is required').max(255, 'Name too long').refine(isSafeName, 'Invalid note name (no path characters allowed)').optional(),
   mimeType: z.string().optional(),
+  // Optimistic-concurrency guard: the note's `updated_at` as last seen by this editor
+  // session. If it no longer matches the row's current `updated_at`, someone else
+  // (another tab/device) saved in between — see updateNote() in storage.service.ts.
+  expectedUpdatedAt: z.string().optional(),
 });
 
 export const UploadStartSchema = z.object({

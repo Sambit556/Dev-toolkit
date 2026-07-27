@@ -257,13 +257,24 @@ export async function createNote(userId: string, name: string, content: string, 
   return note;
 }
 
-export async function updateNote(userId: string, id: string, content: string, name?: string, mimeType?: string) {
+export async function updateNote(userId: string, id: string, content: string, name?: string, mimeType?: string, expectedUpdatedAt?: string) {
   const note = await commonDao.getOneDataByCond<any>(TABLES.STORAGE_ITEMS, { id, is_deleted: false });
   if (!note || note.user_id !== userId) {
     throw new AppError(HttpStatus.NOT_FOUND, 'Note not found', 'VALIDATION_ERROR');
   }
   if (!note.s3_key) {
     throw new AppError(HttpStatus.BAD_REQUEST, 'Missing S3 key for this file resource', 'VALIDATION_ERROR');
+  }
+
+  // Another session (a second tab, or a different device) saved this note after this
+  // caller last loaded it — refuse to blindly overwrite their edits. The caller gets
+  // the current row + content back so it can offer "keep mine" / "use theirs".
+  if (expectedUpdatedAt && new Date(expectedUpdatedAt).getTime() !== new Date(note.updated_at).getTime()) {
+    const latestContent = await getObjectContent(note.s3_key);
+    throw new AppError(HttpStatus.CONFLICT, 'This note was changed elsewhere since you last loaded it', 'NOTE_CONFLICT', {
+      item: note,
+      content: latestContent,
+    });
   }
 
   const noteContent = content || '';
@@ -422,11 +433,22 @@ export async function resumeUploadSession(userId: string, uploadId: string) {
   void notifyUploadQueueChanged(userId);
 }
 
+// How long a finished session (completed/rejected/cancelled) stays visible in the
+// live Upload Queue after it lands in a terminal state — long enough to survive a
+// reconnect/reload right after it finishes, short enough that it doesn't resurrect
+// ancient history every time the queue is (re-)opened (see GET /upload/stream, which
+// re-sends this snapshot on every connect). Sessions still `uploading`/`paused` are
+// always included regardless of age.
+const UPLOAD_QUEUE_TERMINAL_RETENTION_MINUTES = 10;
+
 export async function getUploadQueue(userId: string) {
-  const rows = await commonDao.getAllDataByCond<any>(
-    TABLES.UPLOAD_SESSIONS,
-    { user_id: userId },
-    { orderBy: 'updated_at', orderDir: 'DESC', limit: 50 }
+  const rows = await commonDao.rawQuery<any>(
+    `SELECT * FROM ${TABLES.UPLOAD_SESSIONS}
+     WHERE user_id = $1
+       AND (status IN ('uploading', 'paused') OR updated_at > NOW() - INTERVAL '${UPLOAD_QUEUE_TERMINAL_RETENTION_MINUTES} minutes')
+     ORDER BY updated_at DESC
+     LIMIT 50`,
+    [userId]
   );
   return rows.map((r) => ({
     uploadId: r.upload_id,
