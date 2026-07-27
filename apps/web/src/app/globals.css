@@ -149,6 +149,35 @@
   }
 }
 
+/* LogoSpinner (/storage loading indicator): smile -> sad -> spin, on a loop. All
+ * three share one 2.4s timeline so they stay in sync. The rotation keyframe ends at
+ * 360deg (not 180) purely so consecutive loops don't visibly snap back to 0 — it
+ * still passes through the 180 mark (an upside-down beat) partway through the spin. */
+@keyframes logo-spin-rotate {
+  0%, 70% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+.animate-logo-spin-rotate {
+  animation: logo-spin-rotate 2.4s ease-in-out infinite;
+}
+
+@keyframes logo-spin-smile {
+  0%, 28% { opacity: 1; }
+  36%, 100% { opacity: 0; }
+}
+.animate-logo-spin-smile {
+  animation: logo-spin-smile 2.4s ease-in-out infinite;
+}
+
+@keyframes logo-spin-sad {
+  0%, 28% { opacity: 0; }
+  36%, 62% { opacity: 1; }
+  70%, 100% { opacity: 0; }
+}
+.animate-logo-spin-sad {
+  animation: logo-spin-sad 2.4s ease-in-out infinite;
+}
+
 /* Clock digit slide-up animation (bottom → top flip on every tick) */
 @keyframes clockSlideUp {
   from {

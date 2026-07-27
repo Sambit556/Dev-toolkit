@@ -29,6 +29,7 @@ import {
   AlertTriangle,
   HardDrive,
   User,
+  Loader2,
   Trash,
   ChevronLeft,
   Eye,
@@ -274,21 +275,24 @@ function stripLegacyHtml(text: string): string {
     .replace(/&amp;/g, '&');
 }
 
-// A playful stand-in for the plain spinning-circle loading icon used across this
-// page — cycles through a neutral circle, a happy face, and a sad face on a fixed
-// clock, forever, for as long as it's mounted. `sizeClassName` takes a Tailwind
-// font-size utility (e.g. "text-base") since an emoji glyph's visual size is driven
-// by font-size, not the h-*/w-* box sizing the old icon used.
-const EMOJI_SPINNER_FACES = ['⚪', '😄', '😢'];
-function EmojiSpinner({ sizeClassName = 'text-base', className = '' }: { sizeClassName?: string; className?: string }) {
-  const [frame, setFrame] = useState(0);
-  useEffect(() => {
-    const id = setInterval(() => setFrame((f) => (f + 1) % EMOJI_SPINNER_FACES.length), 450);
-    return () => clearInterval(id);
-  }, []);
+// A miniature, animated version of the app's own logo mark (the gradient rounded
+// square from SplashScreen.tsx) used as the loading indicator across this page: it
+// smiles, turns sad, then spins around — on a continuous loop. Pure CSS (see the
+// .animate-logo-spin-* keyframes in globals.css), no JS timer, so it never jitters.
+function LogoSpinner({ size = 18, className = '' }: { size?: number; className?: string }) {
   return (
-    <span role="status" aria-label="Loading" className={cn('inline-block leading-none select-none', sizeClassName, className)}>
-      {EMOJI_SPINNER_FACES[frame]}
+    <span
+      role="status"
+      aria-label="Loading"
+      className={cn('inline-flex shrink-0 items-center justify-center rounded-[30%] bg-gradient-to-br from-blue-600 via-blue-500 to-purple-600 animate-logo-spin-rotate', className)}
+      style={{ width: size, height: size }}
+    >
+      <svg viewBox="0 0 24 24" width={size * 0.65} height={size * 0.65} aria-hidden>
+        <circle cx="8.5" cy="10" r="1.5" fill="white" />
+        <circle cx="15.5" cy="10" r="1.5" fill="white" />
+        <path d="M7 15 Q12 19.5 17 15" stroke="white" strokeWidth="1.8" fill="none" strokeLinecap="round" className="animate-logo-spin-smile" />
+        <path d="M7 18.5 Q12 14.5 17 18.5" stroke="white" strokeWidth="1.8" fill="none" strokeLinecap="round" className="animate-logo-spin-sad" />
+      </svg>
     </span>
   );
 }
@@ -2772,7 +2776,7 @@ export default function StoragePage() {
   if (isActivated !== true || isExchangingOAuth) {
     return (
       <div className="flex-1 min-h-0 bg-slate-50 dark:bg-slate-950 flex items-center justify-center text-slate-600 dark:text-slate-400 font-mono">
-        <EmojiSpinner sizeClassName="text-2xl" className="mr-2 text-blue-500" />
+        <LogoSpinner size={26} className="mr-2" />
         {isExchangingOAuth ? 'Completing Google sign-in...' : 'Checking configuration...'}
       </div>
     );
@@ -2953,7 +2957,7 @@ export default function StoragePage() {
                 >
                   {isLoggingIn ? (
                     <>
-                      <EmojiSpinner sizeClassName="text-base" className="mr-2" />
+                      <Loader2 className="animate-spin h-4 w-4 mr-2" />
                       Logging in...
                     </>
                   ) : (
@@ -3077,7 +3081,7 @@ export default function StoragePage() {
                 >
                   {isLoggingIn ? (
                     <>
-                      <EmojiSpinner sizeClassName="text-base" className="mr-2" />
+                      <LogoSpinner size={18} className="mr-2" />
                       Registering Vault Peer...
                     </>
                   ) : (
@@ -3137,7 +3141,7 @@ export default function StoragePage() {
                 >
                   {isLoggingIn ? (
                     <>
-                      <EmojiSpinner sizeClassName="text-base" className="mr-2" />
+                      <LogoSpinner size={18} className="mr-2" />
                       Generating Reset Token...
                     </>
                   ) : (
@@ -3222,7 +3226,7 @@ export default function StoragePage() {
                 >
                   {isLoggingIn ? (
                     <>
-                      <EmojiSpinner sizeClassName="text-base" className="mr-2" />
+                      <LogoSpinner size={18} className="mr-2" />
                       Re-encrypting Vault Keys...
                     </>
                   ) : (
@@ -3583,7 +3587,7 @@ export default function StoragePage() {
                       disabled={isUploadingAvatar}
                       className="absolute bottom-0 right-0 h-7 w-7 rounded-full bg-blue-600 hover:bg-blue-500 border-2 border-white dark:border-[#0d1526] flex items-center justify-center cursor-pointer transition-colors disabled:opacity-60 shadow-lg"
                     >
-                      {isUploadingAvatar ? <EmojiSpinner sizeClassName="text-sm" className="text-white" /> : <Camera className="h-3.5 w-3.5 text-white" />}
+                      {isUploadingAvatar ? <LogoSpinner size={16} className="text-white" /> : <Camera className="h-3.5 w-3.5 text-white" />}
                     </button>
                   </div>
                   <div className="flex items-center gap-2 text-[10px]">
@@ -3642,7 +3646,7 @@ export default function StoragePage() {
                         disabled={isSavingName}
                         className="px-3.5 py-2 rounded-lg bg-gradient-to-r from-blue-600 to-violet-600 hover:from-blue-500 hover:to-violet-500 text-white font-bold cursor-pointer transition-all disabled:opacity-50 text-xs shrink-0 shadow-md shadow-blue-950/20"
                       >
-                        {isSavingName ? <EmojiSpinner sizeClassName="text-sm" /> : 'Save'}
+                        {isSavingName ? <LogoSpinner size={16} /> : 'Save'}
                       </button>
                     </div>
                   </div>
@@ -3664,7 +3668,7 @@ export default function StoragePage() {
                         disabled={isSendingOtp}
                         className="w-full flex items-center justify-center gap-1.5 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-white rounded-lg py-2 font-bold cursor-pointer transition-all disabled:opacity-50 text-xs shadow-md shadow-amber-950/20"
                       >
-                        {isSendingOtp ? <EmojiSpinner sizeClassName="text-sm" /> : <Mail className="h-3.5 w-3.5" />}
+                        {isSendingOtp ? <LogoSpinner size={16} /> : <Mail className="h-3.5 w-3.5" />}
                         Send Verification Code
                       </button>
                     ) : (
@@ -3716,7 +3720,7 @@ export default function StoragePage() {
                           disabled={isVerifyingOtp}
                           className="w-full bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-white rounded-lg py-2 font-bold cursor-pointer transition-all disabled:opacity-50 text-xs shadow-md shadow-amber-950/20"
                         >
-                          {isVerifyingOtp ? <EmojiSpinner sizeClassName="text-sm" className="mx-auto" /> : 'Verify & Update Password'}
+                          {isVerifyingOtp ? <LogoSpinner size={16} className="mx-auto" /> : 'Verify & Update Password'}
                         </button>
                         <button
                           onClick={sendSuperadminPasswordOtp}
@@ -3786,7 +3790,7 @@ export default function StoragePage() {
                       disabled={isChangingPassword}
                       className="w-full bg-gradient-to-r from-blue-600 to-violet-600 hover:from-blue-500 hover:to-violet-500 text-white rounded-lg py-2 font-bold cursor-pointer transition-all disabled:opacity-50 text-xs shadow-md shadow-blue-950/20"
                     >
-                      {isChangingPassword ? <EmojiSpinner sizeClassName="text-sm" className="mx-auto" /> : 'Update Password'}
+                      {isChangingPassword ? <LogoSpinner size={16} className="mx-auto" /> : 'Update Password'}
                     </button>
                     <div className="text-[9px] text-slate-400 dark:text-slate-600">Changing your password logs you out of all devices.</div>
                   </div>
@@ -3835,7 +3839,7 @@ export default function StoragePage() {
                 disabled={isDeactivating}
                 className="px-4 py-2 rounded-lg bg-red-600 hover:bg-red-500 text-white font-bold transition-colors cursor-pointer text-xs disabled:opacity-50 flex items-center gap-1.5"
               >
-                {isDeactivating ? <EmojiSpinner sizeClassName="text-sm" /> : 'Deactivate Account'}
+                {isDeactivating ? <LogoSpinner size={16} /> : 'Deactivate Account'}
               </button>
             </div>
           </div>
@@ -3934,7 +3938,7 @@ export default function StoragePage() {
                 disabled={isLoggingOut}
                 className="p-2 rounded-lg text-red-600 dark:text-red-400 bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 hover:border-red-500/40 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {isLoggingOut ? <EmojiSpinner sizeClassName="text-base" /> : <LogOut className="h-4 w-4" />}
+                {isLoggingOut ? <LogoSpinner size={18} /> : <LogOut className="h-4 w-4" />}
               </button>
               <div className="pointer-events-none absolute top-full right-0 mt-2 opacity-0 group-hover/logout:opacity-100 transition-all duration-200 scale-95 group-hover/logout:scale-100 z-50">
                 <div className="bg-slate-900/95 dark:bg-slate-950/95 border border-slate-200/10 dark:border-slate-800/40 text-slate-200 dark:text-slate-150 text-[10px] font-semibold px-2.5 py-1.5 rounded-lg shadow-xl backdrop-blur-md whitespace-nowrap">
@@ -4171,7 +4175,7 @@ export default function StoragePage() {
                   disabled={isSavingNote}
                   className="flex items-center gap-1.5 px-3.5 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg font-bold cursor-pointer transition-colors"
                 >
-                  {isSavingNote ? <EmojiSpinner sizeClassName="text-sm" /> : <Save className="h-3.5 w-3.5" />}
+                  {isSavingNote ? <LogoSpinner size={16} /> : <Save className="h-3.5 w-3.5" />}
                   Save
                 </button>
                 <button
@@ -4327,7 +4331,7 @@ export default function StoragePage() {
             <div className="flex-1 overflow-y-auto pr-2">
               {isLoadingEvents ? (
                 <div className="h-64 flex items-center justify-center text-slate-500 dark:text-slate-500 gap-2">
-                  <EmojiSpinner sizeClassName="text-xl" /> Loading events...
+                  <LogoSpinner size={22} /> Loading events...
                 </div>
               ) : eventsTree.length === 0 ? (
                 <div className="h-64 flex flex-col items-center justify-center text-slate-500 dark:text-slate-500 gap-2 border border-dashed border-slate-200 dark:border-slate-800 rounded-xl bg-slate-100/5 dark:bg-slate-900/5">
@@ -4440,7 +4444,7 @@ export default function StoragePage() {
             <div className="flex-1 overflow-y-auto">
               {isLoadingAdminUsers ? (
                 <div className="h-64 flex items-center justify-center text-slate-500 dark:text-slate-500 gap-2">
-                  <EmojiSpinner sizeClassName="text-xl" /> Loading users...
+                  <LogoSpinner size={22} /> Loading users...
                 </div>
               ) : (
                 <div className="border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden bg-slate-100/5 dark:bg-slate-900/5">
@@ -4991,7 +4995,7 @@ export default function StoragePage() {
             <div className="flex-1 p-4 overflow-y-auto">
               {isLoadingItems ? (
                 <div className="h-64 flex items-center justify-center text-slate-600 dark:text-slate-400 font-mono text-xs">
-                  <EmojiSpinner sizeClassName="text-xl" className="mr-2 text-blue-500" />
+                  <LogoSpinner size={22} className="mr-2" />
                   Loading...
                 </div>
               ) : items.length === 0 ? (
@@ -5120,7 +5124,7 @@ export default function StoragePage() {
                                   disabled={shareLoadingId === item.id}
                                   className="p-1 rounded bg-slate-100 dark:bg-slate-900 text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-slate-100 cursor-pointer disabled:opacity-50"
                                 >
-                                  {shareLoadingId === item.id ? <EmojiSpinner sizeClassName="text-xs" /> : <Share2 className="h-3 w-3" />}
+                                  {shareLoadingId === item.id ? <LogoSpinner size={14} /> : <Share2 className="h-3 w-3" />}
                                 </button>
                                 <div className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 opacity-0 group-hover/share:opacity-100 transition-all duration-200 scale-95 group-hover/share:scale-100 z-50">
                                   <div className="bg-slate-900/95 dark:bg-slate-950/95 border border-slate-200/10 dark:border-slate-800/40 text-slate-200 dark:text-slate-100 text-[9px] font-semibold px-2 py-1 rounded-md shadow-xl backdrop-blur-md whitespace-nowrap">Share (10 min link)</div>
@@ -5335,7 +5339,7 @@ export default function StoragePage() {
                                     disabled={shareLoadingId === item.id}
                                     className="p-1.5 rounded bg-slate-200 dark:bg-slate-800 hover:bg-slate-350 text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-slate-105 cursor-pointer disabled:opacity-50"
                                   >
-                                    {shareLoadingId === item.id ? <EmojiSpinner sizeClassName="text-sm" /> : <Share2 className="h-3.5 w-3.5" />}
+                                    {shareLoadingId === item.id ? <LogoSpinner size={16} /> : <Share2 className="h-3.5 w-3.5" />}
                                   </button>
                                   <div className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 opacity-0 group-hover/share:opacity-100 transition-all duration-200 scale-95 group-hover/share:scale-100 z-50">
                                     <div className="bg-slate-900/95 dark:bg-slate-950/95 border border-slate-200/10 dark:border-slate-800/40 text-slate-200 dark:text-slate-100 text-[9px] font-semibold px-2 py-1 rounded-md shadow-xl backdrop-blur-md whitespace-nowrap">Share (10 min link)</div>
@@ -5709,7 +5713,7 @@ export default function StoragePage() {
                 disabled={isAdminChangingPassword || calculatePasswordStrength(adminChangePasswordNew) < 100}
                 className="w-full bg-blue-600 hover:bg-blue-500 text-white rounded-lg py-2.5 font-bold cursor-pointer transition-colors disabled:opacity-50 text-xs mt-2 flex items-center justify-center gap-2"
               >
-                {isAdminChangingPassword && <EmojiSpinner sizeClassName="text-xs" />}
+                {isAdminChangingPassword && <LogoSpinner size={14} />}
                 Change Password
               </button>
             </div>
