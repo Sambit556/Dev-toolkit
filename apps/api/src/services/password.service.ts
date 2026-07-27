@@ -4,7 +4,7 @@ import { getEnv } from '../utils/env';
 import { logger } from '../utils/logger';
 
 // Salt rounds control bcrypt's own per-hash random salt cost factor.
-const SALT_ROUNDS = parseInt(getEnv('BCRYPT_SALT_ROUNDS') || '12', 10);
+const SALT_ROUNDS = parseInt(getEnv('BCRYPT_SALT_ROUNDS') || '10', 10);
 
 // The pepper is a second, server-only secret (never stored in the DB) mixed in
 // before hashing. Even a full database dump can't be bcrypt-cracked offline
@@ -27,4 +27,16 @@ export async function hashPassword(password: string): Promise<string> {
 
 export async function verifyPassword(password: string, hash: string): Promise<boolean> {
   return bcrypt.compare(withPepper(password), hash);
+}
+
+// True when a stored hash was computed at a different cost factor than the current
+// BCRYPT_SALT_ROUNDS — lets login() opportunistically re-hash old accounts onto
+// today's setting (see auth.service.ts) instead of them staying slow (or weak)
+// forever just because they registered before a config change.
+export function needsRehash(hash: string): boolean {
+  try {
+    return bcrypt.getRounds(hash) !== SALT_ROUNDS;
+  } catch {
+    return false;
+  }
 }

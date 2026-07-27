@@ -25,19 +25,10 @@ import {
   RotateCw,
   RotateCcw,
   Save,
-  Bold,
-  Italic,
-  Underline,
-  Code,
-  Heading1,
-  Heading2,
-  Minus,
-  Eraser,
   CheckCircle,
   AlertTriangle,
   HardDrive,
   User,
-  Loader2,
   Trash,
   ChevronLeft,
   Eye,
@@ -62,16 +53,7 @@ import {
   KeyRound,
   Palette,
   PenTool,
-  AlignLeft,
-  AlignCenter,
-  AlignRight,
-  AlignJustify,
-  Heading3,
-  Heading4,
-  Heading5,
-  Heading6,
   Type,
-  Heading,
   Table,
   MonitorPlay,
   FileCode2,
@@ -85,11 +67,6 @@ import {
   ZoomIn,
   ZoomOut,
 } from 'lucide-react';
-import { useEditor, EditorContent } from '@tiptap/react';
-import StarterKit from '@tiptap/starter-kit';
-import TextAlign from '@tiptap/extension-text-align';
-import { TextStyle } from '@tiptap/extension-text-style';
-import Color from '@tiptap/extension-color';
 import dynamic from 'next/dynamic';
 
 // Excalidraw ships its own stylesheet separately from the JS bundle (required
@@ -250,12 +227,6 @@ const OAUTH_ERROR_MESSAGES: Record<string, string> = {
 interface UsageCategory { key: string; label: string; bytes: number; color: string; }
 interface UsageData { used: number; max: number; percent: string; files: number; folders: number; categories: UsageCategory[]; }
 
-// TipTap/ProseMirror's schema requires the doc to always contain at least one
-// block node — feeding editor.commands.setContent() a bare '' (rather than an
-// empty paragraph) produces a doc with no valid block for the cursor to land
-// in, which is what a freshly created (empty-content) note hit.
-const EMPTY_NOTE_DOC = '<p></p>';
-
 // Colors drawn from a validated categorical palette (adjacent pairs in this fixed
 // order clear colorblind-safe and normal-vision separation floors — see the
 // dataviz skill). The raw per-mime-type usage categories include several
@@ -286,6 +257,40 @@ function groupUsageCategories(categories: UsageCategory[], isDark: boolean) {
       bytes: g.sourceKeys.reduce((sum, k) => sum + (bytesByKey.get(k) || 0), 0),
     }))
     .filter(g => g.bytes > 0);
+}
+
+// Text notes used to be edited as rich text (TipTap-generated HTML) — the editor is
+// now a plain Notepad-style textarea, but notes saved before that switch may still
+// have markup in them. Strip it on load so old notes show clean text instead of tags.
+function stripLegacyHtml(text: string): string {
+  if (!text.includes('<')) return text;
+  return text
+    .replace(/<[^>]*>/g, '')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#x27;/g, "'")
+    .replace(/&amp;/g, '&');
+}
+
+// A playful stand-in for the plain spinning-circle loading icon used across this
+// page — cycles through a neutral circle, a happy face, and a sad face on a fixed
+// clock, forever, for as long as it's mounted. `sizeClassName` takes a Tailwind
+// font-size utility (e.g. "text-base") since an emoji glyph's visual size is driven
+// by font-size, not the h-*/w-* box sizing the old icon used.
+const EMOJI_SPINNER_FACES = ['⚪', '😄', '😢'];
+function EmojiSpinner({ sizeClassName = 'text-base', className = '' }: { sizeClassName?: string; className?: string }) {
+  const [frame, setFrame] = useState(0);
+  useEffect(() => {
+    const id = setInterval(() => setFrame((f) => (f + 1) % EMOJI_SPINNER_FACES.length), 450);
+    return () => clearInterval(id);
+  }, []);
+  return (
+    <span role="status" aria-label="Loading" className={cn('inline-block leading-none select-none', sizeClassName, className)}>
+      {EMOJI_SPINNER_FACES[frame]}
+    </span>
+  );
 }
 
 export default function StoragePage() {
@@ -475,38 +480,12 @@ export default function StoragePage() {
   const [isSavingNote, setIsSavingNote] = useState(false);
   // The note's `updated_at` as last confirmed with the server (on load, or after a
   // successful save) — sent back as `expectedUpdatedAt` on every save so the server can
-  // tell whether another tab/device saved this same note in between (see NOTE_CONFLICT
-  // handling below). This is what makes concurrent editing of the same note safe.
+  // tell whether another tab/device saved this same note in between. Handled the way
+  // Google Docs/Keep do it: silently, never with a dialog that interrupts typing — see
+  // the NOTE_CONFLICT branch in saveNoteContent below.
   const [editorBaseVersion, setEditorBaseVersion] = useState<string | null>(null);
-  const [noteConflict, setNoteConflict] = useState<{ serverName: string; serverContent: string; serverUpdatedAt: string } | null>(null);
   const autoSaveTimer = useRef<ReturnType<typeof setInterval> | null>(null);
-  const editor = useEditor({
-    immediatelyRender: false,
-    extensions: [
-      StarterKit,
-      TextAlign.configure({ types: ['heading', 'paragraph'] }),
-      TextStyle,
-      Color,
-    ],
-    content: editorContent || EMPTY_NOTE_DOC,
-    onUpdate: ({ editor }) => {
-      setEditorContent(editor.getHTML());
-      setEditorCharCount(editor.getText().replace(/\n/g, '').length);
-    },
-  });
-
-  useEffect(() => {
-    if (editorNote && editor) {
-      if (editor.getHTML() !== editorContent) {
-        // A brand-new note's content is '' (both the DB row and this state) —
-        // ProseMirror's schema requires at least one block node, so handing
-        // setContent a bare empty string parses to a doc with no paragraph at
-        // all, leaving no valid place for the cursor to land. That's what
-        // showed up as an uneditable blank box right after creating a note.
-        editor.commands.setContent(editorContent || EMPTY_NOTE_DOC);
-      }
-    }
-  }, [editorNote, editor]);
+  const noteTextareaRef = useRef<HTMLTextAreaElement | null>(null);
 
   // Custom confirmation modal state
   const [confirmModal, setConfirmModal] = useState<{
@@ -982,19 +961,20 @@ export default function StoragePage() {
     setActiveMobileLinks([]);
   };
 
-  // Logout callback — calls API then cleans up locally
+  // Logout callback — clears local session immediately; the server-side session
+  // revocation is fired in the background instead of blocking the UI on it. The
+  // user doesn't need to wait for that round-trip to see themselves logged out,
+  // and if it's slow or fails they're still logged out locally either way.
   const handleLogout = async () => {
     if (isLoggingOutRef.current) return;
     isLoggingOutRef.current = true;
     setIsLoggingOut(true);
-    try {
-      await apiFetch(`${API_BASE}/api/auth/logout`, {
-        method: 'POST',
-        headers: getHeaders(),
-      });
-    } catch (e) {
-      // Silently fall back to UI logout anyway
-    }
+
+    apiFetch(`${API_BASE}/api/auth/logout`, {
+      method: 'POST',
+      headers: getHeaders(),
+    }).catch(() => { /* best-effort; local logout below already happened */ });
+
     silentLocalLogout();
     toast.success('Logged out successfully');
     isLoggingOutRef.current = false;
@@ -1950,20 +1930,20 @@ export default function StoragePage() {
       const json = await res.json();
 
       if (json.success) {
-        // We now get the content directly from the backend
-        const text = json.data.content || '';
+        // We now get the content directly from the backend. Notes created before the
+        // editor switched to plain text may still have TipTap-generated HTML saved —
+        // strip it so old notes don't show raw markup.
+        const text = stripLegacyHtml(json.data.content || '');
         // Use the freshly-fetched row (not the possibly-stale list item passed in) so
         // the concurrency check below starts from the real current version.
         const freshItem = json.data.item || note;
 
-        setNoteConflict(null);
         setEditorNote(freshItem);
         setEditorTitle(freshItem.name);
         setEditorContent(text);
-        setEditorCharCount(text.replace(/<[^>]*>/g, '').length);
+        setEditorCharCount(text.length);
         setEditorBaseVersion(freshItem.updated_at);
         setEditorVersionTime(new Date(freshItem.updated_at).toLocaleString());
-        editor?.commands.setContent(text || EMPTY_NOTE_DOC);
         toast.dismiss('note-load');
       } else {
         toast.error(json.message, { id: 'note-load' });
@@ -1973,9 +1953,11 @@ export default function StoragePage() {
     }
   };
 
-  // Returns false on failure/conflict so callers (e.g. closeNoteEditor) know not to
-  // navigate away and discard unsaved edits.
-  const saveNoteContent = async (isAuto = false): Promise<boolean> => {
+  // Returns false on a real failure so callers (e.g. closeNoteEditor) know not to
+  // navigate away and discard unsaved edits. A version conflict is NOT a failure —
+  // it's resolved silently below (see isRetry), the same way Google Docs/Keep sync
+  // across tabs/devices without ever popping a dialog in your face.
+  const saveNoteContent = async (isAuto = false, isRetry = false): Promise<boolean> => {
     if (!editorNote) return true;
     setIsSavingNote(true);
 
@@ -2002,13 +1984,17 @@ export default function StoragePage() {
       }
 
       if (json.code === 'NOTE_CONFLICT') {
-        // Someone else (another tab/device) saved this note in between — don't clobber
-        // their edits. Surface both versions and let the user pick instead of erroring.
-        setNoteConflict({
-          serverName: json.details.item.name,
-          serverContent: json.details.content || '',
-          serverUpdatedAt: json.details.item.updated_at,
-        });
+        // Another tab/device saved this note in between. Whatever is on screen right
+        // now is what the user is actively looking at, so that's what wins — just
+        // adopt the server's latest version stamp and save again under it. No dialog,
+        // no forced choice; at most a quiet, non-blocking heads-up.
+        setEditorBaseVersion(json.details.item.updated_at);
+        if (!isRetry) {
+          if (!isAuto) toast('Synced with another open session', { icon: '🔄', id: 'note-sync' });
+          return saveNoteContent(isAuto, true);
+        }
+        // Still conflicting immediately after one retry (rapid edits from elsewhere) —
+        // back off for now; the next 5s autosave tick will settle it.
         return false;
       }
 
@@ -2026,33 +2012,10 @@ export default function StoragePage() {
     }
   };
 
-  // "Keep mine": re-save under the server's latest version so the conflict check
-  // passes this time, without touching the content the user is looking at.
-  const resolveConflictKeepMine = async () => {
-    if (!noteConflict) return;
-    setEditorBaseVersion(noteConflict.serverUpdatedAt);
-    setNoteConflict(null);
-    await saveNoteContent(false);
-  };
-
-  // "Use theirs": discard local edits and load the other session's version instead.
-  const resolveConflictUseTheirs = () => {
-    if (!noteConflict) return;
-    const { serverContent, serverName, serverUpdatedAt } = noteConflict;
-    setEditorContent(serverContent);
-    setEditorTitle(serverName);
-    setEditorCharCount(serverContent.replace(/<[^>]*>/g, '').length);
-    setEditorBaseVersion(serverUpdatedAt);
-    setEditorVersionTime(new Date(serverUpdatedAt).toLocaleString());
-    editor?.commands.setContent(serverContent || EMPTY_NOTE_DOC);
-    setNoteConflict(null);
-  };
-
   const closeNoteEditor = async () => {
-    if (noteConflict) return; // Resolve the conflict first — don't discard either version.
     if (autoSaveTimer.current) clearInterval(autoSaveTimer.current);
     const saved = await saveNoteContent(true); // Final save
-    if (!saved) return; // Conflict (modal now showing) or a real error — stay open.
+    if (!saved) return; // Real error (network/validation) — stay open so edits aren't lost.
     setEditorNote(null);
     setEditorBaseVersion(null);
     loadStorageItems();
@@ -2777,21 +2740,23 @@ export default function StoragePage() {
     };
   }, [token, sidebarTab]);
 
-  // Trigger auto-save for Note Editor. This 5s tick is also what makes a concurrent
-  // edit on another tab/device show up promptly: each tick re-sends this session's
-  // known version, so a stale one surfaces the conflict modal within ~5s even if the
-  // user hasn't touched this note themselves.
+  // Trigger auto-save for Note Editor. editorBaseVersion must be in the dependency
+  // array here — without it, this interval's closure keeps calling a stale
+  // saveNoteContent that still has the *previous* base version baked in (React
+  // doesn't recreate the interval just because state it doesn't depend on changed),
+  // so every tick after the first successful autosave would send an outdated
+  // expectedUpdatedAt and spuriously conflict with itself.
   useEffect(() => {
     if (editorNote) {
       if (autoSaveTimer.current) clearInterval(autoSaveTimer.current);
       autoSaveTimer.current = setInterval(() => {
-        if (!noteConflict) saveNoteContent(true);
+        saveNoteContent(true);
       }, 5000);
     }
     return () => {
       if (autoSaveTimer.current) clearInterval(autoSaveTimer.current);
     };
-  }, [editorNote, editorContent, editorTitle, noteConflict]);
+  }, [editorNote, editorContent, editorTitle, editorBaseVersion]);
 
   // Redirect unactivated users safely inside useEffect.
   // A hard navigation (not router.replace) is deliberate here: this is an auth-gate exit for
@@ -2807,7 +2772,7 @@ export default function StoragePage() {
   if (isActivated !== true || isExchangingOAuth) {
     return (
       <div className="flex-1 min-h-0 bg-slate-50 dark:bg-slate-950 flex items-center justify-center text-slate-600 dark:text-slate-400 font-mono">
-        <Loader2 className="animate-spin h-6 w-6 mr-2 text-blue-500" />
+        <EmojiSpinner sizeClassName="text-2xl" className="mr-2 text-blue-500" />
         {isExchangingOAuth ? 'Completing Google sign-in...' : 'Checking configuration...'}
       </div>
     );
@@ -2988,7 +2953,7 @@ export default function StoragePage() {
                 >
                   {isLoggingIn ? (
                     <>
-                      <Loader2 className="animate-spin h-4 w-4 mr-2" />
+                      <EmojiSpinner sizeClassName="text-base" className="mr-2" />
                       Logging in...
                     </>
                   ) : (
@@ -3112,7 +3077,7 @@ export default function StoragePage() {
                 >
                   {isLoggingIn ? (
                     <>
-                      <Loader2 className="animate-spin h-4 w-4 mr-2" />
+                      <EmojiSpinner sizeClassName="text-base" className="mr-2" />
                       Registering Vault Peer...
                     </>
                   ) : (
@@ -3172,7 +3137,7 @@ export default function StoragePage() {
                 >
                   {isLoggingIn ? (
                     <>
-                      <Loader2 className="animate-spin h-4 w-4 mr-2" />
+                      <EmojiSpinner sizeClassName="text-base" className="mr-2" />
                       Generating Reset Token...
                     </>
                   ) : (
@@ -3257,7 +3222,7 @@ export default function StoragePage() {
                 >
                   {isLoggingIn ? (
                     <>
-                      <Loader2 className="animate-spin h-4 w-4 mr-2" />
+                      <EmojiSpinner sizeClassName="text-base" className="mr-2" />
                       Re-encrypting Vault Keys...
                     </>
                   ) : (
@@ -3474,53 +3439,6 @@ export default function StoragePage() {
         </div>
       )}
 
-      {/* Note Conflict Modal — shown when another tab/device saved this same note
-          since this session last loaded it (see saveNoteContent's NOTE_CONFLICT branch) */}
-      {noteConflict && (
-        <div className="fixed inset-0 z-[300] flex items-center justify-center bg-black/70 backdrop-blur-sm">
-          <div className="bg-white dark:bg-[#0d1526] border border-amber-500/40 rounded-2xl p-6 w-[32rem] max-w-[92vw] shadow-2xl">
-            <div className="flex items-center gap-2 mb-2 text-amber-600 dark:text-amber-400 font-bold text-sm">
-              <AlertTriangle className="h-4 w-4 shrink-0" /> This note was changed elsewhere
-            </div>
-            <p className="text-[11px] text-slate-600 dark:text-slate-400 mb-4">
-              Another tab or device saved changes to this note while you were editing it. Pick which version to keep — the one you don&apos;t pick will be discarded.
-            </p>
-            <div className="grid grid-cols-2 gap-3 mb-4 text-xs">
-              <div className="border border-blue-500/30 bg-blue-500/5 rounded-lg p-2.5 flex flex-col min-h-0">
-                <div className="font-bold mb-1.5 text-blue-700 dark:text-blue-300 shrink-0">Your version (unsaved)</div>
-                <div
-                  className="prose prose-slate dark:prose-invert prose-xs max-w-none overflow-y-auto max-h-40 text-[11px]"
-                  dangerouslySetInnerHTML={{ __html: editorContent || EMPTY_NOTE_DOC }}
-                />
-              </div>
-              <div className="border border-slate-300 dark:border-slate-700 rounded-lg p-2.5 flex flex-col min-h-0">
-                <div className="font-bold mb-1.5 text-slate-700 dark:text-slate-300 shrink-0">
-                  Their version ({new Date(noteConflict.serverUpdatedAt).toLocaleTimeString()})
-                </div>
-                <div
-                  className="prose prose-slate dark:prose-invert prose-xs max-w-none overflow-y-auto max-h-40 text-[11px]"
-                  dangerouslySetInnerHTML={{ __html: noteConflict.serverContent || EMPTY_NOTE_DOC }}
-                />
-              </div>
-            </div>
-            <div className="flex gap-2">
-              <button
-                onClick={resolveConflictUseTheirs}
-                className="flex-1 bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 rounded-lg py-2 font-bold text-xs cursor-pointer transition-colors"
-              >
-                Use Their Version
-              </button>
-              <button
-                onClick={resolveConflictKeepMine}
-                className="flex-1 bg-blue-600 hover:bg-blue-500 text-white rounded-lg py-2 font-bold text-xs cursor-pointer transition-colors"
-              >
-                Keep My Version
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* Tag Modal */}
       {showTagModal && tagModalItem && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/70 backdrop-blur-sm" onClick={() => { setShowTagModal(false); setTagModalItem(null); setTagInput(''); }}>
@@ -3532,9 +3450,9 @@ export default function StoragePage() {
             <div className="text-[10px] text-slate-600 dark:text-slate-400 mb-3 truncate">{tagModalItem.name}</div>
             <div className="flex flex-wrap gap-1.5 mb-3 min-h-8">
               {(tagModalItem.tags || []).map(t => (
-                <span key={t} className="flex items-center gap-1 bg-blue-500/15 border border-blue-500/30 text-blue-700 dark:text-blue-300 px-2 py-0.5 rounded-full text-[10px] font-semibold">
+                <span key={t} className="flex items-center gap-1 bg-red-500/15 border border-red-500/30 text-red-700 dark:text-red-300 px-2 py-0.5 rounded-full text-[10px] font-semibold">
                   #{t}
-                  <button onClick={() => saveTagsForItem(tagModalItem, (tagModalItem.tags || []).filter(x => x !== t))} className="hover:text-red-700 dark:hover:text-red-300 cursor-pointer"><X className="h-2.5 w-2.5" /></button>
+                  <button onClick={() => saveTagsForItem(tagModalItem, (tagModalItem.tags || []).filter(x => x !== t))} className="hover:text-red-900 dark:hover:text-red-100 cursor-pointer"><X className="h-2.5 w-2.5" /></button>
                 </span>
               ))}
             </div>
@@ -3665,7 +3583,7 @@ export default function StoragePage() {
                       disabled={isUploadingAvatar}
                       className="absolute bottom-0 right-0 h-7 w-7 rounded-full bg-blue-600 hover:bg-blue-500 border-2 border-white dark:border-[#0d1526] flex items-center justify-center cursor-pointer transition-colors disabled:opacity-60 shadow-lg"
                     >
-                      {isUploadingAvatar ? <Loader2 className="h-3.5 w-3.5 text-white animate-spin" /> : <Camera className="h-3.5 w-3.5 text-white" />}
+                      {isUploadingAvatar ? <EmojiSpinner sizeClassName="text-sm" className="text-white" /> : <Camera className="h-3.5 w-3.5 text-white" />}
                     </button>
                   </div>
                   <div className="flex items-center gap-2 text-[10px]">
@@ -3724,7 +3642,7 @@ export default function StoragePage() {
                         disabled={isSavingName}
                         className="px-3.5 py-2 rounded-lg bg-gradient-to-r from-blue-600 to-violet-600 hover:from-blue-500 hover:to-violet-500 text-white font-bold cursor-pointer transition-all disabled:opacity-50 text-xs shrink-0 shadow-md shadow-blue-950/20"
                       >
-                        {isSavingName ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : 'Save'}
+                        {isSavingName ? <EmojiSpinner sizeClassName="text-sm" /> : 'Save'}
                       </button>
                     </div>
                   </div>
@@ -3746,7 +3664,7 @@ export default function StoragePage() {
                         disabled={isSendingOtp}
                         className="w-full flex items-center justify-center gap-1.5 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-white rounded-lg py-2 font-bold cursor-pointer transition-all disabled:opacity-50 text-xs shadow-md shadow-amber-950/20"
                       >
-                        {isSendingOtp ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Mail className="h-3.5 w-3.5" />}
+                        {isSendingOtp ? <EmojiSpinner sizeClassName="text-sm" /> : <Mail className="h-3.5 w-3.5" />}
                         Send Verification Code
                       </button>
                     ) : (
@@ -3798,7 +3716,7 @@ export default function StoragePage() {
                           disabled={isVerifyingOtp}
                           className="w-full bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-white rounded-lg py-2 font-bold cursor-pointer transition-all disabled:opacity-50 text-xs shadow-md shadow-amber-950/20"
                         >
-                          {isVerifyingOtp ? <Loader2 className="h-3.5 w-3.5 animate-spin mx-auto" /> : 'Verify & Update Password'}
+                          {isVerifyingOtp ? <EmojiSpinner sizeClassName="text-sm" className="mx-auto" /> : 'Verify & Update Password'}
                         </button>
                         <button
                           onClick={sendSuperadminPasswordOtp}
@@ -3868,7 +3786,7 @@ export default function StoragePage() {
                       disabled={isChangingPassword}
                       className="w-full bg-gradient-to-r from-blue-600 to-violet-600 hover:from-blue-500 hover:to-violet-500 text-white rounded-lg py-2 font-bold cursor-pointer transition-all disabled:opacity-50 text-xs shadow-md shadow-blue-950/20"
                     >
-                      {isChangingPassword ? <Loader2 className="h-3.5 w-3.5 animate-spin mx-auto" /> : 'Update Password'}
+                      {isChangingPassword ? <EmojiSpinner sizeClassName="text-sm" className="mx-auto" /> : 'Update Password'}
                     </button>
                     <div className="text-[9px] text-slate-400 dark:text-slate-600">Changing your password logs you out of all devices.</div>
                   </div>
@@ -3917,7 +3835,7 @@ export default function StoragePage() {
                 disabled={isDeactivating}
                 className="px-4 py-2 rounded-lg bg-red-600 hover:bg-red-500 text-white font-bold transition-colors cursor-pointer text-xs disabled:opacity-50 flex items-center gap-1.5"
               >
-                {isDeactivating ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : 'Deactivate Account'}
+                {isDeactivating ? <EmojiSpinner sizeClassName="text-sm" /> : 'Deactivate Account'}
               </button>
             </div>
           </div>
@@ -4016,7 +3934,7 @@ export default function StoragePage() {
                 disabled={isLoggingOut}
                 className="p-2 rounded-lg text-red-600 dark:text-red-400 bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 hover:border-red-500/40 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {isLoggingOut ? <Loader2 className="h-4 w-4 animate-spin" /> : <LogOut className="h-4 w-4" />}
+                {isLoggingOut ? <EmojiSpinner sizeClassName="text-base" /> : <LogOut className="h-4 w-4" />}
               </button>
               <div className="pointer-events-none absolute top-full right-0 mt-2 opacity-0 group-hover/logout:opacity-100 transition-all duration-200 scale-95 group-hover/logout:scale-100 z-50">
                 <div className="bg-slate-900/95 dark:bg-slate-950/95 border border-slate-200/10 dark:border-slate-800/40 text-slate-200 dark:text-slate-150 text-[10px] font-semibold px-2.5 py-1.5 rounded-lg shadow-xl backdrop-blur-md whitespace-nowrap">
@@ -4253,7 +4171,7 @@ export default function StoragePage() {
                   disabled={isSavingNote}
                   className="flex items-center gap-1.5 px-3.5 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg font-bold cursor-pointer transition-colors"
                 >
-                  {isSavingNote ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
+                  {isSavingNote ? <EmojiSpinner sizeClassName="text-sm" /> : <Save className="h-3.5 w-3.5" />}
                   Save
                 </button>
                 <button
@@ -4265,104 +4183,21 @@ export default function StoragePage() {
               </div>
             </div>
 
-            {/* TipTap Document Toolbar */}
-            <div className="mx-4 mt-3 px-3 py-1.5 border border-slate-200/80 dark:border-slate-800/80 bg-slate-100/40 dark:bg-black/30 rounded-xl flex flex-wrap items-center gap-1.5 shrink-0 z-10 backdrop-blur-md">
-              <div className="flex gap-1">
-                {[
-                  { icon: Bold, action: () => editor?.chain().focus().toggleBold().run(), isActive: editor?.isActive('bold'), label: 'Bold' },
-                  { icon: Italic, action: () => editor?.chain().focus().toggleItalic().run(), isActive: editor?.isActive('italic'), label: 'Italic' },
-                  { icon: Code, action: () => editor?.chain().focus().toggleCodeBlock().run(), isActive: editor?.isActive('codeBlock'), label: 'Code Block' },
-                ].map((btn, idx) => (
-                  <div key={idx} className="relative group/tooltip">
-                    <button
-                      type="button" onClick={btn.action}
-                      className={cn("p-1.5 rounded-lg transition-all cursor-pointer", btn.isActive ? 'bg-blue-100 dark:bg-blue-900/50 text-blue-600 dark:text-blue-400' : 'text-slate-700 dark:text-slate-300 hover:bg-slate-200/60 dark:hover:bg-slate-800/60')}
-                    >
-                      <btn.icon className="h-3.5 w-3.5" />
-                    </button>
-                    <div className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 opacity-0 group-hover/tooltip:opacity-100 transition-all duration-200 scale-95 group-hover/tooltip:scale-100 z-50">
-                      <div className="bg-slate-900/95 dark:bg-slate-950/95 border border-slate-200/10 dark:border-slate-800/40 text-slate-200 dark:text-slate-100 text-[9px] font-semibold px-2 py-1 rounded-md shadow-xl backdrop-blur-md whitespace-nowrap">{btn.label}</div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-              <div className="h-4 w-[1px] bg-slate-200 dark:bg-slate-800 mx-1" />
-              <div className="flex gap-1">
-                {[
-                  { icon: AlignLeft, action: () => editor?.chain().focus().setTextAlign('left').run(), isActive: editor?.isActive({ textAlign: 'left' }), label: 'Align Left' },
-                  { icon: AlignCenter, action: () => editor?.chain().focus().setTextAlign('center').run(), isActive: editor?.isActive({ textAlign: 'center' }), label: 'Align Center' },
-                  { icon: AlignRight, action: () => editor?.chain().focus().setTextAlign('right').run(), isActive: editor?.isActive({ textAlign: 'right' }), label: 'Align Right' },
-                  { icon: AlignJustify, action: () => editor?.chain().focus().setTextAlign('justify').run(), isActive: editor?.isActive({ textAlign: 'justify' }), label: 'Justify' },
-                ].map((btn, idx) => (
-                  <div key={idx} className="relative group/tooltip">
-                    <button
-                      type="button" onClick={btn.action}
-                      className={cn("p-1.5 rounded-lg transition-all cursor-pointer", btn.isActive ? 'bg-blue-100 dark:bg-blue-900/50 text-blue-600 dark:text-blue-400' : 'text-slate-700 dark:text-slate-300 hover:bg-slate-200/60 dark:hover:bg-slate-800/60')}
-                    >
-                      <btn.icon className="h-3.5 w-3.5" />
-                    </button>
-                    <div className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 opacity-0 group-hover/tooltip:opacity-100 transition-all duration-200 scale-95 group-hover/tooltip:scale-100 z-50">
-                      <div className="bg-slate-900/95 dark:bg-slate-950/95 border border-slate-200/10 dark:border-slate-800/40 text-slate-200 dark:text-slate-100 text-[9px] font-semibold px-2 py-1 rounded-md shadow-xl backdrop-blur-md whitespace-nowrap">{btn.label}</div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-              <div className="h-4 w-[1px] bg-slate-200 dark:bg-slate-800 mx-1" />
-              <div className="flex gap-1">
-                {[
-                  { icon: Heading1, action: () => editor?.chain().focus().toggleHeading({ level: 1 }).run(), isActive: editor?.isActive('heading', { level: 1 }), label: 'H1' },
-                  { icon: Heading2, action: () => editor?.chain().focus().toggleHeading({ level: 2 }).run(), isActive: editor?.isActive('heading', { level: 2 }), label: 'H2' },
-                  { icon: Heading3, action: () => editor?.chain().focus().toggleHeading({ level: 3 }).run(), isActive: editor?.isActive('heading', { level: 3 }), label: 'H3' },
-                  { icon: Heading4, action: () => editor?.chain().focus().toggleHeading({ level: 4 }).run(), isActive: editor?.isActive('heading', { level: 4 }), label: 'H4' },
-                  { icon: Heading5, action: () => editor?.chain().focus().toggleHeading({ level: 5 }).run(), isActive: editor?.isActive('heading', { level: 5 }), label: 'H5' },
-                  { icon: Heading6, action: () => editor?.chain().focus().toggleHeading({ level: 6 }).run(), isActive: editor?.isActive('heading', { level: 6 }), label: 'H6' },
-                  { icon: List, action: () => editor?.chain().focus().toggleBulletList().run(), isActive: editor?.isActive('bulletList'), label: 'Bullet List' },
-                ].map((btn, idx) => (
-                  <div key={idx} className="relative group/tooltip">
-                    <button
-                      type="button" onClick={btn.action}
-                      className={cn("p-1.5 rounded-lg transition-all cursor-pointer", btn.isActive ? 'bg-blue-100 dark:bg-blue-900/50 text-blue-600 dark:text-blue-400' : 'text-slate-700 dark:text-slate-300 hover:bg-slate-200/60 dark:hover:bg-slate-800/60')}
-                    >
-                      <btn.icon className="h-3.5 w-3.5" />
-                    </button>
-                    <div className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 opacity-0 group-hover/tooltip:opacity-100 transition-all duration-200 scale-95 group-hover/tooltip:scale-100 z-50">
-                      <div className="bg-slate-900/95 dark:bg-slate-950/95 border border-slate-200/10 dark:border-slate-800/40 text-slate-200 dark:text-slate-100 text-[9px] font-semibold px-2 py-1 rounded-md shadow-xl backdrop-blur-md whitespace-nowrap">{btn.label}</div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-              <div className="h-4 w-[1px] bg-slate-200 dark:bg-slate-800 mx-1" />
-              <div className="flex items-center gap-2 relative group/tooltip">
-                <input
-                  type="color"
-                  onInput={(e) => editor?.chain().focus().setColor(e.currentTarget.value).run()}
-                  value={editor?.getAttributes('textStyle').color || '#000000'}
-                  className="w-6 h-6 p-0 border-0 rounded cursor-pointer"
-                />
-                <div className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 opacity-0 group-hover/tooltip:opacity-100 transition-all duration-200 scale-95 group-hover/tooltip:scale-100 z-50">
-                  <div className="bg-slate-900/95 dark:bg-slate-950/95 border border-slate-200/10 dark:border-slate-800/40 text-slate-200 dark:text-slate-100 text-[9px] font-semibold px-2 py-1 rounded-md shadow-xl backdrop-blur-md whitespace-nowrap">Text Color</div>
-                </div>
-              </div>
-              <div className="h-4 w-[1px] bg-slate-200 dark:bg-slate-800 mx-1" />
-              <div className="relative group/tooltip">
-                <button
-                  type="button"
-                  onClick={() => editor?.commands.clearContent(true)}
-                  className="p-1.5 rounded-lg text-red-500 hover:bg-red-50/10 hover:text-red-600 transition-all cursor-pointer"
-                >
-                  <Eraser className="h-3.5 w-3.5" />
-                </button>
-                <div className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 opacity-0 group-hover/tooltip:opacity-100 transition-all duration-200 scale-95 group-hover/tooltip:scale-100 z-50">
-                  <div className="bg-slate-900/95 dark:bg-slate-950/95 border border-slate-200/10 dark:border-slate-800/40 text-slate-200 dark:text-slate-100 text-[9px] font-semibold px-2 py-1 rounded-md shadow-xl backdrop-blur-md whitespace-nowrap">Clear Content</div>
-                </div>
-              </div>
-            </div>
-
-            {/* Note Editor Area */}
+            {/* Note Editor Area — plain text, Notepad-style: no formatting toolbar,
+                just a real <textarea> (native multi-line editing, no contenteditable
+                quirks). */}
             <div className="flex-1 flex flex-col p-4 overflow-hidden">
-              <div className="flex-1 w-full bg-slate-100/30 dark:bg-black/25 border border-slate-200/80 dark:border-slate-800/80 rounded-xl p-4 text-slate-850 dark:text-white focus-within:border-blue-500/50 overflow-y-auto min-h-[300px] relative font-sans prose prose-slate dark:prose-invert max-w-none">
-                <EditorContent editor={editor} />
-              </div>
+              <textarea
+                ref={noteTextareaRef}
+                value={editorContent}
+                onChange={(e) => {
+                  setEditorContent(e.target.value);
+                  setEditorCharCount(e.target.value.length);
+                }}
+                placeholder="Start typing..."
+                spellCheck={false}
+                className="flex-1 w-full bg-slate-100/30 dark:bg-black/25 border border-slate-200/80 dark:border-slate-800/80 rounded-xl p-4 text-slate-850 dark:text-white placeholder-slate-400 dark:placeholder-slate-600 outline-none focus:border-blue-500/50 overflow-y-auto min-h-[300px] resize-none font-sans text-sm leading-relaxed"
+              />
               <div className="h-8 flex items-center justify-between text-[10px] text-slate-500 dark:text-slate-500 px-1 pt-2">
                 <div>Character count: <span className="text-slate-700 dark:text-slate-300 font-bold">{editorCharCount}</span></div>
                 <div className="text-slate-400 dark:text-slate-600">Auto-saves every 5 seconds dynamically</div>
@@ -4492,7 +4327,7 @@ export default function StoragePage() {
             <div className="flex-1 overflow-y-auto pr-2">
               {isLoadingEvents ? (
                 <div className="h-64 flex items-center justify-center text-slate-500 dark:text-slate-500 gap-2">
-                  <Loader2 className="h-5 w-5 animate-spin" /> Loading events...
+                  <EmojiSpinner sizeClassName="text-xl" /> Loading events...
                 </div>
               ) : eventsTree.length === 0 ? (
                 <div className="h-64 flex flex-col items-center justify-center text-slate-500 dark:text-slate-500 gap-2 border border-dashed border-slate-200 dark:border-slate-800 rounded-xl bg-slate-100/5 dark:bg-slate-900/5">
@@ -4605,7 +4440,7 @@ export default function StoragePage() {
             <div className="flex-1 overflow-y-auto">
               {isLoadingAdminUsers ? (
                 <div className="h-64 flex items-center justify-center text-slate-500 dark:text-slate-500 gap-2">
-                  <Loader2 className="h-5 w-5 animate-spin" /> Loading users...
+                  <EmojiSpinner sizeClassName="text-xl" /> Loading users...
                 </div>
               ) : (
                 <div className="border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden bg-slate-100/5 dark:bg-slate-900/5">
@@ -5156,7 +4991,7 @@ export default function StoragePage() {
             <div className="flex-1 p-4 overflow-y-auto">
               {isLoadingItems ? (
                 <div className="h-64 flex items-center justify-center text-slate-600 dark:text-slate-400 font-mono text-xs">
-                  <Loader2 className="animate-spin h-5 w-5 mr-2 text-blue-500" />
+                  <EmojiSpinner sizeClassName="text-xl" className="mr-2 text-blue-500" />
                   Loading...
                 </div>
               ) : items.length === 0 ? (
@@ -5285,7 +5120,7 @@ export default function StoragePage() {
                                   disabled={shareLoadingId === item.id}
                                   className="p-1 rounded bg-slate-100 dark:bg-slate-900 text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-slate-100 cursor-pointer disabled:opacity-50"
                                 >
-                                  {shareLoadingId === item.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <Share2 className="h-3 w-3" />}
+                                  {shareLoadingId === item.id ? <EmojiSpinner sizeClassName="text-xs" /> : <Share2 className="h-3 w-3" />}
                                 </button>
                                 <div className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 opacity-0 group-hover/share:opacity-100 transition-all duration-200 scale-95 group-hover/share:scale-100 z-50">
                                   <div className="bg-slate-900/95 dark:bg-slate-950/95 border border-slate-200/10 dark:border-slate-800/40 text-slate-200 dark:text-slate-100 text-[9px] font-semibold px-2 py-1 rounded-md shadow-xl backdrop-blur-md whitespace-nowrap">Share (10 min link)</div>
@@ -5358,7 +5193,7 @@ export default function StoragePage() {
                         {item.tags && item.tags.length > 0 && (
                           <div className="flex flex-wrap gap-1 mt-1.5">
                             {item.tags.slice(0, 3).map(t => (
-                              <span key={t} className="text-[8px] font-bold text-blue-700 dark:text-blue-300 bg-blue-500/10 border border-blue-500/20 rounded-full px-1.5 py-0.5">#{t}</span>
+                              <span key={t} className="text-[8px] font-bold text-red-700 dark:text-red-300 bg-red-500/10 border border-red-500/20 rounded-full px-1.5 py-0.5">#{t}</span>
                             ))}
                             {item.tags.length > 3 && <span className="text-[8px] text-slate-400 dark:text-slate-600">+{item.tags.length - 3}</span>}
                           </div>
@@ -5451,7 +5286,7 @@ export default function StoragePage() {
                             {item.tags && item.tags.length > 0 && (
                               <div className="flex flex-wrap gap-1 mt-1 pl-6">
                                 {item.tags.map(t => (
-                                  <span key={t} className="text-[8px] font-bold text-blue-700 dark:text-blue-300 bg-blue-500/10 border border-blue-500/20 rounded-full px-1.5 py-0.5">#{t}</span>
+                                  <span key={t} className="text-[8px] font-bold text-red-700 dark:text-red-300 bg-red-500/10 border border-red-500/20 rounded-full px-1.5 py-0.5">#{t}</span>
                                 ))}
                               </div>
                             )}
@@ -5500,7 +5335,7 @@ export default function StoragePage() {
                                     disabled={shareLoadingId === item.id}
                                     className="p-1.5 rounded bg-slate-200 dark:bg-slate-800 hover:bg-slate-350 text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-slate-105 cursor-pointer disabled:opacity-50"
                                   >
-                                    {shareLoadingId === item.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Share2 className="h-3.5 w-3.5" />}
+                                    {shareLoadingId === item.id ? <EmojiSpinner sizeClassName="text-sm" /> : <Share2 className="h-3.5 w-3.5" />}
                                   </button>
                                   <div className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 opacity-0 group-hover/share:opacity-100 transition-all duration-200 scale-95 group-hover/share:scale-100 z-50">
                                     <div className="bg-slate-900/95 dark:bg-slate-950/95 border border-slate-200/10 dark:border-slate-800/40 text-slate-200 dark:text-slate-100 text-[9px] font-semibold px-2 py-1 rounded-md shadow-xl backdrop-blur-md whitespace-nowrap">Share (10 min link)</div>
@@ -5874,7 +5709,7 @@ export default function StoragePage() {
                 disabled={isAdminChangingPassword || calculatePasswordStrength(adminChangePasswordNew) < 100}
                 className="w-full bg-blue-600 hover:bg-blue-500 text-white rounded-lg py-2.5 font-bold cursor-pointer transition-colors disabled:opacity-50 text-xs mt-2 flex items-center justify-center gap-2"
               >
-                {isAdminChangingPassword && <Loader2 className="h-3 w-3 animate-spin" />}
+                {isAdminChangingPassword && <EmojiSpinner sizeClassName="text-xs" />}
                 Change Password
               </button>
             </div>

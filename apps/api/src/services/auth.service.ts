@@ -10,7 +10,7 @@ import {
 import { logger } from '../utils/logger';
 import { ACTIVITY_ACTIONS, ROLES } from '../constants/activityActions';
 import { ACCESS_TOKEN_TTL_SECONDS, REFRESH_TOKEN_TTL_MS, WEB_APP_ORIGIN, PASSWORD_RESET_TOKEN_TTL_MINUTES } from '../config/constants';
-import { hashPassword, verifyPassword } from './password.service';
+import { hashPassword, verifyPassword, needsRehash } from './password.service';
 import { HttpStatus } from '../utils/httpStatus';
 import {
   generateAccessToken,
@@ -55,13 +55,14 @@ export async function issueSession(user: { id: string; email: string }) {
   const expiresAt = new Date(Date.now() + REFRESH_TOKEN_TTL_MS);
   const tokenHash = hashToken(refreshToken);
 
-  await transaction(async (trx) => {
-    await trx.addData(TABLES.REFRESH_TOKENS, {
-      user_id: user.id,
-      token_hash: tokenHash,
-      expires_at: expiresAt,
-      revoked: false,
-    });
+  // A single INSERT is already atomic on its own — wrapping it in transaction()
+  // (BEGIN/COMMIT + a dedicated pool.connect()) was pure overhead on the login
+  // critical path for no added safety.
+  await commonDao.addData(TABLES.REFRESH_TOKENS, {
+    user_id: user.id,
+    token_hash: tokenHash,
+    expires_at: expiresAt,
+    revoked: false,
   });
 
   return { accessToken, refreshToken };
@@ -90,6 +91,16 @@ export async function login(identifier: string, password: string) {
   if (!isMatch) {
     logger.warn('Authentication failure: Incorrect password', { identifier });
     throw new AppError(HttpStatus.UNAUTHORIZED, 'Invalid credentials', 'INVALID_CREDENTIALS');
+  }
+
+  // This account's hash was computed at an old BCRYPT_SALT_ROUNDS value — move it onto
+  // the current one so every login after this one verifies at today's (faster) cost
+  // instead of paying the old cost forever. Fire-and-forget: doesn't block this login,
+  // and re-hashing needs the plaintext password, which only exists during this request.
+  if (needsRehash(user.password_hash)) {
+    hashPassword(password)
+      .then((newHash) => commonDao.updateData(TABLES.USERS, { password_hash: newHash }, { id: user.id }))
+      .catch((err: any) => logger.error('Failed to rehash password on login', { userId: user.id, error: err.message }));
   }
 
   const { accessToken, refreshToken } = await issueSession(user);
@@ -311,15 +322,23 @@ export async function refreshSession(refreshToken: string) {
 }
 
 export async function logout(user: { id: string; accessTokenId: string }) {
+  // Must read the session BEFORE revoking it — revokeSession deletes it, so fetching
+  // it afterward (as this used to) always returned null and silently skipped revoking
+  // the refresh token, leaving it usable until its natural 7-day expiry even after
+  // "logging out".
+  const session = await getSession(user.accessTokenId);
   await revokeSession(user.accessTokenId);
 
-  const session = await getSession(user.accessTokenId);
   if (session) {
     const tokenHash = hashToken(session.refreshToken);
     await commonDao.updateData('refresh_tokens', { revoked: true }, { token_hash: tokenHash });
   }
 
-  await commonDao.addData(TABLES.ACTIVITY_LOGS, { user_id: user.id, action: ACTIVITY_ACTIONS.LOGOUT, resource: 'auth' });
+  // Audit log only — not needed to answer this request, so it shouldn't add a DB
+  // round-trip to the critical path (same reasoning as login()).
+  commonDao.addData(TABLES.ACTIVITY_LOGS, { user_id: user.id, action: ACTIVITY_ACTIONS.LOGOUT, resource: 'auth' }).catch((err: any) => {
+    logger.error('Failed to record logout activity log', { userId: user.id, error: err.message });
+  });
 
   logger.info('User logged out successfully from current session', { userId: user.id });
 }
