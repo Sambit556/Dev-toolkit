@@ -25,6 +25,9 @@ import {
   RotateCw,
   RotateCcw,
   Save,
+  Bold,
+  Highlighter,
+  Eraser,
   CheckCircle,
   AlertTriangle,
   HardDrive,
@@ -68,6 +71,9 @@ import {
   ZoomIn,
   ZoomOut,
 } from 'lucide-react';
+import { useEditor, EditorContent } from '@tiptap/react';
+import StarterKit from '@tiptap/starter-kit';
+import Highlight from '@tiptap/extension-highlight';
 import dynamic from 'next/dynamic';
 
 // Excalidraw ships its own stylesheet separately from the JS bundle (required
@@ -260,20 +266,11 @@ function groupUsageCategories(categories: UsageCategory[], isDark: boolean) {
     .filter(g => g.bytes > 0);
 }
 
-// Text notes used to be edited as rich text (TipTap-generated HTML) — the editor is
-// now a plain Notepad-style textarea, but notes saved before that switch may still
-// have markup in them. Strip it on load so old notes show clean text instead of tags.
-function stripLegacyHtml(text: string): string {
-  if (!text.includes('<')) return text;
-  return text
-    .replace(/<[^>]*>/g, '')
-    .replace(/&nbsp;/g, ' ')
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&quot;/g, '"')
-    .replace(/&#x27;/g, "'")
-    .replace(/&amp;/g, '&');
-}
+// ProseMirror's schema requires the doc to always contain at least one block node —
+// feeding editor.commands.setContent() a bare '' (rather than an empty paragraph)
+// produces a doc with no valid block for the cursor to land in, which is what a
+// freshly created (empty-content) note hit before this was added.
+const EMPTY_NOTE_DOC = '<p></p>';
 
 // A miniature, animated version of the app's own logo mark (the gradient rounded
 // square from SplashScreen.tsx) used as the loading indicator across this page: it
@@ -482,6 +479,10 @@ export default function StoragePage() {
   const [editorCharCount, setEditorCharCount] = useState(0);
   const [editorVersionTime, setEditorVersionTime] = useState('');
   const [isSavingNote, setIsSavingNote] = useState(false);
+  // True from the moment a note is being created/fetched until its editor is actually
+  // ready to show — drives a loading panel for that gap (previously just a small toast,
+  // easy to miss) instead of leaving the screen looking like nothing is happening.
+  const [isOpeningNote, setIsOpeningNote] = useState(false);
   // The note's `updated_at` as last confirmed with the server (on load, or after a
   // successful save) — sent back as `expectedUpdatedAt` on every save so the server can
   // tell whether another tab/device saved this same note in between. Handled the way
@@ -489,7 +490,56 @@ export default function StoragePage() {
   // the NOTE_CONFLICT branch in saveNoteContent below.
   const [editorBaseVersion, setEditorBaseVersion] = useState<string | null>(null);
   const autoSaveTimer = useRef<ReturnType<typeof setInterval> | null>(null);
-  const noteTextareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const editor = useEditor({
+    immediatelyRender: false,
+    extensions: [
+      // Trimmed to just what a Notepad-plus-formatting editor needs — StarterKit's
+      // heading/list/quote/code-block/rule nodes and italic/strike marks are switched
+      // off rather than reached for, keeping the schema (and its failure surface)
+      // small. Bold is the only mark request #1 asked for besides highlighting.
+      StarterKit.configure({
+        heading: false,
+        bulletList: false,
+        orderedList: false,
+        listItem: false,
+        blockquote: false,
+        codeBlock: false,
+        horizontalRule: false,
+        italic: false,
+        strike: false,
+        code: false,
+        dropcursor: false,
+        gapcursor: false,
+      }),
+      // multicolor lets toggleHighlight({ color }) apply an arbitrary background
+      // color rather than one fixed shade — that's the "colour highlight" ask.
+      Highlight.configure({ multicolor: true }),
+    ],
+    content: editorContent || EMPTY_NOTE_DOC,
+    // `outline-none` goes directly on the contenteditable surface via editorProps
+    // (not just a wrapper div) — the previous editor never set this, so selecting
+    // text triggered the browser's default focus ring, which read as a stray white
+    // border around the box. No `prose` typography plugin this time either (it was
+    // never actually needed for bold+highlight and added more CSS to fight with);
+    // paragraph spacing is handled directly below instead.
+    editorProps: {
+      attributes: {
+        class: 'outline-none focus:outline-none min-h-full whitespace-pre-wrap break-words [&_p]:mb-3 [&_p:last-child]:mb-0',
+      },
+    },
+    onUpdate: ({ editor }) => {
+      setEditorContent(editor.getHTML());
+      setEditorCharCount(editor.getText().length);
+    },
+  });
+
+  useEffect(() => {
+    if (editorNote && editor) {
+      if (editor.getHTML() !== editorContent) {
+        editor.commands.setContent(editorContent || EMPTY_NOTE_DOC);
+      }
+    }
+  }, [editorNote, editor]);
 
   // Custom confirmation modal state
   const [confirmModal, setConfirmModal] = useState<{
@@ -565,13 +615,28 @@ export default function StoragePage() {
     () => usageData ? groupUsageCategories(usageData.categories, isDarkMode) : [],
     [usageData, isDarkMode]
   );
-  // Excalidraw's own toolbar/icons are a fixed size regardless of screen — this scales the
-  // whole widget's UI down via CSS zoom (not transform, which would misalign click/draw
-  // coordinates from what's visually shown). Persisted so it's a one-time setup per browser.
+  // Excalidraw's own toolbar/icons are a fixed size regardless of screen — this CAN scale
+  // the whole widget's UI down via CSS zoom (not transform, which would misalign click/draw
+  // coordinates from what's visually shown) for people who want a smaller toolbar. Defaults
+  // to 1 (native, unscaled) rather than 0.8 — CSS `zoom` isn't supported at all on pre-126
+  // Firefox (it silently no-ops there while the width/height compensation below still
+  // applies, leaving the canvas 25% oversized and clipped by this panel's overflow-hidden),
+  // and even where it is supported, a canvas-based drawing surface reading its own
+  // getBoundingClientRect()/devicePixelRatio under a non-1 ancestor zoom is exactly the kind
+  // of thing that produces "element won't drag" / "handle didn't render" symptoms. Scaling
+  // down is now opt-in via the zoom controls instead of on-by-default for every user.
   const [diagramUiScale, setDiagramUiScale] = useState(() => {
-    if (typeof window === 'undefined') return 0.8;
+    if (typeof window === 'undefined') return 1;
+    // One-time migration: anyone who already has a stored value from before this fix got
+    // it from the old unconditional 0.8 default, not a deliberate choice — reset it back to
+    // native once so the fix actually takes effect for existing browsers, not just new ones.
+    if (localStorage.getItem('storage_diagram_ui_scale_migrated_v2') !== 'true') {
+      localStorage.setItem('storage_diagram_ui_scale_migrated_v2', 'true');
+      localStorage.setItem('storage_diagram_ui_scale', '1');
+      return 1;
+    }
     const stored = parseFloat(localStorage.getItem('storage_diagram_ui_scale') || '');
-    return Number.isFinite(stored) && stored >= 0.5 && stored <= 1 ? stored : 0.8;
+    return Number.isFinite(stored) && stored >= 0.5 && stored <= 1 ? stored : 1;
   });
   const adjustDiagramUiScale = (delta: number) => {
     setDiagramUiScale((prev) => {
@@ -614,7 +679,12 @@ export default function StoragePage() {
             }
           }
           setEditorDiagramId(diagram.id);
-          setIsDiagramEditing(false);
+          // Opening a diagram used to drop it into Excalidraw's read-only viewModeEnabled
+          // (requiring an extra click on "Edit" before anything could be dragged) — in a
+          // private single-owner vault that's just friction, and is almost certainly what
+          // read as "some diagrams aren't moving" (freshly-drawn ones work immediately;
+          // reopened ones silently didn't until that button was found and clicked).
+          setIsDiagramEditing(true);
           setDiagramName(diagram.name.replace('.excalidraw', ''));
           setSidebarTab('diagrams');
           toast.dismiss('diagram-load');
@@ -1898,6 +1968,11 @@ export default function StoragePage() {
     }
 
     setShowNewNoteModal(false);
+    // Covers the whole create-then-open sequence below, not just the final fetch inside
+    // openNoteEditor — previously the only feedback for this entire gap was a small toast,
+    // easy to miss, which read as "nothing is happening" between closing the modal and the
+    // editor actually appearing.
+    setIsOpeningNote(true);
 
     try {
       const res = await apiFetch(`${API_BASE}/api/storage/text`, {
@@ -1915,29 +1990,29 @@ export default function StoragePage() {
         toast.success('Note created');
         loadStorageItems();
         // Automatically open the editor
-        openNoteEditor(json.data);
+        await openNoteEditor(json.data);
       } else {
         toast.error(json.message);
+        setIsOpeningNote(false);
       }
     } catch (err) {
       toast.error('Failed to create note');
+      setIsOpeningNote(false);
     }
   };
 
   // Note editor control
   const openNoteEditor = async (note: StorageItem) => {
+    setIsOpeningNote(true);
     try {
-      toast.loading('Fetching note content...', { id: 'note-load' });
       const res = await apiFetch(`${API_BASE}/api/storage/text/${note.id}`, {
         headers: getHeaders(),
       });
       const json = await res.json();
 
       if (json.success) {
-        // We now get the content directly from the backend. Notes created before the
-        // editor switched to plain text may still have TipTap-generated HTML saved —
-        // strip it so old notes don't show raw markup.
-        const text = stripLegacyHtml(json.data.content || '');
+        // We now get the content directly from the backend
+        const text = json.data.content || '';
         // Use the freshly-fetched row (not the possibly-stale list item passed in) so
         // the concurrency check below starts from the real current version.
         const freshItem = json.data.item || note;
@@ -1945,15 +2020,17 @@ export default function StoragePage() {
         setEditorNote(freshItem);
         setEditorTitle(freshItem.name);
         setEditorContent(text);
-        setEditorCharCount(text.length);
+        setEditorCharCount(text.replace(/<[^>]*>/g, '').length);
         setEditorBaseVersion(freshItem.updated_at);
         setEditorVersionTime(new Date(freshItem.updated_at).toLocaleString());
-        toast.dismiss('note-load');
+        editor?.commands.setContent(text || EMPTY_NOTE_DOC);
       } else {
-        toast.error(json.message, { id: 'note-load' });
+        toast.error(json.message);
       }
     } catch (e) {
-      toast.error('Could not fetch note content', { id: 'note-load' });
+      toast.error('Could not fetch note content');
+    } finally {
+      setIsOpeningNote(false);
     }
   };
 
@@ -4147,7 +4224,13 @@ export default function StoragePage() {
         </aside>
 
         {/* Note Editor Workspace overlay */}
-        {editorNote ? (
+        {isOpeningNote && !editorNote ? (
+          <main key="note-opening" className="flex-1 flex flex-col items-center justify-center gap-3 bg-slate-50/60 dark:bg-black/45 backdrop-blur-md overflow-hidden relative animate-scale-in">
+            {renderDiagnosticBar()}
+            <LogoSpinner size={40} />
+            <div className="text-xs font-bold text-slate-600 dark:text-slate-400">Opening note...</div>
+          </main>
+        ) : editorNote ? (
           <main key="note-editor" className="flex-1 flex flex-col bg-slate-50/60 dark:bg-black/45 backdrop-blur-md overflow-hidden relative animate-scale-in">
             {renderDiagnosticBar()}
             <div className="h-14 border-b border-slate-200/80 dark:border-slate-800/80 px-4 flex items-center justify-between shrink-0 bg-slate-100/30 dark:bg-slate-900/30">
@@ -4187,21 +4270,60 @@ export default function StoragePage() {
               </div>
             </div>
 
-            {/* Note Editor Area — plain text, Notepad-style: no formatting toolbar,
-                just a real <textarea> (native multi-line editing, no contenteditable
-                quirks). */}
-            <div className="flex-1 flex flex-col p-4 overflow-hidden">
-              <textarea
-                ref={noteTextareaRef}
-                value={editorContent}
-                onChange={(e) => {
-                  setEditorContent(e.target.value);
-                  setEditorCharCount(e.target.value.length);
-                }}
-                placeholder="Start typing..."
-                spellCheck={false}
-                className="flex-1 w-full bg-slate-100/30 dark:bg-black/25 border border-slate-200/80 dark:border-slate-800/80 rounded-xl p-4 text-slate-850 dark:text-white placeholder-slate-400 dark:placeholder-slate-600 outline-none focus:border-blue-500/50 overflow-y-auto min-h-[300px] resize-none font-sans text-sm leading-relaxed"
-              />
+            {/* Note Editor Toolbar — just Bold + a highlight color, not a full
+                rich-text suite (request #1 asked for "notepad, but with bold and
+                colour highlight" specifically). */}
+            <div className="mx-4 mt-3 px-3 py-1.5 border border-slate-200/80 dark:border-slate-800/80 bg-slate-100/40 dark:bg-black/30 rounded-xl flex flex-wrap items-center gap-2 shrink-0 z-10 backdrop-blur-md">
+              <button
+                type="button"
+                onClick={() => editor?.chain().focus().toggleBold().run()}
+                title="Bold"
+                className={cn("p-1.5 rounded-lg transition-all cursor-pointer", editor?.isActive('bold') ? 'bg-blue-100 dark:bg-blue-900/50 text-blue-600 dark:text-blue-400' : 'text-slate-700 dark:text-slate-300 hover:bg-slate-200/60 dark:hover:bg-slate-800/60')}
+              >
+                <Bold className="h-3.5 w-3.5" />
+              </button>
+              <div className="h-4 w-[1px] bg-slate-200 dark:bg-slate-800" />
+              <Highlighter className="h-3.5 w-3.5 text-slate-500 dark:text-slate-400" />
+              <div className="flex items-center gap-1.5">
+                {['#fef08a', '#bbf7d0', '#fbcfe8', '#bfdbfe'].map((color) => (
+                  <button
+                    key={color}
+                    type="button"
+                    title="Highlight"
+                    onClick={() => editor?.chain().focus().toggleHighlight({ color }).run()}
+                    style={{ backgroundColor: color }}
+                    className={cn(
+                      "h-5 w-5 rounded-full border transition-transform cursor-pointer hover:scale-110",
+                      editor?.isActive('highlight', { color }) ? 'border-slate-900 dark:border-white scale-110' : 'border-slate-300 dark:border-slate-700'
+                    )}
+                  />
+                ))}
+                <label
+                  title="Custom highlight color"
+                  className="relative h-5 w-5 rounded-full border border-slate-300 dark:border-slate-700 cursor-pointer overflow-hidden hover:scale-110 transition-transform bg-[conic-gradient(from_0deg,red,yellow,lime,cyan,blue,magenta,red)]"
+                >
+                  <input
+                    type="color"
+                    onInput={(e) => editor?.chain().focus().toggleHighlight({ color: e.currentTarget.value }).run()}
+                    className="absolute -inset-1 cursor-pointer opacity-0"
+                  />
+                </label>
+                <button
+                  type="button"
+                  title="Remove highlight"
+                  onClick={() => editor?.chain().focus().unsetHighlight().run()}
+                  className="p-1 rounded-lg text-slate-500 dark:text-slate-400 hover:text-red-500 hover:bg-red-50/10 transition-all cursor-pointer"
+                >
+                  <Eraser className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            </div>
+
+            {/* Note Editor Area */}
+            <div className="flex-1 min-h-0 flex flex-col p-4 overflow-hidden">
+              <div className="flex-1 min-h-0 w-full bg-slate-100/30 dark:bg-black/25 border border-slate-200/80 dark:border-slate-800/80 rounded-xl p-4 text-slate-850 dark:text-white focus-within:border-blue-500/50 overflow-y-auto relative font-sans text-sm leading-relaxed">
+                <EditorContent editor={editor} className="h-full" />
+              </div>
               <div className="h-8 flex items-center justify-between text-[10px] text-slate-500 dark:text-slate-500 px-1 pt-2">
                 <div>Character count: <span className="text-slate-700 dark:text-slate-300 font-bold">{editorCharCount}</span></div>
                 <div className="text-slate-400 dark:text-slate-600">Auto-saves every 5 seconds dynamically</div>
