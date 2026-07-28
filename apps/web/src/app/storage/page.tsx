@@ -3161,7 +3161,7 @@ export default function StoragePage() {
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <label className="text-[10px] text-slate-800 dark:text-slate-200 uppercase tracking-widest font-black">Mobile Number (Optional)</label>
+                  <label className="text-[10px] text-slate-800 dark:text-slate-200 uppercase tracking-widest font-black">Mobile Number</label>
                   <input
                     type="text"
                     className="w-full rounded-xl bg-slate-50/70 dark:bg-slate-950/70 border border-slate-200 dark:border-slate-800 px-3.5 py-3 text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-600 focus:outline-none focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/25 transition-all text-xs"
@@ -5248,22 +5248,35 @@ export default function StoragePage() {
             )}
 
             {/* Bulk selection action bar */}
-            {selectedItems.size > 0 && (
+            {isSelecting && (
               <div className="h-11 border-b border-blue-500/20 bg-blue-500/5 px-4 flex items-center justify-between shrink-0">
                 <span className="text-xs font-bold text-blue-700 dark:text-blue-300">{selectedItems.size} selected</span>
                 <div className="flex items-center gap-2">
                   <button
-                    onClick={() => { setMoveTargetItems(Array.from(selectedItems)); fetchAllFolders(); setShowMoveModal(true); }}
+                    onClick={() => setSelectedItems(
+                      items.length > 0 && items.every(i => selectedItems.has(i.id)) ? new Set() : new Set(items.map(i => i.id))
+                    )}
                     className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-slate-200/80 dark:bg-slate-800/80 hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-800 dark:text-slate-200 text-xs font-bold cursor-pointer"
                   >
-                    <FolderTree className="h-3.5 w-3.5" /> Move
+                    <CheckSquare className="h-3.5 w-3.5" />
+                    {items.length > 0 && items.every(i => selectedItems.has(i.id)) ? 'Deselect All' : 'Select All'}
                   </button>
-                  <button
-                    onClick={handleTriggerBulkDelete}
-                    className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-600 dark:text-red-400 text-xs font-bold cursor-pointer"
-                  >
-                    <Trash2 className="h-3.5 w-3.5" /> {sidebarTab === 'trash' ? 'Delete permanently' : 'Move to trash'}
-                  </button>
+                  {selectedItems.size > 0 && (
+                    <>
+                      <button
+                        onClick={() => { setMoveTargetItems(Array.from(selectedItems)); fetchAllFolders(); setShowMoveModal(true); }}
+                        className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-slate-200/80 dark:bg-slate-800/80 hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-800 dark:text-slate-200 text-xs font-bold cursor-pointer"
+                      >
+                        <FolderTree className="h-3.5 w-3.5" /> Move
+                      </button>
+                      <button
+                        onClick={handleTriggerBulkDelete}
+                        className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-600 dark:text-red-400 text-xs font-bold cursor-pointer"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" /> {sidebarTab === 'trash' ? 'Delete permanently' : 'Move to trash'}
+                      </button>
+                    </>
+                  )}
                   <button
                     onClick={() => { setSelectedItems(new Set()); setIsSelecting(false); }}
                     className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-slate-100/60 dark:bg-slate-900/60 hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-400 text-xs font-bold cursor-pointer"
