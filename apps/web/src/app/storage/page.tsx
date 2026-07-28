@@ -15,6 +15,7 @@ import {
   Search,
   Grid,
   List,
+  Circle,
   ChevronRight,
   ChevronDown,
   ArrowUpDown,
@@ -74,6 +75,8 @@ import {
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import Highlight from '@tiptap/extension-highlight';
+import BulletList from '@tiptap/extension-bullet-list';
+import TiptapImage from '@tiptap/extension-image';
 import dynamic from 'next/dynamic';
 
 // Excalidraw ships its own stylesheet separately from the JS bundle (required
@@ -271,6 +274,35 @@ function groupUsageCategories(categories: UsageCategory[], isDark: boolean) {
 // produces a doc with no valid block for the cursor to land in, which is what a
 // freshly created (empty-content) note hit before this was added.
 const EMPTY_NOTE_DOC = '<p></p>';
+
+// Adds a `listStyleType` attribute to bullet lists so the note editor's toolbar can
+// switch between marker styles (bullet / square / dark circle) instead of being stuck
+// with the browser's one default <ul> marker.
+const NOTE_BULLET_KEYWORDS = ['disc', 'square', 'circle', 'none'];
+const NoteBulletList = BulletList.extend({
+  addAttributes() {
+    return {
+      ...this.parent?.(),
+      listStyleType: {
+        default: 'disc',
+        parseHTML: (element: HTMLElement) => {
+          const raw = element.style.listStyleType || 'disc';
+          // A custom marker string round-trips through the CSSOM with its quotes
+          // still attached (e.g. `"● "`) — strip them back to the plain text we
+          // compare against in setNoteBulletStyle/isActive checks.
+          return raw.replace(/^"(.*)"$/, '$1');
+        },
+        renderHTML: (attributes: { listStyleType?: string }) => {
+          const value = attributes.listStyleType || 'disc';
+          // disc/square/circle/none are CSS keywords (no quotes); anything else (our
+          // "dark circle" marker) is a custom-ident <string> and must be quoted.
+          const cssValue = NOTE_BULLET_KEYWORDS.includes(value) ? value : `"${value}"`;
+          return { style: `list-style-type: ${cssValue}` };
+        },
+      },
+    };
+  },
+});
 
 // A miniature, animated version of the app's own logo mark (the gradient rounded
 // square from SplashScreen.tsx) used as the loading indicator across this page: it
@@ -499,9 +531,10 @@ export default function StoragePage() {
       // small. Bold is the only mark request #1 asked for besides highlighting.
       StarterKit.configure({
         heading: false,
+        // Replaced by NoteBulletList below (adds the marker-style attribute) — listItem
+        // stays on since bullet lists are built out of listItem nodes.
         bulletList: false,
         orderedList: false,
-        listItem: false,
         blockquote: false,
         codeBlock: false,
         horizontalRule: false,
@@ -511,9 +544,11 @@ export default function StoragePage() {
         dropcursor: false,
         gapcursor: false,
       }),
+      NoteBulletList,
       // multicolor lets toggleHighlight({ color }) apply an arbitrary background
       // color rather than one fixed shade — that's the "colour highlight" ask.
       Highlight.configure({ multicolor: true }),
+      TiptapImage.configure({ HTMLAttributes: { class: 'rounded-lg my-2 max-w-full' } }),
     ],
     content: editorContent || EMPTY_NOTE_DOC,
     // `outline-none` goes directly on the contenteditable surface via editorProps
@@ -524,7 +559,11 @@ export default function StoragePage() {
     // paragraph spacing is handled directly below instead.
     editorProps: {
       attributes: {
-        class: 'outline-none focus:outline-none min-h-full whitespace-pre-wrap break-words [&_p]:mb-3 [&_p:last-child]:mb-0',
+        // Tailwind's preflight zeroes out <ul>/<li> margin+padding and sets
+        // list-style: none globally — without restoring those here (no `prose` plugin
+        // this time, see above) every bullet list would render with no marker and no
+        // indentation at all, regardless of the listStyleType NoteBulletList sets.
+        class: 'outline-none focus:outline-none min-h-full whitespace-pre-wrap break-words [&_p]:mb-3 [&_p:last-child]:mb-0 [&_ul]:list-outside [&_ul]:pl-5 [&_ul]:mb-3 [&_li]:mb-1 [&_img]:max-w-full',
       },
     },
     onUpdate: ({ editor }) => {
@@ -540,6 +579,57 @@ export default function StoragePage() {
       }
     }
   }, [editorNote, editor]);
+
+  // Cycles the current list through: off -> this style -> off again if it's already
+  // this style, or just switches the marker if a bullet list with a *different* style
+  // is already active — so the three buttons act like one 3-way toggle, not three
+  // independent lists.
+  const setNoteBulletStyle = (listStyleType: 'disc' | 'square' | '● ') => {
+    if (!editor) return;
+    if (editor.isActive('bulletList', { listStyleType })) {
+      editor.chain().focus().toggleBulletList().run();
+    } else if (editor.isActive('bulletList')) {
+      editor.chain().focus().updateAttributes('bulletList', { listStyleType }).run();
+    } else {
+      editor.chain().focus().toggleBulletList().updateAttributes('bulletList', { listStyleType }).run();
+    }
+  };
+
+  // Insert-a-diagram-into-a-note state: a scratch Excalidraw instance separate from the
+  // Secure Diagrams tab's own one, opened in a modal over the note editor. "Insert" flattens
+  // whatever's drawn to a PNG and drops it into the note at the cursor — the note itself
+  // stays plain HTML/text (no live, re-editable diagram embed), which is the difference
+  // between "draw a diagram to put in this note" and the standalone diagram vault feature.
+  const [showNoteDiagramModal, setShowNoteDiagramModal] = useState(false);
+  const [noteDiagramApi, setNoteDiagramApi] = useState<any>(null);
+  const insertNoteDiagram = async () => {
+    if (!noteDiagramApi || !editor) return;
+    const elements = noteDiagramApi.getSceneElements();
+    if (!elements.length) {
+      toast.error('Draw something first');
+      return;
+    }
+    try {
+      const { exportToBlob } = await import('@excalidraw/excalidraw');
+      const blob = await exportToBlob({
+        elements,
+        appState: noteDiagramApi.getAppState(),
+        files: noteDiagramApi.getFiles(),
+        mimeType: 'image/png',
+      });
+      const dataUrl: string = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = reject;
+        reader.readAsDataURL(blob);
+      });
+      editor.chain().focus().setImage({ src: dataUrl, alt: 'Diagram' }).run();
+      setShowNoteDiagramModal(false);
+      noteDiagramApi.resetScene();
+    } catch (err) {
+      toast.error('Failed to insert diagram');
+    }
+  };
 
   // Custom confirmation modal state
   const [confirmModal, setConfirmModal] = useState<{
@@ -3520,6 +3610,45 @@ export default function StoragePage() {
         </div>
       )}
 
+      {/* Insert Diagram Modal — a scratch Excalidraw canvas for sketching something to
+          flatten into a PNG and drop into the note at the cursor (see insertNoteDiagram).
+          Unmounting Excalidraw on close is what gives the next open a blank canvas —
+          no manual reset needed for that. */}
+      {showNoteDiagramModal && (
+        <div className="fixed inset-0 z-[250] flex items-center justify-center bg-black/70 backdrop-blur-sm p-6">
+          <div className="bg-white dark:bg-[#0d1526] border border-slate-300/60 dark:border-slate-700/60 rounded-2xl shadow-2xl w-full max-w-4xl h-[80vh] flex flex-col overflow-hidden">
+            <div className="h-12 border-b border-slate-200 dark:border-slate-800 px-4 flex items-center justify-between shrink-0">
+              <h3 className="font-bold text-sm text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
+                <Palette className="h-4 w-4 text-indigo-500" /> Draw a diagram
+              </h3>
+              <button
+                onClick={() => setShowNoteDiagramModal(false)}
+                className="text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 cursor-pointer"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <div className="flex-1 min-h-0">
+              <Excalidraw excalidrawAPI={(api: any) => setNoteDiagramApi(api)} theme={isDarkMode ? 'dark' : 'light'} />
+            </div>
+            <div className="h-14 border-t border-slate-200 dark:border-slate-800 px-4 flex items-center justify-end gap-2 shrink-0">
+              <button
+                onClick={() => setShowNoteDiagramModal(false)}
+                className="px-3.5 py-2 text-xs font-bold rounded-lg bg-slate-200 dark:bg-slate-800 text-slate-800 dark:text-slate-200 hover:bg-slate-300 dark:hover:bg-slate-700 cursor-pointer transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={insertNoteDiagram}
+                className="px-3.5 py-2 text-xs font-bold rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white cursor-pointer transition-colors"
+              >
+                Insert into note
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Tag Modal */}
       {showTagModal && tagModalItem && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/70 backdrop-blur-sm" onClick={() => { setShowTagModal(false); setTagModalItem(null); setTagInput(''); }}>
@@ -4317,6 +4446,38 @@ export default function StoragePage() {
                   <Eraser className="h-3.5 w-3.5" />
                 </button>
               </div>
+              <div className="h-4 w-[1px] bg-slate-200 dark:bg-slate-800" />
+              <div className="flex items-center gap-1">
+                {([
+                  { style: 'disc' as const, icon: List, title: 'Bullet point' },
+                  { style: 'square' as const, icon: SquareIcon, title: 'Square point' },
+                  { style: '● ' as const, icon: Circle, title: 'Dark circle points' },
+                ]).map((b) => (
+                  <button
+                    key={b.title}
+                    type="button"
+                    title={b.title}
+                    onClick={() => setNoteBulletStyle(b.style)}
+                    className={cn(
+                      "p-1.5 rounded-lg transition-all cursor-pointer",
+                      editor?.isActive('bulletList', { listStyleType: b.style })
+                        ? 'bg-blue-100 dark:bg-blue-900/50 text-blue-600 dark:text-blue-400'
+                        : 'text-slate-700 dark:text-slate-300 hover:bg-slate-200/60 dark:hover:bg-slate-800/60'
+                    )}
+                  >
+                    <b.icon className={cn("h-3.5 w-3.5", b.style !== 'disc' && 'fill-current')} />
+                  </button>
+                ))}
+              </div>
+              <div className="h-4 w-[1px] bg-slate-200 dark:bg-slate-800" />
+              <button
+                type="button"
+                title="Insert diagram"
+                onClick={() => setShowNoteDiagramModal(true)}
+                className="p-1.5 rounded-lg text-slate-700 dark:text-slate-300 hover:bg-slate-200/60 dark:hover:bg-slate-800/60 transition-all cursor-pointer flex items-center gap-1"
+              >
+                <Palette className="h-3.5 w-3.5" />
+              </button>
             </div>
 
             {/* Note Editor Area */}
