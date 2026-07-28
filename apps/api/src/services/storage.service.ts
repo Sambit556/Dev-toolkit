@@ -145,11 +145,16 @@ export async function listItems(userId: string, query: ListItemsQuery) {
     });
   }
 
+  // A tag filter is expected to search the whole vault (like text search already does)
+  // rather than just whatever folder happens to be open — otherwise tagging a file in a
+  // subfolder and then filtering by that tag from the root would silently show nothing,
+  // which reads as "the tag filter doesn't work" even though the tag itself saved fine.
+  const isGlobalQuery = query.search || query.tag;
   const baseConditions = [`user_id = $1`, `is_deleted = $2`];
-  if (query.parentId && !query.search && !query.isTrash) {
+  if (query.parentId && !isGlobalQuery && !query.isTrash) {
     baseConditions.push(`parent_id = $${paramIdx++}`);
     extraParams.push(query.parentId);
-  } else if (!query.parentId && !query.search && !query.isTrash) {
+  } else if (!query.parentId && !isGlobalQuery && !query.isTrash) {
     baseConditions.push(`parent_id IS NULL`);
   }
   if (query.search && !query.isTrash) {

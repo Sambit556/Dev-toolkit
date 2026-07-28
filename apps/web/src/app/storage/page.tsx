@@ -5157,6 +5157,17 @@ export default function StoragePage() {
                     </div>
                   </div>
                 </div>
+                {filterTag && (
+                  <button
+                    type="button"
+                    onClick={() => setFilterTag('')}
+                    title="Clear tag filter"
+                    className="flex items-center gap-1.5 px-3 py-2 border border-red-500/30 bg-red-500/10 text-red-700 dark:text-red-300 rounded-lg text-xs font-bold cursor-pointer hover:bg-red-500/20 transition-colors"
+                  >
+                    #{filterTag}
+                    <X className="h-3 w-3" />
+                  </button>
+                )}
                 <div className="relative">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-500 dark:text-slate-500" />
                   <input
@@ -5493,7 +5504,15 @@ export default function StoragePage() {
                         {item.tags && item.tags.length > 0 && (
                           <div className="flex flex-wrap gap-1 mt-1.5">
                             {item.tags.slice(0, 3).map(t => (
-                              <span key={t} className="text-[8px] font-bold text-red-700 dark:text-red-300 bg-red-500/10 border border-red-500/20 rounded-full px-1.5 py-0.5">#{t}</span>
+                              <button
+                                key={t}
+                                type="button"
+                                title={`Filter by #${t}`}
+                                onClick={(e) => { e.stopPropagation(); setFilterMimeCategories([]); setFilterTag(t); }}
+                                className="text-[8px] font-bold text-red-700 dark:text-red-300 bg-red-500/10 border border-red-500/20 rounded-full px-1.5 py-0.5 cursor-pointer hover:bg-red-500/20"
+                              >
+                                #{t}
+                              </button>
                             ))}
                             {item.tags.length > 3 && <span className="text-[8px] text-slate-400 dark:text-slate-600">+{item.tags.length - 3}</span>}
                           </div>
@@ -5586,7 +5605,15 @@ export default function StoragePage() {
                             {item.tags && item.tags.length > 0 && (
                               <div className="flex flex-wrap gap-1 mt-1 pl-6">
                                 {item.tags.map(t => (
-                                  <span key={t} className="text-[8px] font-bold text-red-700 dark:text-red-300 bg-red-500/10 border border-red-500/20 rounded-full px-1.5 py-0.5">#{t}</span>
+                                  <button
+                                    key={t}
+                                    type="button"
+                                    title={`Filter by #${t}`}
+                                    onClick={(e) => { e.stopPropagation(); setFilterMimeCategories([]); setFilterTag(t); }}
+                                    className="text-[8px] font-bold text-red-700 dark:text-red-300 bg-red-500/10 border border-red-500/20 rounded-full px-1.5 py-0.5 cursor-pointer hover:bg-red-500/20"
+                                  >
+                                    #{t}
+                                  </button>
                                 ))}
                               </div>
                             )}
