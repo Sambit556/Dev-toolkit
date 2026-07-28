@@ -15,8 +15,15 @@ import {
 let transporter: Transporter | null = null;
 let isConfigured = false;
 
-const smtpUser = getEnv('SMTP_USER');
-const smtpPass = getEnv('SMTP_PASS');
+// Google displays app passwords grouped as "xxxx xxxx xxxx xxxx" for readability, but
+// the actual credential has no spaces — if SMTP_PASS was copy-pasted straight from that
+// display (a very easy mistake), Gmail's SMTP server rejects auth outright, and since
+// sendFireAndForget only logs failures (by design — email must never block/fail the
+// action that triggered it), that shows up as "email sending doesn't work" with nothing
+// visibly wrong anywhere. Stripping whitespace here makes that mistake unable to recur,
+// regardless of what ends up in .env.
+const smtpUser = getEnv('SMTP_USER')?.trim();
+const smtpPass = getEnv('SMTP_PASS')?.replace(/\s+/g, '');
 
 if (smtpUser && smtpPass) {
   transporter = nodemailer.createTransport({
