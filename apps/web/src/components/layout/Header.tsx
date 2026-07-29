@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
-import { usePathname, useRouter } from 'next/navigation';
+import { usePathname } from 'next/navigation';
 import {
   Moon,
   Sun,
@@ -375,40 +375,9 @@ function HeaderStatus() {
 
 export function Header() {
   const pathname = usePathname();
-  const router = useRouter();
   const { t } = useLocale();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [desktopOpen, setDesktopOpen] = useState(false);
-  const [secretClicks, setSecretClicks] = useState(0);
-  const [isSecretActivating, setIsSecretActivating] = useState(false);
-  const clickResetTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  const handleSecretClick = () => {
-    if (isSecretActivating) return;
-
-    if (clickResetTimeout.current) {
-      clearTimeout(clickResetTimeout.current);
-    }
-
-    const nextClicks = secretClicks + 1;
-    setSecretClicks(nextClicks);
-
-    if (nextClicks === 3) {
-      setIsSecretActivating(true);
-      // Set the flag immediately so it's ready when the page loads
-      sessionStorage.setItem('hidden_storage_activated', 'true');
-      
-      setTimeout(() => {
-        setSecretClicks(0);
-        setIsSecretActivating(false);
-        router.push('/storage');
-      }, 1000);
-    } else {
-      clickResetTimeout.current = setTimeout(() => {
-        setSecretClicks(0);
-      }, 2500);
-    }
-  };
   const clickLocked = useRef(false); // true = user clicked to pin the dropdown open
   const hoverTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   const progressBarRef = useRef<HTMLDivElement>(null);
@@ -432,10 +401,6 @@ export function Header() {
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
-
-  // +1 accounts for the hidden Storage vault — deliberately not listed in
-  // toolCategories since it's an unlisted/secret feature, not a nav entry.
-  const totalTools = toolCategories.reduce((acc, cat) => acc + cat.items.length, 0) + 1;
 
   useEffect(() => {
     const handleScroll = () => {
@@ -577,7 +542,7 @@ export function Header() {
             </button>
             {desktopOpen && (
               <div className="fixed left-1/2 top-14 z-50 w-[calc(100vw-2rem)] max-w-[1100px] -translate-x-1/2 animate-fade-in rounded-2xl border border-primary/20 bg-card/95 p-5 shadow-[0_20px_50px_rgba(59,130,246,0.15)] backdrop-blur-md dark:border-primary/30 dark:shadow-[0_20px_50px_rgba(99,102,241,0.25)] sm:p-6">
-                <div className="grid grid-cols-3 gap-5 sm:gap-6 xl:grid-cols-6">
+                <div className="grid grid-cols-3 gap-5 sm:gap-6 xl:grid-cols-5">
                   {toolCategories.map((cat) => (
                     <div key={cat.name} className="min-w-0 space-y-3">
                       <h4 className="text-[10px] uppercase font-black tracking-widest text-primary/85 border-b pb-2 border-primary/10 px-1 leading-snug">
@@ -613,44 +578,6 @@ export function Header() {
                       </div>
                     </div>
                   ))}
-
-                  {/* Toolbox stats sidebar */}
-                  <div className="min-w-0 flex flex-col justify-end border-t border-border/60 pt-4 sm:border-l sm:border-t-0 sm:pl-6 sm:pt-0">
-                    <div
-                      onClick={handleSecretClick}
-                      className={cn(
-                        "bg-muted/40 rounded-xl p-3.5 border border-border/50 text-[10px] space-y-2.5 transition-all duration-550 cursor-pointer select-none relative overflow-hidden",
-                        secretClicks === 1 && "border-blue-500/50 shadow-[0_0_15px_rgba(59,130,246,0.25)] bg-blue-500/5 scale-[1.01] rotate-[0.2deg]",
-                        secretClicks === 2 && "border-indigo-500/70 shadow-[0_0_25px_rgba(99,102,241,0.45)] bg-indigo-500/10 scale-[1.03] -rotate-[0.2deg]",
-                        isSecretActivating && "scale-105 border-emerald-500 shadow-[0_0_35px_rgba(16,185,129,0.7)] bg-emerald-500/10 animate-pulse duration-700"
-                      )}
-                    >
-                      <div className="flex flex-col gap-1">
-                        <span className="text-muted-foreground font-medium">Toolbox Count:</span>
-                        <span className="font-bold font-mono text-primary bg-primary/10 px-2 py-0.5 rounded-md w-fit mt-0.5">
-                          {totalTools} Utilities
-                        </span>
-                      </div>
-                      <div className="flex flex-col gap-1 border-t pt-2 border-border/40">
-                        <span className="text-muted-foreground font-medium">Storage State:</span>
-                        <span className="font-bold text-emerald-600 dark:text-emerald-450 font-mono">
-                          Production Sandbox
-                        </span>
-                      </div>
-                      <div className="flex justify-between items-center border-t border-border/40 pt-2 font-mono">
-                        <span className="text-muted-foreground font-medium">Gateway:</span>
-                        <div className="flex items-center gap-1.5 px-1.5 py-0.5 rounded-full bg-slate-950/60 border border-border/30">
-                          <span className={cn("h-1.5 w-1.5 rounded-full transition-all duration-300", 
-                            (secretClicks >= 1 || isSecretActivating) ? "bg-blue-500 shadow-[0_0_8px_#3b82f6]" : "bg-muted-foreground/20")} />
-                          <span className={cn("h-1.5 w-1.5 rounded-full transition-all duration-300", 
-                            (secretClicks >= 2 || isSecretActivating) ? "bg-indigo-500 shadow-[0_0_8px_#6366f1]" : "bg-muted-foreground/20")} />
-                          {isSecretActivating && (
-                            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 shadow-[0_0_8px_#10b981] animate-ping" />
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
                 </div>
               </div>
             )}
