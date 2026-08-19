@@ -16,7 +16,7 @@ describe('timeService', () => {
       const result = convertTimestamp('1700000000', 'seconds', 'UTC');
       expect(result.unixSeconds).toBe(1700000000);
       expect(result.unit).toBe('seconds');
-      expect(result.iso8601).toMatch(/2026/);
+      expect(result.iso8601).toMatch(/2023/);
     });
 
     it('converts milliseconds timestamp', () => {
@@ -54,7 +54,7 @@ describe('timeService', () => {
 
   describe('convertDate', () => {
     it('converts ISO 8601 date to timestamp', () => {
-      const result = convertDate('2026-11-14T22:13:20.000Z', 'UTC');
+      const result = convertDate('2023-11-14T22:13:20.000Z', 'UTC');
       expect(result.unixSeconds).toBe(1700000000);
     });
 

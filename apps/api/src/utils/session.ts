@@ -1,5 +1,7 @@
-import { createClient, RedisClientType } from 'redis';
 import { logger } from './logger';
+import { redisClient, isRedisHealthy, redisStatusText, initRedis, closeRedis, redis } from './redis';
+
+export { redisClient, isRedisHealthy, redisStatusText, initRedis, closeRedis, redis };
 
 export interface SessionData {
   userId: string;
@@ -10,72 +12,9 @@ export interface SessionData {
   expiresAt: string; // ISO string
 }
 
-import { getEnv } from './env';
-
-const redisUrl = getEnv('REDIS_URL');
-
-export let redisClient: RedisClientType | null = null;
-export let isRedisHealthy = false;
-export let redisStatusText = 'Disconnected';
-
 // In-Memory Fallback Store
 const memorySessions = new Map<string, SessionData>();
 const memoryUserSessions = new Map<string, Set<string>>(); // userId -> Set of accessTokenIds
-
-if (redisUrl) {
-  redisClient = createClient({
-    url: redisUrl,
-    socket: {
-      connectTimeout: 3000,
-      reconnectStrategy: (retries) => {
-        if (retries > 5) {
-          logger.error('Redis reconnection max retries reached. Switching to memory fallback.');
-          isRedisHealthy = false;
-          redisStatusText = 'Fallback (Redis offline)';
-          return false; // Stop reconnecting
-        }
-        logger.warn(`Redis reconnecting... Attempt ${retries}`);
-        return Math.min(retries * 500, 2000);
-      },
-    },
-  }) as RedisClientType;
-
-  redisClient.on('error', (err) => {
-    logger.error('Redis Client Error', { error: err.message });
-    isRedisHealthy = false;
-    redisStatusText = `Error: ${err.message}`;
-  });
-
-  redisClient.on('connect', () => {
-    logger.info('Redis Client connecting...');
-  });
-
-  redisClient.on('ready', () => {
-    logger.info('Redis Client connected and ready.');
-    isRedisHealthy = true;
-    redisStatusText = 'Connected';
-  });
-} else {
-  redisStatusText = 'Fallback (Memory)';
-  logger.warn('REDIS_URL is not configured. Session manager will run in-memory mode.');
-}
-
-export async function initRedis(): Promise<void> {
-  if (!redisClient) {
-    isRedisHealthy = false;
-    return;
-  }
-
-  try {
-    await redisClient.connect();
-  } catch (err: any) {
-    logger.error('Could not connect to Redis, running in memory-fallback state.', {
-      error: err.message,
-    });
-    isRedisHealthy = false;
-    redisStatusText = `Failed to connect: ${err.message}`;
-  }
-}
 
 // Session store operations
 export async function setSession(
@@ -87,9 +26,8 @@ export async function setSession(
     try {
       const key = `session:${accessTokenId}`;
       const userKey = `user:sessions:${sessionData.userId}`;
-      await redisClient.setEx(key, ttlSeconds, JSON.stringify(sessionData));
-      await redisClient.sAdd(userKey, accessTokenId);
-      // Set expiration on the user set as well
+      await redisClient.set(key, JSON.stringify(sessionData), { ex: ttlSeconds });
+      await redisClient.sadd(userKey, accessTokenId);
       await redisClient.expire(userKey, ttlSeconds * 2);
       return;
     } catch (err: any) {
@@ -121,7 +59,10 @@ export async function getSession(accessTokenId: string): Promise<SessionData | n
       const key = `session:${accessTokenId}`;
       const data = await redisClient.get(key);
       if (data) {
-        return JSON.parse(data) as SessionData;
+        if (typeof data === 'string') {
+          return JSON.parse(data) as SessionData;
+        }
+        return data as SessionData;
       }
       return null;
     } catch (err: any) {
@@ -141,7 +82,7 @@ export async function revokeSession(accessTokenId: string): Promise<void> {
       await redisClient.del(key);
       if (session) {
         const userKey = `user:sessions:${session.userId}`;
-        await redisClient.sRem(userKey, accessTokenId);
+        await redisClient.srem(userKey, accessTokenId);
       }
       return;
     } catch (err: any) {
@@ -164,9 +105,10 @@ export async function revokeUserSessions(userId: string): Promise<void> {
   if (isRedisHealthy && redisClient) {
     try {
       const userKey = `user:sessions:${userId}`;
-      const sessionIds = await redisClient.sMembers(userKey);
-      for (const id of sessionIds) {
-        await redisClient.del(`session:${id}`);
+      const sessionIds = await redisClient.smembers(userKey);
+      if (Array.isArray(sessionIds) && sessionIds.length > 0) {
+        const keys = sessionIds.map((id) => `session:${id}`);
+        await redisClient.del(...keys);
       }
       await redisClient.del(userKey);
       return;
@@ -186,18 +128,12 @@ export async function revokeUserSessions(userId: string): Promise<void> {
 }
 
 // --- One-time OAuth exchange codes -------------------------------------------
-// Bridges the server-side Google OAuth callback (which can only respond with a
-// redirect, not JSON) to the frontend: the callback stashes the freshly-issued
-// session tokens under a short-lived, single-use random code and redirects the
-// browser with just that code in the URL — never the real JWTs — then the
-// frontend immediately trades it for the tokens via POST. Same Redis-with-
-// in-memory-fallback shape as setSession/getSession/revokeSession above.
 const memoryOAuthExchanges = new Map<string, { data: unknown; timeout: ReturnType<typeof setTimeout> }>();
 
 export async function stashOAuthExchange(code: string, data: unknown, ttlSeconds: number): Promise<void> {
   if (isRedisHealthy && redisClient) {
     try {
-      await redisClient.setEx(`oauth:exchange:${code}`, ttlSeconds, JSON.stringify(data));
+      await redisClient.set(`oauth:exchange:${code}`, JSON.stringify(data), { ex: ttlSeconds });
       return;
     } catch (err: any) {
       logger.error('Redis stashOAuthExchange failed, using memory fallback', { error: err.message });
@@ -211,8 +147,13 @@ export async function stashOAuthExchange(code: string, data: unknown, ttlSeconds
 export async function consumeOAuthExchange<T>(code: string): Promise<T | null> {
   if (isRedisHealthy && redisClient) {
     try {
-      const data = await redisClient.getDel(`oauth:exchange:${code}`);
-      return data ? (JSON.parse(data) as T) : null;
+      const key = `oauth:exchange:${code}`;
+      const data = await redisClient.get(key);
+      if (data) {
+        await redisClient.del(key);
+        return typeof data === 'string' ? (JSON.parse(data) as T) : (data as T);
+      }
+      return null;
     } catch (err: any) {
       logger.error('Redis consumeOAuthExchange failed, checking memory fallback', { error: err.message });
     }
@@ -226,10 +167,6 @@ export async function consumeOAuthExchange<T>(code: string): Promise<T | null> {
 }
 
 // --- Superadmin password-change OTP ------------------------------------------
-// Short-lived, attempt-limited one-time codes. `expiresAt` is embedded in the
-// stored record (not just relied on via the store's own TTL) so an attempt
-// increment can safely re-persist the record without needing to read back
-// Redis's remaining TTL first — it just recomputes seconds-until-expiresAt.
 export interface PasswordOtpRecord {
   otpHash: string;
   attempts: number;
@@ -248,7 +185,7 @@ export async function setPasswordChangeOtp(userId: string, otpHash: string, ttlS
 
   if (isRedisHealthy && redisClient) {
     try {
-      await redisClient.setEx(key, ttlSeconds, JSON.stringify(record));
+      await redisClient.set(key, JSON.stringify(record), { ex: ttlSeconds });
       return;
     } catch (err: any) {
       logger.error('Redis setPasswordChangeOtp failed, using memory fallback', { error: err.message });
@@ -268,7 +205,9 @@ export async function getPasswordChangeOtp(userId: string): Promise<PasswordOtpR
   if (isRedisHealthy && redisClient) {
     try {
       const data = await redisClient.get(key);
-      record = data ? (JSON.parse(data) as PasswordOtpRecord) : null;
+      if (data) {
+        record = typeof data === 'string' ? (JSON.parse(data) as PasswordOtpRecord) : (data as PasswordOtpRecord);
+      }
     } catch (err: any) {
       logger.error('Redis getPasswordChangeOtp failed, checking memory fallback', { error: err.message });
     }
@@ -279,8 +218,6 @@ export async function getPasswordChangeOtp(userId: string): Promise<PasswordOtpR
   return record;
 }
 
-// Re-persists the record with the incremented attempt count, preserving the
-// original expiry (recomputed as remaining seconds) rather than resetting the TTL.
 export async function recordFailedPasswordChangeOtpAttempt(userId: string): Promise<number> {
   const record = await getPasswordChangeOtp(userId);
   if (!record) return 0;
@@ -291,7 +228,7 @@ export async function recordFailedPasswordChangeOtpAttempt(userId: string): Prom
 
   if (isRedisHealthy && redisClient) {
     try {
-      await redisClient.setEx(key, remainingSeconds, JSON.stringify(record));
+      await redisClient.set(key, JSON.stringify(record), { ex: remainingSeconds });
       return record.attempts;
     } catch (err: any) {
       logger.error('Redis recordFailedPasswordChangeOtpAttempt failed, using memory fallback', { error: err.message });
@@ -318,16 +255,5 @@ export async function clearPasswordChangeOtp(userId: string): Promise<void> {
   if (existing) {
     clearTimeout(existing.timeout);
     memoryPasswordOtps.delete(key);
-  }
-}
-
-export async function closeRedis(): Promise<void> {
-  if (redisClient && isRedisHealthy) {
-    logger.info('Disconnecting Redis client...');
-    try {
-      await redisClient.quit();
-    } catch (err: any) {
-      logger.error('Failed to cleanly disconnect Redis client', { error: err.message });
-    }
   }
 }

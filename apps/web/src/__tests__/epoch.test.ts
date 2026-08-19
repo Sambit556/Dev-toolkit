@@ -39,7 +39,7 @@ describe('epoch utilities', () => {
 
   describe('parseDateString', () => {
     it('parses ISO 8601 date', () => {
-      const d = parseDateString('2026-11-14T22:13:20.000Z');
+      const d = parseDateString('2023-11-14T22:13:20.000Z');
       expect(d).not.toBeNull();
       expect(d!.getTime()).toBe(1700000000000);
     });
@@ -77,7 +77,7 @@ describe('epoch utilities', () => {
     it('converts seconds timestamp', () => {
       const result = timestampToDate('1700000000', 'seconds', 'UTC');
       expect(result.unixSeconds).toBe(1700000000);
-      expect(result.iso8601).toBe('2026-11-14T22:13:20.000Z');
+      expect(result.iso8601).toBe('2023-11-14T22:13:20.000Z');
     });
 
     it('handles zero timestamp (epoch)', () => {

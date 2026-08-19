@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { RotateCcw, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -20,13 +20,29 @@ interface ConversionResult {
   iso8601: string;
 }
 
-const FORMAT_EXAMPLES = [
-  { label: 'ISO 8601', value: '2026-11-14T22:13:20Z' },
-  { label: 'Date + Time', value: '2026-11-14 22:13:20' },
-  { label: 'Date only', value: '2026-11-14' },
-  { label: 'MM/DD/YYYY', value: '11/14/2026' },
-  { label: 'DD-MM-YYYY', value: '14-11-2026' },
-];
+function getFormatExamples(date: Date = new Date()) {
+  const pad = (n: number) => n.toString().padStart(2, '0');
+  const YYYY = date.getFullYear();
+  const MM = pad(date.getMonth() + 1);
+  const DD = pad(date.getDate());
+  const hh = pad(date.getHours());
+  const mm = pad(date.getMinutes());
+  const ss = pad(date.getSeconds());
+
+  const iso = date.toISOString().replace(/\.\d{3}Z$/, 'Z');
+  const dateTime = `${YYYY}-${MM}-${DD} ${hh}:${mm}:${ss}`;
+  const dateOnly = `${YYYY}-${MM}-${DD}`;
+  const mmddyyyy = `${MM}/${DD}/${YYYY}`;
+  const ddmmyyyy = `${DD}-${MM}-${YYYY}`;
+
+  return [
+    { label: 'ISO 8601', value: iso },
+    { label: 'Date + Time', value: dateTime },
+    { label: 'Date only', value: dateOnly },
+    { label: 'MM/DD/YYYY', value: mmddyyyy },
+    { label: 'DD-MM-YYYY', value: ddmmyyyy },
+  ];
+}
 
 export function DateToTimestamp() {
   const prefs = usePreferencesStore();
@@ -34,6 +50,16 @@ export function DateToTimestamp() {
   const [timezone, setTimezone] = useState(prefs.defaultTimezone);
   const [result, setResult] = useState<ConversionResult | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [examples, setExamples] = useState<{ label: string; value: string }[]>([]);
+
+  // Update suggestions in sync with current clock
+  useEffect(() => {
+    setExamples(getFormatExamples());
+    const interval = setInterval(() => {
+      setExamples(getFormatExamples());
+    }, 1000);
+    return () => clearInterval(interval);
+  }, []);
 
   const convert = useCallback(() => {
     const trimmed = input.trim();
@@ -41,7 +67,7 @@ export function DateToTimestamp() {
 
     const date = parseDateString(trimmed, timezone);
     if (!date || isNaN(date.getTime())) {
-      setError(`Cannot parse "${trimmed}" as a date. Try formats like: 2026-11-14, 2026-11-14T22:13:20Z`);
+      setError(`Cannot parse "${trimmed}" as a date. Try formats like: ${examples[0]?.value || '2026-08-19T18:15:30Z'}`);
       setResult(null);
       return;
     }
@@ -58,7 +84,7 @@ export function DateToTimestamp() {
       iso8601: date.toISOString(),
     });
     setError(null);
-  }, [input, timezone]);
+  }, [input, timezone, examples]);
 
   const useNow = () => {
     const now = new Date();
@@ -74,7 +100,7 @@ export function DateToTimestamp() {
           <div className="flex gap-2">
             <Input
               id="date-input"
-              placeholder="e.g. 2026-11-14T22:13:20Z"
+              placeholder={examples[0] ? `e.g. ${examples[0].value}` : 'e.g. 2026-08-19T18:15:30Z'}
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && convert()}
@@ -84,18 +110,26 @@ export function DateToTimestamp() {
               Now
             </Button>
           </div>
-          {/* Format examples */}
-          <div className="flex flex-wrap gap-1.5 mt-1">
-            {FORMAT_EXAMPLES.map(({ label, value }) => (
-              <button
-                key={label}
-                onClick={() => setInput(value)}
-                className="inline-flex items-center gap-1 rounded border px-1.5 py-0.5 text-[10px] hover:bg-accent transition-colors"
-              >
-                <span className="text-muted-foreground">{label}:</span>
-                <code className="font-mono">{value}</code>
-              </button>
-            ))}
+          {/* Real-time format examples */}
+          <div className="space-y-1 mt-2">
+            <span className="text-[11px] text-muted-foreground block font-medium">Click a live format to populate:</span>
+            <div className="flex flex-wrap gap-1.5">
+              {examples.map(({ label, value }) => (
+                <button
+                  key={label}
+                  type="button"
+                  onClick={() => {
+                    setInput(value);
+                    setError(null);
+                  }}
+                  className="inline-flex items-center gap-1.5 rounded border bg-muted/40 hover:bg-accent hover:border-primary/40 px-2 py-1 text-[11px] transition-colors cursor-pointer text-left"
+                  title={`Insert current ${label}: ${value}`}
+                >
+                  <span className="text-muted-foreground font-medium">{label}:</span>
+                  <code className="font-mono text-primary font-semibold">{value}</code>
+                </button>
+              ))}
+            </div>
           </div>
         </div>
 

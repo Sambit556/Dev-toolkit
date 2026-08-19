@@ -94,6 +94,16 @@ export function TimestampToDate() {
       ]
     : [];
 
+  const [placeholderTs, setPlaceholderTs] = useState('1700000000');
+
+  useEffect(() => {
+    setPlaceholderTs(Math.floor(Date.now() / 1000).toString());
+    const id = setInterval(() => {
+      setPlaceholderTs(Math.floor(Date.now() / 1000).toString());
+    }, 1000);
+    return () => clearInterval(id);
+  }, []);
+
   return (
     <div className="space-y-4">
       <div className="space-y-3">
@@ -102,7 +112,7 @@ export function TimestampToDate() {
             <Label htmlFor="ts-input" className="text-primary font-semibold">Unix Timestamp</Label>
             <Input
               id="ts-input"
-              placeholder="e.g. 1700000000"
+              placeholder={`e.g. ${placeholderTs}`}
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && convert()}
@@ -195,7 +205,25 @@ export function TimestampToDate() {
                 <span className={cn('text-xs text-muted-foreground shrink-0 w-32', highlight && 'text-primary font-medium')}>
                   {label}
                 </span>
-                <code className="font-mono text-sm flex-1 break-all">{value}</code>
+                <code className="font-mono text-sm flex-1 break-all">
+                  {label === timezone ? (
+                    (() => {
+                      const match = value.match(/^(.+?,\s*\d{1,2}:\d{2}(?::\d{2})?(?:\s*[AaPp][Mm])?)\s+(.+)$/);
+                      if (match) {
+                        return (
+                          <span className="inline-block leading-snug">
+                            <span className="font-bold text-foreground">{match[1]}</span>
+                            <br />
+                            <span className="text-sm font-medium text-primary/90 font-mono mt-0.5 inline-block">{match[2]}</span>
+                          </span>
+                        );
+                      }
+                      return value;
+                    })()
+                  ) : (
+                    value
+                  )}
+                </code>
                 <CopyButton value={value} toastMessage={`Copied ${label}`} className="h-6 w-6 shrink-0" />
               </div>
             ))}
