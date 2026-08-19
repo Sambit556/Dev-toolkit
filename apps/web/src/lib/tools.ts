@@ -116,10 +116,20 @@ export const toolCategories = [
       },
       {
         href: '/file-converter',
-        label: 'Universal File Converter',
+        label: 'File Converter',
         icon: ArrowRightLeft,
-        desc: 'Convert files client-side',
-        keywords: ['file converter', 'convert files', 'file format converter', 'document converter', 'image to base64', 'file to text converter', 'client-side file conversion', 'batch file convert', 'json to ini', 'ini to json', 'png to webp', 'jpg to png', 'webp to png', 'image format converter', 'svg to png', 'base64 to file', 'drag and drop converter'],
+        desc: 'Universal document, image & PDF converter',
+        keywords: [
+          'file converter', 'convert files', 'word to pdf', 'pdf to word', 'docx to pdf', 'pdf to docx', 'word to html', 'word to markdown',
+          'word to txt', 'pdf to txt', 'pdf to html', 'pdf to jpg', 'pdf to png', 'html to pdf', 'html to txt', 'html to markdown',
+          'markdown to pdf', 'markdown to html', 'markdown to word', 'txt to pdf', 'txt to word', 'txt to html', 'rtf to pdf', 'rtf to word',
+          'rtf to txt', 'epub to pdf', 'epub to txt', 'excel to pdf', 'excel to csv', 'excel to json', 'csv to excel', 'csv to pdf',
+          'csv to json', 'json to csv', 'json to pdf', 'jpg to png', 'jpg to webp', 'jpg to pdf', 'png to jpg', 'png to webp', 'png to pdf',
+          'webp to jpg', 'webp to png', 'webp to pdf', 'svg to png', 'svg to jpg', 'svg to webp', 'svg to pdf', 'heic to jpg', 'heic to png',
+          'heic to webp', 'avif to jpg', 'avif to png', 'bmp to jpg', 'bmp to png', 'tiff to jpg', 'tiff to png', 'gif to jpg', 'gif to png',
+          'image to pdf', 'images to pdf', 'image to base64', 'base64 to image', 'image to svg', 'pdf merger', 'pdf splitter', 'protect pdf',
+          'sign pdf', 'esign pdf', 'client-side converter', 'offline file converter'
+        ],
       },
     ],
   },
@@ -233,13 +243,6 @@ export const toolCategories = [
         icon: Zap,
         desc: 'Ping, jitter, download, upload',
         keywords: ['internet speed test', 'download speed test', 'upload speed test', 'ping test', 'jitter test', 'bandwidth test', 'network speed checker', 'speedometer', 'mbps test', 'cloudflare speed test', 'throughput test', 'speed test history'],
-      },
-      {
-        href: '/pdf-tools',
-        label: 'PDF Suite',
-        icon: FileCode,
-        desc: 'Merge, split, and password protect',
-        keywords: ['merge pdf', 'split pdf', 'password protect pdf', 'pdf tools', 'combine pdf', 'pdf merger', 'pdf splitter', 'encrypt pdf', 'compress pdf', 'sign pdf', 'pdf signature', 'esign pdf', 'draw signature', 'text to pdf', 'generate pdf from text', 'extract pdf pages', 'unlock pdf', 'decrypt pdf', 'reorder pdf pages'],
       },
       {
         href: '/http-toolkit',

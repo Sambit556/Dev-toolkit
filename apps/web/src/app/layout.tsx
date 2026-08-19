@@ -145,7 +145,7 @@ const jsonLd = {
     'Currency Exchanger with Live Rates',
     'IP & Identity Intelligence',
     'Internet Speed Tester',
-    'Client-Side File Converter',
+    'File Converter',
   ],
   screenshot: `${APP_URL}/og-image.png`,
 };

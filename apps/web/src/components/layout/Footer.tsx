@@ -252,12 +252,6 @@ export function Footer() {
                 </Link>
               </li>
               <li>
-                <Link href="/pdf-tools" className="flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground transition-colors">
-                  <FileCode className="h-3.5 w-3.5 text-primary/70" />
-                  PDF Suite
-                </Link>
-              </li>
-              <li>
                 <Link href="/http-toolkit" className="flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground transition-colors">
                   <Webhook className="h-3.5 w-3.5 text-primary/70" />
                   HTTP Toolkit

@@ -109,7 +109,7 @@ const TRANSLATION_BUNDLES: Record<string, Record<string, string>> = {
     ipIntelDesc: 'Check current IP details, lookup geolocation and ISP records, and validate email/phone inputs.',
     speedTestTitle: 'Internet Speed Tester',
     speedTestDesc: 'Test your internet latency, jitter, download, and upload connection speeds with live animated speedometer dial.',
-    fileConverterTitle: 'Client-Side File Converter',
+    fileConverterTitle: 'File Converter',
     fileConverterDesc: 'Securely convert CSV, JSON, Markdown documents, and images locally in your browser.',
   },
   fr: {

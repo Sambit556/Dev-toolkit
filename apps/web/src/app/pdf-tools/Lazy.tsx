@@ -4,7 +4,11 @@ import dynamic from 'next/dynamic';
 import { Loader2 } from 'lucide-react';
 
 export const PdfTools = dynamic(
-  () => import('@/components/pdf-tools/PdfTools').then((m) => m.PdfTools),
+  () => import('@/components/file-converter/FileConverterTool').then((m) => {
+    // Return component pre-set to PDF operations
+    const Component = (props: any) => <m.FileConverterTool initialTab="merge-split" {...props} />;
+    return Component;
+  }),
   {
     ssr: false,
     loading: () => (

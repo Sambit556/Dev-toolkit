@@ -214,9 +214,9 @@ const TOOLS = [
   {
     href: '/file-converter',
     icon: RefreshCw,
-    title: 'Client-Side File Converter',
+    title: 'File Converter',
     description:
-      'Convert CSV tables to JSON arrays, JSON lists to CSV sheets, Markdown docs to HTML, and draw/convert image formats.',
+      'Convert Word documents, PDFs, Excel sheets, images, Markdown, CSV, JSON, and text locally in your browser.',
     features: ['CSV ↔ JSON structure', 'Markdown ↔ HTML previews', 'WebP/PNG/JPG canvas exports', 'Local file upload zone'],
     category: 'converters',
     badge: 'Converter',
@@ -294,18 +294,6 @@ const TOOLS = [
     badge: 'Marketing',
     color: 'blue',
     keywords: ['qr code generator', 'barcode generator', 'qr generator', 'create qr code', 'generate barcode', 'qr code maker', 'barcode maker', 'scan code generator'],
-  },
-  {
-    href: '/pdf-tools',
-    icon: FileCode,
-    title: 'PDF Merger, Splitter & Protector',
-    description:
-      'Merge multiple PDF documents client-side, extract specific pages, or password-protect files with User & Owner encryption.',
-    features: ['Drag-and-drop file reordering', 'Client-side pdf-lib processor', 'Password locking', 'Page range selectors'],
-    category: 'system',
-    badge: 'PDF',
-    color: 'purple',
-    keywords: ['merge pdf', 'split pdf', 'password protect pdf', 'pdf tools', 'combine pdf', 'pdf merger', 'pdf splitter', 'encrypt pdf', 'compress pdf'],
   },
   {
     href: '/html-preview',

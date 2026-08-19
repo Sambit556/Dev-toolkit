@@ -21,7 +21,6 @@ const TOOL_ROUTES = [
   '/lorem-ipsum',
   '/security-tools',
   '/qr-barcode',
-  '/pdf-tools',
   '/html-preview',
   '/fake-address',
   '/fun-tools',

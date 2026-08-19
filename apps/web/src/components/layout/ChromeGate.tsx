@@ -6,7 +6,6 @@ import { Footer } from './Footer';
 import { FloatingSupport } from './FloatingSupport';
 import { StickyNotes } from './StickyNotes';
 import { QuickAccess } from './QuickAccess';
-import { StorageLauncher } from './StorageLauncher';
 
 // The Storage Vault keeps the site's nav, quick-access dock, and sticky notes —
 // but not the marketing Footer or the support bubble, which don't fit its
@@ -42,7 +41,6 @@ export function ChromeGate({ children }: { children: React.ReactNode }) {
       <FloatingSupport />
       <StickyNotes />
       <QuickAccess />
-      <StorageLauncher />
     </>
   );
 }

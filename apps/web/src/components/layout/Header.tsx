@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import {
   Moon,
   Sun,
@@ -13,6 +13,7 @@ import {
   Keyboard,
   HeartHandshake,
   BookOpen,
+  Database,
   Shield,
   Layers,
   ShieldCheck,
@@ -375,7 +376,13 @@ function HeaderStatus() {
 
 export function Header() {
   const pathname = usePathname();
+  const router = useRouter();
   const { t } = useLocale();
+
+  const handleStorageClick = () => {
+    sessionStorage.setItem('hidden_storage_activated', 'true');
+    router.push('/storage');
+  };
   const [mobileOpen, setMobileOpen] = useState(false);
   const [desktopOpen, setDesktopOpen] = useState(false);
   const clickLocked = useRef(false); // true = user clicked to pin the dropdown open
@@ -596,6 +603,20 @@ export function Header() {
             {t('blog')}
           </Link>
 
+          <button
+            type="button"
+            onClick={handleStorageClick}
+            className={cn(
+              'inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors',
+              pathname?.startsWith('/storage')
+                ? 'bg-accent text-accent-foreground'
+                : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
+            )}
+          >
+            <Database className="h-4 w-4 text-indigo-500 dark:text-indigo-400" />
+            <span>Storage</span>
+          </button>
+
           <Link
             href="/support"
             className={cn(
@@ -694,6 +715,17 @@ export function Header() {
                 <BookOpen className="h-3.5 w-3.5" />
                 {t('blog')}
               </Link>
+              <button
+                type="button"
+                onClick={() => {
+                  setMobileOpen(false);
+                  handleStorageClick();
+                }}
+                className="flex items-center gap-1 text-xs font-bold text-muted-foreground p-1 hover:text-foreground"
+              >
+                <Database className="h-3.5 w-3.5 text-indigo-500" />
+                <span>Storage</span>
+              </button>
               <Link
                 href="/support"
                 onClick={() => setMobileOpen(false)}
