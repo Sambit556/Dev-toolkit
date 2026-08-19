@@ -2657,40 +2657,18 @@ export default function StoragePage() {
     if (hasVerified.current) return;
     hasVerified.current = true;
 
-    const active = sessionStorage.getItem('hidden_storage_activated');
-    // A Google OAuth round trip navigates fully away to accounts.google.com and back,
-    // landing here as a *fresh* page load — after the sessionStorage flag above was
-    // already consumed on the very first pass (before the user clicked "Continue with
-    // Google"). Without this, the legitimate return trip gets bounced straight back to
-    // '/' by the else-branch below. Safe to trust: oauth_exchange is an unguessable,
-    // single-use, server-issued code that only exists after a real state-verified round
-    // trip through Google's own consent screen — it can't be manufactured, and a
-    // replayed URL from browser history just gets a 400 on second use, not a bypass.
-    const params = new URLSearchParams(window.location.search);
-    const isOAuthReturn = params.has('oauth_exchange') || params.has('oauth_error');
-    // Same reasoning as the OAuth case: a password-reset link lands here as a fresh
-    // page load too, after the flag above was already consumed. A resetToken is only
-    // ever mailed to an address that already requested it through this same gated
-    // form, so its mere presence is an equally valid "you already unlocked this" signal.
-    const isPasswordResetLink = params.has('resetToken');
-    if (active === 'true' || isOAuthReturn || isPasswordResetLink) {
-      setIsActivated(true);
-      sessionStorage.removeItem('hidden_storage_activated');
-
-      // Restore existing auth session if already logged in
-      const storedToken = localStorage.getItem('storage_token');
-      const storedEmail = localStorage.getItem('storage_email');
-      const storedName = localStorage.getItem('storage_name');
-      const storedRole = localStorage.getItem('storage_role');
-      if (storedToken && storedEmail) {
-        setToken(storedToken);
-        setUserEmail(storedEmail);
-        setUserName(storedName || storedEmail);
-        setUserRole(storedRole || 'user');
-      }
-    } else {
-      setIsActivated(false);
+    // Restore existing auth session if already logged in
+    const storedToken = localStorage.getItem('storage_token');
+    const storedEmail = localStorage.getItem('storage_email');
+    const storedName = localStorage.getItem('storage_name');
+    const storedRole = localStorage.getItem('storage_role');
+    if (storedToken && storedEmail) {
+      setToken(storedToken);
+      setUserEmail(storedEmail);
+      setUserName(storedName || storedEmail);
+      setUserRole(storedRole || 'user');
     }
+    setIsActivated(true);
   }, []);
 
   // Consume a Google OAuth return: trade the one-time exchange code the callback
@@ -2928,17 +2906,6 @@ export default function StoragePage() {
       if (autoSaveTimer.current) clearInterval(autoSaveTimer.current);
     };
   }, [editorNote, editorContent, editorTitle, editorBaseVersion]);
-
-  // Redirect unactivated users safely inside useEffect.
-  // A hard navigation (not router.replace) is deliberate here: this is an auth-gate exit for
-  // users who reached /storage without the unlock flow, and firing it this early in the mount
-  // cycle can race the App Router's own initialization and throw "Router action dispatched
-  // before initialization" — window.location sidesteps that internal router state entirely.
-  useEffect(() => {
-    if (isActivated === false) {
-      window.location.href = '/';
-    }
-  }, [isActivated]);
 
   if (isActivated !== true || isExchangingOAuth) {
     return (
