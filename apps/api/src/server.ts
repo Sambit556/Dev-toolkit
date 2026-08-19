@@ -9,7 +9,7 @@ const PORT = parseInt(getEnvWithDefault('PORT', '3001'), 10);
 const HOST = getEnvWithDefault('HOST', '0.0.0.0');
 
 async function bootstrap() {
-  logger.info('System starting in deferred-initialization mode...');
+  logger.info('System initializing and warming up connection pools...');
 
   const server = app.listen(PORT, HOST, () => {
      logger.info(`DevChrono JSONLab API running`, {
@@ -19,6 +19,13 @@ async function bootstrap() {
        env: getEnvWithDefault('NODE_ENV', 'development'),
      });
    });
+
+  // Eagerly warm up DB pool, schema, Redis, and S3 in background without delaying port listen
+  Promise.allSettled([
+    initDb().catch((err: any) => logger.error('Eager DB warmup failed', { error: err.message })),
+    initRedis().catch((err: any) => logger.error('Eager Redis warmup failed', { error: err.message })),
+    initS3().catch((err: any) => logger.error('Eager S3 warmup failed', { error: err.message })),
+  ]);
 
   // Graceful shutdown
   const shutdown = async (signal: string) => {

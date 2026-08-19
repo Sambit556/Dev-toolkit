@@ -69,8 +69,12 @@ export async function issueSession(user: { id: string; email: string }) {
 }
 
 export async function login(identifier: string, password: string) {
-  const isEmail = identifier.includes('@');
-  const user = await commonDao.getOneDataByCond<any>(TABLES.USERS, isEmail ? { email: identifier } : { mobile_number: identifier });
+  const trimmed = identifier.trim();
+  const isEmail = trimmed.includes('@');
+  const user = await commonDao.getOneDataByCond<any>(
+    TABLES.USERS,
+    isEmail ? { email: trimmed.toLowerCase() } : { mobile_number: trimmed }
+  );
   if (!user) {
     logger.warn('Authentication failure: User not found', { identifier });
     throw new AppError(HttpStatus.UNAUTHORIZED, 'Invalid credentials', 'INVALID_CREDENTIALS');

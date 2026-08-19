@@ -130,6 +130,14 @@ const FK_AND_INDEX_DEFINITIONS = [
   {
     name: `idx_${TABLES.USERS}_is_active`,
     sql: `CREATE INDEX IF NOT EXISTS idx_${TABLES.USERS}_is_active ON ${TABLES.USERS}(is_active)`
+  },
+  {
+    name: `idx_${TABLES.USERS}_lower_email`,
+    sql: `CREATE INDEX IF NOT EXISTS idx_${TABLES.USERS}_lower_email ON ${TABLES.USERS}(LOWER(email))`
+  },
+  {
+    name: `idx_${TABLES.USERS}_mobile_number`,
+    sql: `CREATE INDEX IF NOT EXISTS idx_${TABLES.USERS}_mobile_number ON ${TABLES.USERS}(mobile_number)`
   }
 ];
 
@@ -247,46 +255,27 @@ export async function createContainers(client: PoolClient): Promise<void> {
   // Ensure UUID extension is loaded
   await client.query('CREATE EXTENSION IF NOT EXISTS "uuid-ossp"');
 
-  // 1. Process Table Definitions
-  for (const def of TABLE_DEFINITIONS) {
-    logger.info(`Checking/creating table: ${def.name}`);
-    await client.query(def.sql);
-  }
-
-  // 2. Process Migrations (e.g. Alter Table additions)
-  for (const mig of MIGRATIONS) {
-    logger.info(`Applying database migration check: ${mig.name}`);
-    await client.query(mig.sql);
-  }
-
-  // 3. Process Index & Constraint Definitions
-  for (const fki of FK_AND_INDEX_DEFINITIONS) {
-    logger.info(`Verifying index/constraint: ${fki.name}`);
-    await client.query(fki.sql);
-  }
-
-  // 4. Setup Auto-Update Timestamp Trigger Function
-  await client.query(`
-    CREATE OR REPLACE FUNCTION update_updated_at_column()
+  // 1. Batch Table Definitions, Migrations, Indexes and Triggers into a single round-trip
+  const batchStatements = [
+    ...TABLE_DEFINITIONS.map((def) => def.sql),
+    ...MIGRATIONS.map((mig) => mig.sql),
+    ...FK_AND_INDEX_DEFINITIONS.map((fki) => fki.sql),
+    `CREATE OR REPLACE FUNCTION update_updated_at_column()
     RETURNS TRIGGER AS $$
     BEGIN
       NEW.updated_at = NOW();
       RETURN NEW;
     END;
-    $$ LANGUAGE plpgsql
-  `);
+    $$ LANGUAGE plpgsql`,
+    `DROP TRIGGER IF EXISTS trg_${TABLES.USERS}_updated_at ON ${TABLES.USERS}`,
+    `CREATE TRIGGER trg_${TABLES.USERS}_updated_at BEFORE UPDATE ON ${TABLES.USERS} FOR EACH ROW EXECUTE FUNCTION update_updated_at_column()`,
+    `DROP TRIGGER IF EXISTS trg_${TABLES.STORAGE_ITEMS}_updated_at ON ${TABLES.STORAGE_ITEMS}`,
+    `CREATE TRIGGER trg_${TABLES.STORAGE_ITEMS}_updated_at BEFORE UPDATE ON ${TABLES.STORAGE_ITEMS} FOR EACH ROW EXECUTE FUNCTION update_updated_at_column()`,
+    `DROP TRIGGER IF EXISTS trg_${TABLES.UPLOAD_SESSIONS}_updated_at ON ${TABLES.UPLOAD_SESSIONS}`,
+    `CREATE TRIGGER trg_${TABLES.UPLOAD_SESSIONS}_updated_at BEFORE UPDATE ON ${TABLES.UPLOAD_SESSIONS} FOR EACH ROW EXECUTE FUNCTION update_updated_at_column()`,
+  ];
 
-  // 5. Apply Triggers to Tables
-  const tablesWithTriggers = [TABLES.USERS, TABLES.STORAGE_ITEMS, TABLES.UPLOAD_SESSIONS];
-  for (const tbl of tablesWithTriggers) {
-    await client.query(`DROP TRIGGER IF EXISTS trg_${tbl}_updated_at ON ${tbl}`);
-    await client.query(`
-      CREATE TRIGGER trg_${tbl}_updated_at
-      BEFORE UPDATE ON ${tbl}
-      FOR EACH ROW
-      EXECUTE FUNCTION update_updated_at_column()
-    `);
-  }
+  await client.query(batchStatements.join(';\n'));
 
   // 5b. Guard against deleting the superadmin account, or demoting/deactivating it
   // via a direct role/is_active change (defense in depth beyond the app-layer checks).
