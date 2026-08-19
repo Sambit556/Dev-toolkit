@@ -8,7 +8,7 @@ const redisToken = getEnv('UPSTASH_REDIS_REST_TOKEN');
 export let redisClient: Redis | null = null;
 export let isRedisHealthy = false;
 export let redisStatusText = 'Disconnected';
-
+// redis client
 if (redisUrl && redisToken) {
   try {
     redisClient = new Redis({
