@@ -1766,8 +1766,10 @@ export default function StoragePage() {
         setSendSubject('');
         setSendHtml('');
         setSendScheduledAt('');
-        setEmailSubTab('list');
-        fetchAdminEmails(true);
+        if (userRole === 'superadmin') {
+          setEmailSubTab('list');
+          fetchAdminEmails(true);
+        }
       } else {
         toast.error(json.message || 'Failed to send email');
       }
@@ -1803,8 +1805,10 @@ export default function StoragePage() {
       if (json.success) {
         toast.success(`Batch of ${validItems.length} emails dispatched!`);
         setBatchItems([{ to: '', subject: '', html: '' }]);
-        setEmailSubTab('list');
-        fetchAdminEmails(true);
+        if (userRole === 'superadmin') {
+          setEmailSubTab('list');
+          fetchAdminEmails(true);
+        }
       } else {
         toast.error(json.message || 'Failed to send batch');
       }
@@ -4421,7 +4425,12 @@ export default function StoragePage() {
                     if (excalidrawAPI) excalidrawAPI.resetScene();
                   }
                   if (tab === 'admin-emails') {
-                    fetchAdminEmails();
+                    if (userRole === 'superadmin') {
+                      fetchAdminEmails();
+                      setEmailSubTab('list');
+                    } else {
+                      setEmailSubTab('compose');
+                    }
                   }
                   setEditorNote(null);
                   setSelectedItems(new Set());
@@ -5095,17 +5104,19 @@ export default function StoragePage() {
               {/* Subtabs & Refresh */}
               <div className="flex items-center gap-2">
                 <div className="flex bg-slate-100 dark:bg-slate-900 p-1 rounded-xl border border-slate-200 dark:border-slate-800 text-xs">
-                  <button
-                    onClick={() => setEmailSubTab('list')}
-                    className={cn(
-                      "px-3 py-1.5 rounded-lg font-bold transition-all cursor-pointer flex items-center gap-1.5 text-xs",
-                      emailSubTab === 'list'
-                        ? "bg-white dark:bg-slate-800 text-blue-600 dark:text-blue-400 shadow-sm"
-                        : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100"
-                    )}
-                  >
-                    <Inbox className="h-3.5 w-3.5" /> Activity Log
-                  </button>
+                  {userRole === 'superadmin' && (
+                    <button
+                      onClick={() => setEmailSubTab('list')}
+                      className={cn(
+                        "px-3 py-1.5 rounded-lg font-bold transition-all cursor-pointer flex items-center gap-1.5 text-xs",
+                        emailSubTab === 'list'
+                          ? "bg-white dark:bg-slate-800 text-blue-600 dark:text-blue-400 shadow-sm"
+                          : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100"
+                      )}
+                    >
+                      <Inbox className="h-3.5 w-3.5" /> Activity Log
+                    </button>
+                  )}
                   <button
                     onClick={() => setEmailSubTab('compose')}
                     className={cn(
@@ -5130,18 +5141,20 @@ export default function StoragePage() {
                   </button>
                 </div>
 
-                <button
-                  onClick={() => fetchAdminEmails(true)}
-                  title="Force refresh from Resend API"
-                  className="flex items-center gap-1.5 px-3 py-2 bg-slate-100/60 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 rounded-lg font-bold transition-all cursor-pointer text-xs"
-                >
-                  <RotateCw className={cn("h-3.5 w-3.5", isLoadingEmails && "animate-spin")} />
-                </button>
+                {userRole === 'superadmin' && (
+                  <button
+                    onClick={() => fetchAdminEmails(true)}
+                    title="Force refresh from Resend API"
+                    className="flex items-center gap-1.5 px-3 py-2 bg-slate-100/60 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 rounded-lg font-bold transition-all cursor-pointer text-xs"
+                  >
+                    <RotateCw className={cn("h-3.5 w-3.5", isLoadingEmails && "animate-spin")} />
+                  </button>
+                )}
               </div>
             </div>
 
-            {/* Subtab 1: Activity Log Table */}
-            {emailSubTab === 'list' && (
+            {/* Subtab 1: Activity Log Table (Superadmin Only) */}
+            {emailSubTab === 'list' && userRole === 'superadmin' && (
               <div className="flex-1 flex flex-col overflow-hidden">
                 <div className="flex items-center justify-between gap-3 mb-3 shrink-0">
                   <div className="relative flex-1 max-w-sm">

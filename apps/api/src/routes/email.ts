@@ -1,5 +1,6 @@
 import { Router, Request, Response, NextFunction } from 'express';
-import { requireAuth } from '../middleware/auth';
+import { requireAuth, requireRole } from '../middleware/auth';
+import { ROLES } from '../constants/activityActions';
 import { AppError } from '../middleware/errorHandler';
 import * as emailService from '../services/email.service';
 import { SendEmailSchema, SendBatchEmailSchema, UpdateScheduledEmailSchema } from '../validators/email.validators';
@@ -14,11 +15,11 @@ router.use(requireAuth);
  * @openapi
  * /api/emails:
  *   get:
- *     summary: List recent transactional emails via Resend
+ *     summary: List recent transactional emails via Resend (Superadmin only)
  *     tags: [Emails]
  *     security: [{ bearerAuth: [] }]
  */
-router.get('/', async (req: Request, res: Response, next: NextFunction) => {
+router.get('/', requireRole(ROLES.SUPERADMIN), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const bypassCache = req.query.fresh === 'true';
     const emailList = await emailService.listEmails(bypassCache);
@@ -32,11 +33,11 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
  * @openapi
  * /api/emails/{id}:
  *   get:
- *     summary: Get details of a single email from Resend
+ *     summary: Get details of a single email from Resend (Superadmin only)
  *     tags: [Emails]
  *     security: [{ bearerAuth: [] }]
  */
-router.get('/:id', async (req: Request, res: Response, next: NextFunction) => {
+router.get('/:id', requireRole(ROLES.SUPERADMIN), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const email = await emailService.getEmailById(req.params.id);
     res.json({ success: true, data: email });
@@ -99,7 +100,7 @@ router.post('/batch', async (req: Request, res: Response, next: NextFunction) =>
  *     tags: [Emails]
  *     security: [{ bearerAuth: [] }]
  */
-router.patch('/:id/schedule', async (req: Request, res: Response, next: NextFunction) => {
+router.patch('/:id/schedule', requireRole(ROLES.SUPERADMIN), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const parseResult = UpdateScheduledEmailSchema.safeParse(req.body);
     if (!parseResult.success) {
@@ -122,7 +123,7 @@ router.patch('/:id/schedule', async (req: Request, res: Response, next: NextFunc
  *     tags: [Emails]
  *     security: [{ bearerAuth: [] }]
  */
-router.delete('/:id/cancel', async (req: Request, res: Response, next: NextFunction) => {
+router.delete('/:id/cancel', requireRole(ROLES.SUPERADMIN), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const data = await emailService.cancelScheduledEmail(req.params.id);
     res.json({ success: true, data, message: 'Scheduled email cancelled successfully' });
