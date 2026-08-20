@@ -1692,11 +1692,11 @@ export default function StoragePage() {
     }
   };
 
-  // --- Superadmin Email Management (Resend) -------------------------------
+  // --- Transactional Email Management (Resend) -------------------------------
   const fetchAdminEmails = async (bypassCache = false) => {
     setIsLoadingEmails(true);
     try {
-      const url = `${API_BASE}/api/backoffice/emails${bypassCache ? '?fresh=true' : ''}`;
+      const url = `${API_BASE}/api/emails${bypassCache ? '?fresh=true' : ''}`;
       const res = await apiFetch(url, { headers: getHeaders() });
       const json = await res.json();
       if (json.success) {
@@ -1717,7 +1717,7 @@ export default function StoragePage() {
     setIsLoadingEmailDetail(true);
     setShowEmailDetailModal(true);
     try {
-      const res = await apiFetch(`${API_BASE}/api/backoffice/emails/${emailId}`, { headers: getHeaders() });
+      const res = await apiFetch(`${API_BASE}/api/emails/${emailId}`, { headers: getHeaders() });
       const json = await res.json();
       if (json.success) {
         setSelectedEmailDetail(json.data);
@@ -1752,7 +1752,7 @@ export default function StoragePage() {
       if (sendScheduledAt) {
         payload.scheduledAt = new Date(sendScheduledAt).toISOString();
       }
-      const res = await apiFetch(`${API_BASE}/api/backoffice/emails/send`, {
+      const res = await apiFetch(`${API_BASE}/api/emails/send`, {
         method: 'POST',
         headers: getHeaders(),
         body: JSON.stringify(payload),
@@ -1794,7 +1794,7 @@ export default function StoragePage() {
           html: item.html,
         }))
       };
-      const res = await apiFetch(`${API_BASE}/api/backoffice/emails/batch`, {
+      const res = await apiFetch(`${API_BASE}/api/emails/batch`, {
         method: 'POST',
         headers: getHeaders(),
         body: JSON.stringify(payload),
@@ -1822,7 +1822,7 @@ export default function StoragePage() {
     }
     setIsRescheduling(true);
     try {
-      const res = await apiFetch(`${API_BASE}/api/backoffice/emails/${emailId}/schedule`, {
+      const res = await apiFetch(`${API_BASE}/api/emails/${emailId}/schedule`, {
         method: 'PATCH',
         headers: getHeaders(),
         body: JSON.stringify({ scheduledAt: new Date(rescheduleDate).toISOString() }),
@@ -1845,7 +1845,7 @@ export default function StoragePage() {
   const handleCancelScheduledEmail = async (emailId: string) => {
     setIsCancelingSchedule(true);
     try {
-      const res = await apiFetch(`${API_BASE}/api/backoffice/emails/${emailId}/cancel`, {
+      const res = await apiFetch(`${API_BASE}/api/emails/${emailId}/cancel`, {
         method: 'DELETE',
         headers: getHeaders(),
       });
@@ -4405,6 +4405,7 @@ export default function StoragePage() {
               { tab: 'events' as const, icon: Calendar, label: 'Events', badge: null },
               { tab: 'notes' as const, icon: FileText, label: 'Text Notes', badge: null },
               { tab: 'diagrams' as const, icon: Palette, label: 'Diagrams', badge: null },
+              { tab: 'admin-emails' as const, icon: Mail, label: 'Transactional Email', badge: null },
               { tab: 'uploads' as const, icon: Upload, label: 'Upload Queue', badge: uploadsList.filter(u => u.status === 'uploading').length || null },
               { tab: 'trash' as const, icon: Trash2, label: 'Trash', badge: null },
             ].map(({ tab, icon: Icon, label, badge }) => (
@@ -4418,6 +4419,9 @@ export default function StoragePage() {
                     setIsDiagramEditing(true);
                     setDiagramName('');
                     if (excalidrawAPI) excalidrawAPI.resetScene();
+                  }
+                  if (tab === 'admin-emails') {
+                    fetchAdminEmails();
                   }
                   setEditorNote(null);
                   setSelectedItems(new Set());
@@ -4450,18 +4454,6 @@ export default function StoragePage() {
                 >
                   <Shield className="h-3.5 w-3.5 shrink-0" />
                   <span className="flex-1">User Management</span>
-                </button>
-                <button
-                  onClick={() => { setSidebarTab('admin-emails'); setEditorNote(null); setSelectedItems(new Set()); setIsSelecting(false); fetchAdminEmails(); }}
-                  className={cn(
-                    "w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-left transition-all cursor-pointer font-bold text-xs mt-1",
-                    sidebarTab === 'admin-emails'
-                      ? "bg-gradient-to-r from-blue-600/20 to-purple-600/10 border border-blue-500/30 text-blue-600 dark:text-blue-400 shadow-[0_0_12px_rgba(59,130,246,0.12)]"
-                      : "text-slate-600 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-500/5"
-                  )}
-                >
-                  <Mail className="h-3.5 w-3.5 shrink-0" />
-                  <span className="flex-1">Transactional Email</span>
                 </button>
               </>
             )}
@@ -5081,8 +5073,8 @@ export default function StoragePage() {
               )}
             </div>
           </main>
-        ) : sidebarTab === 'admin-emails' && userRole === 'superadmin' ? (
-          /* Superadmin dashboard: Resend Transactional Email Suite */
+        ) : sidebarTab === 'admin-emails' ? (
+          /* Transactional Email Suite (Single Send, Batch Send, Activity Log) */
           <main key="admin-emails" className="flex-1 flex flex-col overflow-hidden bg-white/60 dark:bg-black/45 backdrop-blur-md p-4 animate-scale-in">
             {renderDiagnosticBar('-mx-4 -mt-4 mb-4')}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4 border-b border-slate-200 dark:border-slate-800 pb-3 shrink-0">
@@ -5096,7 +5088,7 @@ export default function StoragePage() {
                   </span>
                 </div>
                 <div className="text-[10px] text-slate-500 dark:text-slate-500 mt-0.5">
-                  Superadmin only — manage transactional dispatches, schedule queue, batch sends & delivery analytics
+                  Compose single & batch transactional emails, schedule future dispatches, and inspect delivery telemetry
                 </div>
               </div>
 

@@ -20,8 +20,8 @@
     --accent-foreground: 222.2 47.4% 11.2%;
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 210 40% 98%;
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
+    --border: 215 25% 82%;
+    --input: 215 25% 82%;
     --ring: 221.2 83.2% 53.3%;
     --radius: 0.5rem;
   }
@@ -50,6 +50,21 @@
 }
 
 @layer base {
+  /* Enhance light-mode border visibility and definition across all tool surfaces, inputs, dividers, and cards */
+  html:not(.dark) .border-slate-200,
+  html:not(.dark) .border-gray-200,
+  html:not(.dark) .border-zinc-200,
+  html:not(.dark) .border-neutral-200 {
+    border-color: rgb(203 213 225 / var(--tw-border-opacity, 1));
+  }
+
+  html:not(.dark) .border-slate-100,
+  html:not(.dark) .border-gray-100,
+  html:not(.dark) .border-zinc-100,
+  html:not(.dark) .border-neutral-100 {
+    border-color: rgb(226 232 240 / var(--tw-border-opacity, 1));
+  }
+
   * {
     @apply border-border;
     /* Prevent any element from causing horizontal scroll */
