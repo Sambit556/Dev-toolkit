@@ -3,8 +3,10 @@ import { requireAuth, requireRole } from '../middleware/auth';
 import { AppError } from '../middleware/errorHandler';
 import { ROLES } from '../constants/activityActions';
 import * as adminService from '../services/admin.service';
+import * as emailService from '../services/email.service';
 import { isValidUuid } from '../utils/ids';
 import { SetActiveSchema, UpdateQuotaSchema, AdminChangePasswordSchema } from '../validators/admin.validators';
+import { SendEmailSchema, SendBatchEmailSchema, UpdateScheduledEmailSchema } from '../validators/email.validators';
 import { HttpStatus } from '../utils/httpStatus';
 
 const router = Router();
@@ -183,6 +185,131 @@ router.patch('/users/:id/password', async (req: Request, res: Response, next: Ne
     res.json({ success: true, message: 'Password updated successfully' });
   } catch (err) {
     next(err);
+  }
+});
+
+// ===========================================================================
+// Resend Transactional Email Management (Superadmin Only)
+// ===========================================================================
+
+/**
+ * @openapi
+ * /api/backoffice/emails:
+ *   get:
+ *     summary: List recent transactional emails via Resend
+ *     tags: [Admin, Emails]
+ *     security: [{ bearerAuth: [] }]
+ */
+router.get('/emails', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const bypassCache = req.query.fresh === 'true';
+    const emailList = await emailService.listEmails(bypassCache);
+    res.json({ success: true, data: emailList });
+  } catch (err: any) {
+    next(new AppError(HttpStatus.BAD_REQUEST, err.message || 'Failed to list emails from Resend', 'RESEND_ERROR'));
+  }
+});
+
+/**
+ * @openapi
+ * /api/backoffice/emails/{id}:
+ *   get:
+ *     summary: Get details of a single email from Resend
+ *     tags: [Admin, Emails]
+ *     security: [{ bearerAuth: [] }]
+ */
+router.get('/emails/:id', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const email = await emailService.getEmailById(req.params.id);
+    res.json({ success: true, data: email });
+  } catch (err: any) {
+    next(new AppError(HttpStatus.NOT_FOUND, err.message || 'Email not found in Resend', 'NOT_FOUND'));
+  }
+});
+
+/**
+ * @openapi
+ * /api/backoffice/emails/send:
+ *   post:
+ *     summary: Send a single email via Resend
+ *     tags: [Admin, Emails]
+ *     security: [{ bearerAuth: [] }]
+ */
+router.post('/emails/send', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const parseResult = SendEmailSchema.safeParse(req.body);
+    if (!parseResult.success) {
+      throw new AppError(HttpStatus.BAD_REQUEST, 'Invalid email payload', 'VALIDATION_ERROR', parseResult.error.flatten().fieldErrors);
+    }
+
+    const data = await emailService.sendSingleEmail(parseResult.data);
+    res.json({ success: true, data, message: 'Email sent successfully via Resend' });
+  } catch (err: any) {
+    if (err instanceof AppError) return next(err);
+    next(new AppError(HttpStatus.BAD_REQUEST, err.message || 'Failed to send email via Resend', 'RESEND_ERROR'));
+  }
+});
+
+/**
+ * @openapi
+ * /api/backoffice/emails/batch:
+ *   post:
+ *     summary: Send batch emails via Resend
+ *     tags: [Admin, Emails]
+ *     security: [{ bearerAuth: [] }]
+ */
+router.post('/emails/batch', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const parseResult = SendBatchEmailSchema.safeParse(req.body);
+    if (!parseResult.success) {
+      throw new AppError(HttpStatus.BAD_REQUEST, 'Invalid batch email payload', 'VALIDATION_ERROR', parseResult.error.flatten().fieldErrors);
+    }
+
+    const data = await emailService.sendBatchEmails(parseResult.data.emails);
+    res.json({ success: true, data, message: 'Batch emails sent successfully via Resend' });
+  } catch (err: any) {
+    if (err instanceof AppError) return next(err);
+    next(new AppError(HttpStatus.BAD_REQUEST, err.message || 'Failed to send batch emails via Resend', 'RESEND_ERROR'));
+  }
+});
+
+/**
+ * @openapi
+ * /api/backoffice/emails/{id}/schedule:
+ *   patch:
+ *     summary: Update scheduled send time for an email
+ *     tags: [Admin, Emails]
+ *     security: [{ bearerAuth: [] }]
+ */
+router.patch('/emails/:id/schedule', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const parseResult = UpdateScheduledEmailSchema.safeParse(req.body);
+    if (!parseResult.success) {
+      throw new AppError(HttpStatus.BAD_REQUEST, 'Invalid schedule update payload', 'VALIDATION_ERROR', parseResult.error.flatten().fieldErrors);
+    }
+
+    const data = await emailService.updateScheduledEmail(req.params.id, parseResult.data.scheduledAt);
+    res.json({ success: true, data, message: 'Email scheduled time updated successfully' });
+  } catch (err: any) {
+    if (err instanceof AppError) return next(err);
+    next(new AppError(HttpStatus.BAD_REQUEST, err.message || 'Failed to update scheduled email', 'RESEND_ERROR'));
+  }
+});
+
+/**
+ * @openapi
+ * /api/backoffice/emails/{id}/cancel:
+ *   delete:
+ *     summary: Cancel a scheduled email
+ *     tags: [Admin, Emails]
+ *     security: [{ bearerAuth: [] }]
+ */
+router.delete('/emails/:id/cancel', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const data = await emailService.cancelScheduledEmail(req.params.id);
+    res.json({ success: true, data, message: 'Scheduled email cancelled successfully' });
+  } catch (err: any) {
+    next(new AppError(HttpStatus.BAD_REQUEST, err.message || 'Failed to cancel scheduled email', 'RESEND_ERROR'));
   }
 });
 

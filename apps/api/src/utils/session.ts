@@ -257,3 +257,112 @@ export async function clearPasswordChangeOtp(userId: string): Promise<void> {
     memoryPasswordOtps.delete(key);
   }
 }
+
+// ---------------------------------------------------------------------------
+// Single-Use Password Reset Token Store (OWASP Replay Attack Defense)
+// ---------------------------------------------------------------------------
+const memoryResetTokens = new Map<string, { userId: string; timeout: NodeJS.Timeout }>();
+const memoryUserResetTokens = new Map<string, Set<string>>(); // userId -> Set of tokenIds
+
+function resetTokenKey(tokenId: string): string {
+  return `pwd_reset:token:${tokenId}`;
+}
+
+function userResetTokensKey(userId: string): string {
+  return `user:pwd_resets:${userId}`;
+}
+
+export async function registerPasswordResetToken(
+  tokenId: string,
+  userId: string,
+  ttlSeconds: number
+): Promise<void> {
+  if (isRedisHealthy && redisClient) {
+    try {
+      const key = resetTokenKey(tokenId);
+      const userKey = userResetTokensKey(userId);
+      await redisClient.set(key, userId, { ex: ttlSeconds });
+      await redisClient.sadd(userKey, tokenId);
+      await redisClient.expire(userKey, ttlSeconds);
+      return;
+    } catch (err: any) {
+      logger.error('Redis registerPasswordResetToken failed, using memory fallback', { error: err.message });
+    }
+  }
+
+  // Memory Fallback
+  if (!memoryUserResetTokens.has(userId)) {
+    memoryUserResetTokens.set(userId, new Set());
+  }
+  memoryUserResetTokens.get(userId)!.add(tokenId);
+
+  const timeout = setTimeout(() => {
+    memoryResetTokens.delete(tokenId);
+    const set = memoryUserResetTokens.get(userId);
+    if (set) {
+      set.delete(tokenId);
+      if (set.size === 0) memoryUserResetTokens.delete(userId);
+    }
+  }, ttlSeconds * 1000);
+
+  memoryResetTokens.set(tokenId, { userId, timeout });
+}
+
+export async function consumePasswordResetToken(tokenId: string): Promise<boolean> {
+  if (isRedisHealthy && redisClient) {
+    try {
+      const key = resetTokenKey(tokenId);
+      const userId = await redisClient.get(key);
+      if (!userId) return false;
+      await redisClient.del(key);
+      if (typeof userId === 'string') {
+        await redisClient.srem(userResetTokensKey(userId), tokenId);
+      }
+      return true;
+    } catch (err: any) {
+      logger.error('Redis consumePasswordResetToken failed, checking memory fallback', { error: err.message });
+    }
+  }
+
+  const existing = memoryResetTokens.get(tokenId);
+  if (!existing) return false;
+
+  clearTimeout(existing.timeout);
+  memoryResetTokens.delete(tokenId);
+  const set = memoryUserResetTokens.get(existing.userId);
+  if (set) {
+    set.delete(tokenId);
+    if (set.size === 0) memoryUserResetTokens.delete(existing.userId);
+  }
+  return true;
+}
+
+export async function revokeAllUserResetTokens(userId: string): Promise<void> {
+  if (isRedisHealthy && redisClient) {
+    try {
+      const userKey = userResetTokensKey(userId);
+      const tokenIds = await redisClient.smembers(userKey);
+      if (Array.isArray(tokenIds) && tokenIds.length > 0) {
+        const keysToDelete = tokenIds.map(id => resetTokenKey(id));
+        await Promise.all(keysToDelete.map(k => redisClient!.del(k)));
+      }
+      await redisClient.del(userKey);
+      return;
+    } catch (err: any) {
+      logger.error('Redis revokeAllUserResetTokens failed, using memory fallback', { error: err.message });
+    }
+  }
+
+  const set = memoryUserResetTokens.get(userId);
+  if (set) {
+    for (const tokenId of set) {
+      const record = memoryResetTokens.get(tokenId);
+      if (record) {
+        clearTimeout(record.timeout);
+        memoryResetTokens.delete(tokenId);
+      }
+    }
+    memoryUserResetTokens.delete(userId);
+  }
+}
+

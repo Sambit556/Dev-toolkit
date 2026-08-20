@@ -71,6 +71,13 @@ import {
   Crown,
   ZoomIn,
   ZoomOut,
+  Send,
+  Layers,
+  Inbox,
+  CalendarClock,
+  CheckCheck,
+  ExternalLink,
+  RefreshCw,
 } from 'lucide-react';
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
@@ -385,7 +392,7 @@ export default function StoragePage() {
   const [currentFolderId, setCurrentFolderId] = useState<string | null>(null);
   const [folderPath, setFolderPath] = useState<{ id: string; name: string }[]>([]);
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
-  const [sidebarTab, setSidebarTab] = useState<'files' | 'notes' | 'uploads' | 'trash' | 'events' | 'admin' | 'diagrams'>('files');
+  const [sidebarTab, setSidebarTab] = useState<'files' | 'notes' | 'uploads' | 'trash' | 'events' | 'admin' | 'diagrams' | 'admin-emails'>('files');
   // Drives the "All Files" split-button tooltips imperatively — the diagonal-cut
   // segment relies on overflow-hidden for its clip-path, which would silently clip
   // a CSS group-hover tooltip nested inside it, so hover state is tracked here and
@@ -454,6 +461,45 @@ export default function StoragePage() {
   const [adminChangePasswordEmail, setAdminChangePasswordEmail] = useState('');
   const [adminChangePasswordNew, setAdminChangePasswordNew] = useState('');
   const [isAdminChangingPassword, setIsAdminChangingPassword] = useState(false);
+
+  // Resend Email Management State
+  interface ResendEmailItem {
+    id: string;
+    object: string;
+    to: string[] | string;
+    from: string;
+    created_at: string;
+    subject: string;
+    html?: string;
+    text?: string;
+    last_event?: string;
+    scheduled_at?: string | null;
+  }
+  const [adminEmails, setAdminEmails] = useState<ResendEmailItem[]>([]);
+  const [isLoadingEmails, setIsLoadingEmails] = useState(false);
+  const [emailSearchQuery, setEmailSearchQuery] = useState('');
+  const [emailSubTab, setEmailSubTab] = useState<'list' | 'compose' | 'batch'>('list');
+
+  // Single Send State
+  const [sendTo, setSendTo] = useState('');
+  const [sendSubject, setSendSubject] = useState('');
+  const [sendHtml, setSendHtml] = useState('');
+  const [sendScheduledAt, setSendScheduledAt] = useState('');
+  const [isSendingEmail, setIsSendingEmail] = useState(false);
+
+  // Batch Send State
+  const [batchItems, setBatchItems] = useState<{ to: string; subject: string; html: string }[]>([
+    { to: '', subject: '', html: '' },
+  ]);
+  const [isSendingBatch, setIsSendingBatch] = useState(false);
+
+  // Email Detail Modal State
+  const [selectedEmailDetail, setSelectedEmailDetail] = useState<ResendEmailItem | null>(null);
+  const [isLoadingEmailDetail, setIsLoadingEmailDetail] = useState(false);
+  const [showEmailDetailModal, setShowEmailDetailModal] = useState(false);
+  const [rescheduleDate, setRescheduleDate] = useState('');
+  const [isRescheduling, setIsRescheduling] = useState(false);
+  const [isCancelingSchedule, setIsCancelingSchedule] = useState(false);
 
   // Drag and drop state
   const [draggedItemId, setDraggedItemId] = useState<string | null>(null);
@@ -1643,6 +1689,178 @@ export default function StoragePage() {
       toast.error('Failed to change password');
     } finally {
       setIsAdminChangingPassword(false);
+    }
+  };
+
+  // --- Superadmin Email Management (Resend) -------------------------------
+  const fetchAdminEmails = async (bypassCache = false) => {
+    setIsLoadingEmails(true);
+    try {
+      const url = `${API_BASE}/api/backoffice/emails${bypassCache ? '?fresh=true' : ''}`;
+      const res = await apiFetch(url, { headers: getHeaders() });
+      const json = await res.json();
+      if (json.success) {
+        const raw = json.data;
+        const items = Array.isArray(raw) ? raw : (raw?.data && Array.isArray(raw.data) ? raw.data : []);
+        setAdminEmails(items);
+      } else {
+        toast.error(json.message || 'Failed to load emails');
+      }
+    } catch {
+      toast.error('Failed to connect to Resend email service');
+    } finally {
+      setIsLoadingEmails(false);
+    }
+  };
+
+  const fetchEmailDetails = async (emailId: string) => {
+    setIsLoadingEmailDetail(true);
+    setShowEmailDetailModal(true);
+    try {
+      const res = await apiFetch(`${API_BASE}/api/backoffice/emails/${emailId}`, { headers: getHeaders() });
+      const json = await res.json();
+      if (json.success) {
+        setSelectedEmailDetail(json.data);
+        if (json.data.scheduled_at) {
+          setRescheduleDate(new Date(json.data.scheduled_at).toISOString().slice(0, 16));
+        } else {
+          setRescheduleDate('');
+        }
+      } else {
+        toast.error(json.message || 'Failed to load email details');
+      }
+    } catch {
+      toast.error('Failed to load email details');
+    } finally {
+      setIsLoadingEmailDetail(false);
+    }
+  };
+
+  const handleSendSingleEmail = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!sendTo || !sendSubject || !sendHtml) {
+      toast.error('Please enter To, Subject, and HTML Content');
+      return;
+    }
+    setIsSendingEmail(true);
+    try {
+      const payload: any = {
+        to: sendTo.split(',').map(s => s.trim()).filter(Boolean),
+        subject: sendSubject,
+        html: sendHtml,
+      };
+      if (sendScheduledAt) {
+        payload.scheduledAt = new Date(sendScheduledAt).toISOString();
+      }
+      const res = await apiFetch(`${API_BASE}/api/backoffice/emails/send`, {
+        method: 'POST',
+        headers: getHeaders(),
+        body: JSON.stringify(payload),
+      });
+      const json = await res.json();
+      if (json.success) {
+        toast.success('Email dispatched via Resend!', {
+          description: `Message ID: ${json.data?.id || 'Sent'}`
+        });
+        setSendTo('');
+        setSendSubject('');
+        setSendHtml('');
+        setSendScheduledAt('');
+        setEmailSubTab('list');
+        fetchAdminEmails(true);
+      } else {
+        toast.error(json.message || 'Failed to send email');
+      }
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to send email');
+    } finally {
+      setIsSendingEmail(false);
+    }
+  };
+
+  const handleSendBatchEmails = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const validItems = batchItems.filter(item => item.to.trim() && item.subject.trim() && item.html.trim());
+    if (validItems.length === 0) {
+      toast.error('Please add at least 1 valid email with To, Subject, and Body');
+      return;
+    }
+    setIsSendingBatch(true);
+    try {
+      const payload = {
+        emails: validItems.map(item => ({
+          to: item.to.split(',').map(s => s.trim()).filter(Boolean),
+          subject: item.subject,
+          html: item.html,
+        }))
+      };
+      const res = await apiFetch(`${API_BASE}/api/backoffice/emails/batch`, {
+        method: 'POST',
+        headers: getHeaders(),
+        body: JSON.stringify(payload),
+      });
+      const json = await res.json();
+      if (json.success) {
+        toast.success(`Batch of ${validItems.length} emails dispatched!`);
+        setBatchItems([{ to: '', subject: '', html: '' }]);
+        setEmailSubTab('list');
+        fetchAdminEmails(true);
+      } else {
+        toast.error(json.message || 'Failed to send batch');
+      }
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to send batch');
+    } finally {
+      setIsSendingBatch(false);
+    }
+  };
+
+  const handleRescheduleEmail = async (emailId: string) => {
+    if (!rescheduleDate) {
+      toast.error('Select a valid future date & time');
+      return;
+    }
+    setIsRescheduling(true);
+    try {
+      const res = await apiFetch(`${API_BASE}/api/backoffice/emails/${emailId}/schedule`, {
+        method: 'PATCH',
+        headers: getHeaders(),
+        body: JSON.stringify({ scheduledAt: new Date(rescheduleDate).toISOString() }),
+      });
+      const json = await res.json();
+      if (json.success) {
+        toast.success('Email rescheduled successfully');
+        fetchEmailDetails(emailId);
+        fetchAdminEmails(true);
+      } else {
+        toast.error(json.message || 'Failed to reschedule email');
+      }
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to reschedule email');
+    } finally {
+      setIsRescheduling(false);
+    }
+  };
+
+  const handleCancelScheduledEmail = async (emailId: string) => {
+    setIsCancelingSchedule(true);
+    try {
+      const res = await apiFetch(`${API_BASE}/api/backoffice/emails/${emailId}/cancel`, {
+        method: 'DELETE',
+        headers: getHeaders(),
+      });
+      const json = await res.json();
+      if (json.success) {
+        toast.success('Scheduled email cancelled successfully');
+        setShowEmailDetailModal(false);
+        fetchAdminEmails(true);
+      } else {
+        toast.error(json.message || 'Failed to cancel scheduled email');
+      }
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to cancel email');
+    } finally {
+      setIsCancelingSchedule(false);
     }
   };
 
@@ -4233,6 +4451,18 @@ export default function StoragePage() {
                   <Shield className="h-3.5 w-3.5 shrink-0" />
                   <span className="flex-1">User Management</span>
                 </button>
+                <button
+                  onClick={() => { setSidebarTab('admin-emails'); setEditorNote(null); setSelectedItems(new Set()); setIsSelecting(false); fetchAdminEmails(); }}
+                  className={cn(
+                    "w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-left transition-all cursor-pointer font-bold text-xs mt-1",
+                    sidebarTab === 'admin-emails'
+                      ? "bg-gradient-to-r from-blue-600/20 to-purple-600/10 border border-blue-500/30 text-blue-600 dark:text-blue-400 shadow-[0_0_12px_rgba(59,130,246,0.12)]"
+                      : "text-slate-600 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-500/5"
+                  )}
+                >
+                  <Mail className="h-3.5 w-3.5 shrink-0" />
+                  <span className="flex-1">Transactional Email</span>
+                </button>
               </>
             )}
 
@@ -4850,6 +5080,450 @@ export default function StoragePage() {
                 </div>
               )}
             </div>
+          </main>
+        ) : sidebarTab === 'admin-emails' && userRole === 'superadmin' ? (
+          /* Superadmin dashboard: Resend Transactional Email Suite */
+          <main key="admin-emails" className="flex-1 flex flex-col overflow-hidden bg-white/60 dark:bg-black/45 backdrop-blur-md p-4 animate-scale-in">
+            {renderDiagnosticBar('-mx-4 -mt-4 mb-4')}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4 border-b border-slate-200 dark:border-slate-800 pb-3 shrink-0">
+              <div>
+                <div className="flex items-center gap-2">
+                  <h2 className="text-sm font-bold text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
+                    <Mail className="h-4 w-4 text-blue-600 dark:text-blue-400" /> Resend Email Console
+                  </h2>
+                  <span className="text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
+                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" /> Resend Active
+                  </span>
+                </div>
+                <div className="text-[10px] text-slate-500 dark:text-slate-500 mt-0.5">
+                  Superadmin only — manage transactional dispatches, schedule queue, batch sends & delivery analytics
+                </div>
+              </div>
+
+              {/* Subtabs & Refresh */}
+              <div className="flex items-center gap-2">
+                <div className="flex bg-slate-100 dark:bg-slate-900 p-1 rounded-xl border border-slate-200 dark:border-slate-800 text-xs">
+                  <button
+                    onClick={() => setEmailSubTab('list')}
+                    className={cn(
+                      "px-3 py-1.5 rounded-lg font-bold transition-all cursor-pointer flex items-center gap-1.5 text-xs",
+                      emailSubTab === 'list'
+                        ? "bg-white dark:bg-slate-800 text-blue-600 dark:text-blue-400 shadow-sm"
+                        : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100"
+                    )}
+                  >
+                    <Inbox className="h-3.5 w-3.5" /> Activity Log
+                  </button>
+                  <button
+                    onClick={() => setEmailSubTab('compose')}
+                    className={cn(
+                      "px-3 py-1.5 rounded-lg font-bold transition-all cursor-pointer flex items-center gap-1.5 text-xs",
+                      emailSubTab === 'compose'
+                        ? "bg-white dark:bg-slate-800 text-blue-600 dark:text-blue-400 shadow-sm"
+                        : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100"
+                    )}
+                  >
+                    <Send className="h-3.5 w-3.5" /> Single Send
+                  </button>
+                  <button
+                    onClick={() => setEmailSubTab('batch')}
+                    className={cn(
+                      "px-3 py-1.5 rounded-lg font-bold transition-all cursor-pointer flex items-center gap-1.5 text-xs",
+                      emailSubTab === 'batch'
+                        ? "bg-white dark:bg-slate-800 text-blue-600 dark:text-blue-400 shadow-sm"
+                        : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100"
+                    )}
+                  >
+                    <Layers className="h-3.5 w-3.5" /> Batch Send
+                  </button>
+                </div>
+
+                <button
+                  onClick={() => fetchAdminEmails(true)}
+                  title="Force refresh from Resend API"
+                  className="flex items-center gap-1.5 px-3 py-2 bg-slate-100/60 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 rounded-lg font-bold transition-all cursor-pointer text-xs"
+                >
+                  <RotateCw className={cn("h-3.5 w-3.5", isLoadingEmails && "animate-spin")} />
+                </button>
+              </div>
+            </div>
+
+            {/* Subtab 1: Activity Log Table */}
+            {emailSubTab === 'list' && (
+              <div className="flex-1 flex flex-col overflow-hidden">
+                <div className="flex items-center justify-between gap-3 mb-3 shrink-0">
+                  <div className="relative flex-1 max-w-sm">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
+                    <input
+                      type="text"
+                      placeholder="Search recipient, subject, or email ID..."
+                      value={emailSearchQuery}
+                      onChange={(e) => setEmailSearchQuery(e.target.value)}
+                      className="w-full pl-9 pr-3 py-1.5 text-xs rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/60 text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:border-blue-500/50"
+                    />
+                  </div>
+                  <div className="text-[11px] text-slate-500 font-mono">
+                    Total: {adminEmails.length} logged
+                  </div>
+                </div>
+
+                <div className="flex-1 overflow-y-auto border border-slate-200 dark:border-slate-800 rounded-xl bg-slate-100/5 dark:bg-slate-900/5">
+                  {isLoadingEmails ? (
+                    <div className="h-64 flex items-center justify-center text-slate-500 gap-2 font-mono text-xs">
+                      <Loader2 className="h-5 w-5 animate-spin text-blue-500" /> Querying Resend emails...
+                    </div>
+                  ) : adminEmails.length === 0 ? (
+                    <div className="h-64 flex flex-col items-center justify-center text-slate-500 gap-2 p-6 text-center">
+                      <Mail className="h-8 w-8 text-slate-400 animate-pulse" />
+                      <div className="text-xs font-bold text-slate-700 dark:text-slate-300">No emails found</div>
+                      <div className="text-[10px] text-slate-400 max-w-xs">
+                        Use the "Single Send" or "Batch Send" tab above to dispatch your first transactional email via Resend.
+                      </div>
+                    </div>
+                  ) : (
+                    <table className="w-full text-left border-collapse">
+                      <thead>
+                        <tr className="border-b border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 uppercase tracking-widest text-[9px] font-black bg-slate-100/15 dark:bg-slate-900/15 sticky top-0 backdrop-blur-md">
+                          <th className="py-2.5 px-4">To Recipient</th>
+                          <th className="py-2.5 px-4">Subject</th>
+                          <th className="py-2.5 px-4">Status</th>
+                          <th className="py-2.5 px-4">Date / Scheduled</th>
+                          <th className="py-2.5 px-4">Email ID</th>
+                          <th className="py-2.5 px-4 text-right">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {adminEmails
+                          .filter((em) => {
+                            if (!emailSearchQuery) return true;
+                            const q = emailSearchQuery.toLowerCase();
+                            const toStr = Array.isArray(em.to) ? em.to.join(', ') : String(em.to || '');
+                            return (
+                              toStr.toLowerCase().includes(q) ||
+                              (em.subject || '').toLowerCase().includes(q) ||
+                              (em.id || '').toLowerCase().includes(q)
+                            );
+                          })
+                          .map((em) => {
+                            const toList = Array.isArray(em.to) ? em.to : [em.to];
+                            const isScheduled = Boolean(em.scheduled_at);
+                            const status = em.last_event || (isScheduled ? 'scheduled' : 'sent');
+                            
+                            let statusBadge = (
+                              <span className="text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md border bg-blue-500/10 border-blue-500/30 text-blue-600 dark:text-blue-400">
+                                {status}
+                              </span>
+                            );
+                            if (status === 'delivered') {
+                              statusBadge = (
+                                <span className="text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md border bg-emerald-500/10 border-emerald-500/30 text-emerald-600 dark:text-emerald-400 flex items-center gap-1 w-fit">
+                                  <CheckCheck className="h-3 w-3" /> delivered
+                                </span>
+                              );
+                            } else if (status === 'scheduled') {
+                              statusBadge = (
+                                <span className="text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md border bg-purple-500/10 border-purple-500/30 text-purple-600 dark:text-purple-400 flex items-center gap-1 w-fit">
+                                  <CalendarClock className="h-3 w-3" /> scheduled
+                                </span>
+                              );
+                            } else if (status === 'bounced' || status === 'complained' || status === 'failed') {
+                              statusBadge = (
+                                <span className="text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md border bg-rose-500/10 border-rose-500/30 text-rose-600 dark:text-rose-400">
+                                  {status}
+                                </span>
+                              );
+                            }
+
+                            return (
+                              <tr key={em.id} className="border-b border-slate-100 dark:border-slate-900 hover:bg-slate-100/10 dark:hover:bg-slate-900/10 transition-colors">
+                                <td className="py-3 px-4">
+                                  <div className="flex items-center gap-2">
+                                    <div className="font-bold text-slate-800 dark:text-slate-200 text-xs font-mono truncate max-w-[180px]">
+                                      {toList[0] || 'Unknown'}
+                                    </div>
+                                    {toList.length > 1 && (
+                                      <span className="text-[9px] px-1.5 py-0.5 bg-slate-200 dark:bg-slate-800 rounded font-semibold text-slate-600 dark:text-slate-400">
+                                        +{toList.length - 1}
+                                      </span>
+                                    )}
+                                    <CopyButton
+                                      value={toList.join(', ')}
+                                      tooltip="Copy Recipient(s)"
+                                      toastMessage={false}
+                                      className="h-4 w-4 p-0 shrink-0"
+                                      iconClassName="h-2.5 w-2.5"
+                                    />
+                                  </div>
+                                </td>
+                                <td className="py-3 px-4">
+                                  <div className="text-xs text-slate-800 dark:text-slate-200 font-medium truncate max-w-[240px]">
+                                    {em.subject || '(No Subject)'}
+                                  </div>
+                                </td>
+                                <td className="py-3 px-4">
+                                  {statusBadge}
+                                </td>
+                                <td className="py-3 px-4 text-[10px] text-slate-500 font-mono">
+                                  {isScheduled && em.scheduled_at ? (
+                                    <div className="text-purple-600 dark:text-purple-400 font-bold">
+                                      {new Date(em.scheduled_at).toLocaleString()}
+                                    </div>
+                                  ) : (
+                                    new Date(em.created_at).toLocaleString()
+                                  )}
+                                </td>
+                                <td className="py-3 px-4">
+                                  <div className="flex items-center gap-1 font-mono text-[9px] text-slate-400">
+                                    <span className="truncate max-w-[100px]">{em.id}</span>
+                                    <CopyButton
+                                      value={em.id}
+                                      tooltip="Copy Email ID"
+                                      toastMessage={false}
+                                      className="h-4 w-4 p-0 shrink-0"
+                                      iconClassName="h-2.5 w-2.5"
+                                    />
+                                  </div>
+                                </td>
+                                <td className="py-3 px-4 text-right">
+                                  <button
+                                    onClick={() => fetchEmailDetails(em.id)}
+                                    className="px-2.5 py-1 rounded bg-blue-500/10 hover:bg-blue-500/20 text-blue-600 dark:text-blue-400 text-[10px] font-bold transition-all cursor-pointer inline-flex items-center gap-1"
+                                  >
+                                    <Eye className="h-3 w-3" /> Inspect
+                                  </button>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                      </tbody>
+                    </table>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Subtab 2: Single Email Composer */}
+            {emailSubTab === 'compose' && (
+              <div className="flex-1 overflow-y-auto max-w-3xl pr-2">
+                <form onSubmit={handleSendSingleEmail} className="space-y-4 font-mono text-xs">
+                  <div className="bg-slate-50/70 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 space-y-4">
+                    <div className="flex items-center gap-2 border-b border-slate-200 dark:border-slate-800 pb-3">
+                      <Send className="h-4 w-4 text-blue-500" />
+                      <h3 className="font-sans font-bold text-sm text-slate-900 dark:text-slate-100">Compose Transactional Email</h3>
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] uppercase tracking-widest font-black text-slate-700 dark:text-slate-300">
+                        Recipient To (Email or comma-separated list) *
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        placeholder="recipient@example.com, developer@company.io"
+                        value={sendTo}
+                        onChange={(e) => setSendTo(e.target.value)}
+                        className="w-full rounded-xl bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 px-3.5 py-2.5 text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:border-blue-500/50"
+                      />
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] uppercase tracking-widest font-black text-slate-700 dark:text-slate-300">
+                        Subject Line *
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        placeholder="Welcome to DevKits / System Notification"
+                        value={sendSubject}
+                        onChange={(e) => setSendSubject(e.target.value)}
+                        className="w-full rounded-xl bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 px-3.5 py-2.5 text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:border-blue-500/50"
+                      />
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <div className="flex items-center justify-between">
+                        <label className="text-[10px] uppercase tracking-widest font-black text-slate-700 dark:text-slate-300">
+                          Schedule Dispatch (Optional)
+                        </label>
+                        <span className="text-[9px] text-slate-500">Leave blank to dispatch immediately</span>
+                      </div>
+                      <input
+                        type="datetime-local"
+                        value={sendScheduledAt}
+                        onChange={(e) => setSendScheduledAt(e.target.value)}
+                        className="w-full rounded-xl bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 px-3.5 py-2.5 text-slate-900 dark:text-slate-100 focus:outline-none focus:border-blue-500/50"
+                      />
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <div className="flex items-center justify-between">
+                        <label className="text-[10px] uppercase tracking-widest font-black text-slate-700 dark:text-slate-300">
+                          HTML Content *
+                        </label>
+                        <button
+                          type="button"
+                          onClick={() => setSendHtml(`<!DOCTYPE html>
+<html>
+  <body style="font-family: system-ui, -apple-system, sans-serif; background-color: #f8fafc; padding: 24px;">
+    <div style="max-width: 540px; margin: 0 auto; background: white; border-radius: 12px; padding: 24px; border: 1px solid #e2e8f0;">
+      <h2 style="color: #2563eb; margin-top: 0;">DevKits Notification</h2>
+      <p style="color: #334155; line-height: 1.5;">This is a transactional message sent directly via the <strong>Resend API</strong> engine.</p>
+      <div style="background: #eff6ff; padding: 12px 16px; border-radius: 8px; border-left: 4px solid #3b82f6; margin: 16px 0;">
+        <span style="font-size: 12px; color: #1e40af;">All systems operational • Security check passed.</span>
+      </div>
+      <p style="font-size: 11px; color: #64748b;">© DevKits Developer Utility Suite</p>
+    </div>
+  </body>
+</html>`)}
+                          className="text-[10px] font-bold text-blue-600 dark:text-blue-400 hover:underline cursor-pointer"
+                        >
+                          Load Clean Starter Template
+                        </button>
+                      </div>
+                      <textarea
+                        required
+                        rows={8}
+                        placeholder="<p>Enter your HTML body here...</p>"
+                        value={sendHtml}
+                        onChange={(e) => setSendHtml(e.target.value)}
+                        className="w-full font-mono text-xs rounded-xl bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 p-3.5 text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:border-blue-500/50"
+                      />
+                    </div>
+
+                    <button
+                      type="submit"
+                      disabled={isSendingEmail}
+                      className="w-full py-3 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold rounded-xl shadow-lg shadow-blue-500/20 transition-all cursor-pointer flex items-center justify-center gap-2 text-xs"
+                    >
+                      {isSendingEmail ? (
+                        <>
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                          Dispatching via Resend...
+                        </>
+                      ) : (
+                        <>
+                          <Send className="h-4 w-4" />
+                          {sendScheduledAt ? 'Schedule Email' : 'Send Email Now'}
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </form>
+              </div>
+            )}
+
+            {/* Subtab 3: Batch Dispatcher */}
+            {emailSubTab === 'batch' && (
+              <div className="flex-1 overflow-y-auto max-w-4xl pr-2">
+                <form onSubmit={handleSendBatchEmails} className="space-y-4 font-mono text-xs">
+                  <div className="bg-slate-50/70 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 space-y-4">
+                    <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-3">
+                      <div className="flex items-center gap-2">
+                        <Layers className="h-4 w-4 text-purple-500" />
+                        <h3 className="font-sans font-bold text-sm text-slate-900 dark:text-slate-100">
+                          Resend Batch Dispatcher ({batchItems.length} items)
+                        </h3>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setBatchItems([...batchItems, { to: '', subject: '', html: '' }])}
+                        className="px-3 py-1.5 rounded-lg bg-purple-600 hover:bg-purple-500 text-white font-bold text-[11px] cursor-pointer flex items-center gap-1 transition-all"
+                      >
+                        <Plus className="h-3.5 w-3.5" /> Add Email Item
+                      </button>
+                    </div>
+
+                    <div className="space-y-4">
+                      {batchItems.map((item, idx) => (
+                        <div key={idx} className="p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 space-y-3 relative">
+                          <div className="flex items-center justify-between">
+                            <span className="text-[10px] font-bold text-purple-600 dark:text-purple-400 uppercase tracking-widest">
+                              Item #{idx + 1}
+                            </span>
+                            {batchItems.length > 1 && (
+                              <button
+                                type="button"
+                                onClick={() => setBatchItems(batchItems.filter((_, i) => i !== idx))}
+                                className="text-slate-400 hover:text-red-500 cursor-pointer"
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </button>
+                            )}
+                          </div>
+
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            <div className="space-y-1">
+                              <label className="text-[9px] uppercase tracking-wider font-bold text-slate-500">To Recipient</label>
+                              <input
+                                type="email"
+                                required
+                                placeholder="recipient@example.com"
+                                value={item.to}
+                                onChange={(e) => {
+                                  const updated = [...batchItems];
+                                  updated[idx].to = e.target.value;
+                                  setBatchItems(updated);
+                                }}
+                                className="w-full rounded-lg bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 px-3 py-2 text-slate-900 dark:text-slate-100 placeholder-slate-400 text-xs focus:outline-none focus:border-purple-500/50"
+                              />
+                            </div>
+                            <div className="space-y-1">
+                              <label className="text-[9px] uppercase tracking-wider font-bold text-slate-500">Subject</label>
+                              <input
+                                type="text"
+                                required
+                                placeholder="Subject line"
+                                value={item.subject}
+                                onChange={(e) => {
+                                  const updated = [...batchItems];
+                                  updated[idx].subject = e.target.value;
+                                  setBatchItems(updated);
+                                }}
+                                className="w-full rounded-lg bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 px-3 py-2 text-slate-900 dark:text-slate-100 placeholder-slate-400 text-xs focus:outline-none focus:border-purple-500/50"
+                              />
+                            </div>
+                          </div>
+
+                          <div className="space-y-1">
+                            <label className="text-[9px] uppercase tracking-wider font-bold text-slate-500">HTML Body</label>
+                            <textarea
+                              rows={3}
+                              required
+                              placeholder="<p>Message content here...</p>"
+                              value={item.html}
+                              onChange={(e) => {
+                                const updated = [...batchItems];
+                                updated[idx].html = e.target.value;
+                                setBatchItems(updated);
+                              }}
+                              className="w-full font-mono text-xs rounded-lg bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-2.5 text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:border-purple-500/50"
+                            />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+
+                    <button
+                      type="submit"
+                      disabled={isSendingBatch}
+                      className="w-full py-3 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold rounded-xl shadow-lg shadow-purple-500/20 transition-all cursor-pointer flex items-center justify-center gap-2 text-xs"
+                    >
+                      {isSendingBatch ? (
+                        <>
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                          Sending {batchItems.length} Batch Items...
+                        </>
+                      ) : (
+                        <>
+                          <Layers className="h-4 w-4" />
+                          Dispatch Batch ({batchItems.length} Emails)
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </form>
+              </div>
+            )}
           </main>
         ) : sidebarTab === 'uploads' ? (
           /* Upload list management tab */
@@ -5994,6 +6668,120 @@ export default function StoragePage() {
                 {isAdminChangingPassword && <LogoSpinner size={14} />}
                 Change Password
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Resend Email Inspector & Schedule Management Modal */}
+      {showEmailDetailModal && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4" onClick={() => setShowEmailDetailModal(false)}>
+          <div className="bg-white dark:bg-[#0d1526] border border-slate-300/60 dark:border-slate-700/60 rounded-2xl w-full max-w-2xl shadow-2xl flex flex-col max-h-[90vh] overflow-hidden" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between p-5 border-b border-slate-200 dark:border-slate-800 shrink-0">
+              <div className="flex items-center gap-2">
+                <Mail className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                <h3 className="font-bold text-slate-900 dark:text-slate-100 text-sm">Resend Email Inspector</h3>
+              </div>
+              <button onClick={() => setShowEmailDetailModal(false)} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer">
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <div className="p-5 overflow-y-auto space-y-4 font-mono text-xs">
+              {isLoadingEmailDetail ? (
+                <div className="h-48 flex items-center justify-center text-slate-500 gap-2 font-mono text-xs">
+                  <Loader2 className="h-5 w-5 animate-spin text-blue-500" /> Fetching email telemetry from Resend...
+                </div>
+              ) : selectedEmailDetail ? (
+                <>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 bg-slate-50 dark:bg-slate-900/60 p-4 rounded-xl border border-slate-200 dark:border-slate-800 text-[11px]">
+                    <div>
+                      <span className="text-[9px] uppercase tracking-wider font-bold text-slate-400 block mb-0.5">Email ID</span>
+                      <span className="font-bold text-slate-800 dark:text-slate-200 break-all select-all">{selectedEmailDetail.id}</span>
+                    </div>
+                    <div>
+                      <span className="text-[9px] uppercase tracking-wider font-bold text-slate-400 block mb-0.5">Status</span>
+                      <span className="font-bold text-blue-600 dark:text-blue-400 uppercase tracking-wide">
+                        {selectedEmailDetail.last_event || (selectedEmailDetail.scheduled_at ? 'scheduled' : 'sent')}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-[9px] uppercase tracking-wider font-bold text-slate-400 block mb-0.5">From</span>
+                      <span className="text-slate-700 dark:text-slate-300 truncate block">{selectedEmailDetail.from || 'Default sender'}</span>
+                    </div>
+                    <div>
+                      <span className="text-[9px] uppercase tracking-wider font-bold text-slate-400 block mb-0.5">To Recipient</span>
+                      <span className="font-bold text-slate-900 dark:text-slate-100 break-all">
+                        {Array.isArray(selectedEmailDetail.to) ? selectedEmailDetail.to.join(', ') : selectedEmailDetail.to}
+                      </span>
+                    </div>
+                    <div className="sm:col-span-2">
+                      <span className="text-[9px] uppercase tracking-wider font-bold text-slate-400 block mb-0.5">Subject</span>
+                      <span className="font-bold text-slate-900 dark:text-slate-100 text-xs font-sans">{selectedEmailDetail.subject}</span>
+                    </div>
+                  </div>
+
+                  {/* Scheduled Action Section */}
+                  {selectedEmailDetail.scheduled_at && (
+                    <div className="p-4 rounded-xl border border-purple-500/30 bg-purple-500/5 space-y-3">
+                      <div className="flex items-center gap-2 text-purple-600 dark:text-purple-400 font-bold text-xs">
+                        <CalendarClock className="h-4 w-4" />
+                        <span>Scheduled Dispatch: {new Date(selectedEmailDetail.scheduled_at).toLocaleString()}</span>
+                      </div>
+                      
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        <div className="space-y-1">
+                          <label className="text-[9px] uppercase tracking-wider font-bold text-slate-400">Reschedule To</label>
+                          <input
+                            type="datetime-local"
+                            value={rescheduleDate}
+                            onChange={(e) => setRescheduleDate(e.target.value)}
+                            className="w-full rounded-lg bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-700 px-3 py-1.5 text-xs text-slate-900 dark:text-slate-100 focus:outline-none"
+                          />
+                        </div>
+                        <div className="flex items-end gap-2">
+                          <button
+                            onClick={() => handleRescheduleEmail(selectedEmailDetail.id)}
+                            disabled={isRescheduling || !rescheduleDate}
+                            className="flex-1 px-3 py-2 bg-purple-600 hover:bg-purple-500 text-white font-bold rounded-lg transition-all cursor-pointer disabled:opacity-50 text-xs flex items-center justify-center gap-1"
+                          >
+                            {isRescheduling && <Loader2 className="h-3 w-3 animate-spin" />}
+                            Update Schedule
+                          </button>
+                          <button
+                            onClick={() => handleCancelScheduledEmail(selectedEmailDetail.id)}
+                            disabled={isCancelingSchedule}
+                            className="px-3 py-2 bg-rose-600 hover:bg-rose-500 text-white font-bold rounded-lg transition-all cursor-pointer disabled:opacity-50 text-xs flex items-center justify-center gap-1"
+                          >
+                            {isCancelingSchedule && <Loader2 className="h-3 w-3 animate-spin" />}
+                            Cancel Send
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* HTML Content Body Preview */}
+                  {selectedEmailDetail.html && (
+                    <div className="space-y-1.5">
+                      <span className="text-[10px] uppercase tracking-widest font-black text-slate-400 block">Message Body Preview</span>
+                      <div className="border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden bg-white p-4 max-h-64 overflow-y-auto text-slate-900 font-sans">
+                        <div dangerouslySetInnerHTML={{ __html: selectedEmailDetail.html }} />
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Raw JSON Payload */}
+                  <details className="border border-slate-200 dark:border-slate-800 rounded-xl p-3 bg-slate-50/50 dark:bg-slate-900/30">
+                    <summary className="text-[10px] font-bold text-slate-500 cursor-pointer uppercase tracking-wider select-none">
+                      View Raw JSON Telemetry
+                    </summary>
+                    <pre className="mt-2 text-[10px] font-mono text-slate-600 dark:text-slate-400 overflow-x-auto p-2 bg-slate-100 dark:bg-slate-950 rounded-lg">
+                      {JSON.stringify(selectedEmailDetail, null, 2)}
+                    </pre>
+                  </details>
+                </>
+              ) : null}
             </div>
           </div>
         </div>

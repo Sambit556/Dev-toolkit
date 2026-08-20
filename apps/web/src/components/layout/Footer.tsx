@@ -43,9 +43,11 @@ export function Footer() {
           {/* Brand */}
           <div className="space-y-3">
             <div className="flex items-center gap-2 font-bold">
-              <div className="flex h-6 w-6 items-center justify-center rounded bg-primary text-primary-foreground text-xs font-black">
-                DK
-              </div>
+              <img
+                src="/logo.svg"
+                alt="DevKits"
+                className="h-6 w-6 rounded object-contain shrink-0"
+              />
               DevKits
             </div>
             <p className="text-xs text-muted-foreground leading-relaxed">

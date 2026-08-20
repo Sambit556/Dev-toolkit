@@ -163,7 +163,7 @@ export function SplashScreen() {
         <div
           ref={logoRef}
           style={logoStyle}
-          className={`relative flex h-16 w-16 items-center justify-center overflow-hidden bg-gradient-to-br from-blue-600 via-blue-500 to-purple-600 text-[27.4px] font-black text-white shadow-lg shadow-blue-500/30 ${
+          className={`relative flex h-16 w-16 items-center justify-center overflow-hidden rounded-2xl shadow-lg shadow-blue-500/30 ${
             phase === 'intro'
               ? 'rounded-2xl motion-safe:animate-premium-logo-in'
               : phase === 'anticipation'
@@ -171,7 +171,11 @@ export function SplashScreen() {
               : 'shadow-md'
           }`}
         >
-          <span className="relative z-10 select-none">DK</span>
+          <img
+            src="/logo.svg"
+            alt="DevKits"
+            className="w-full h-full object-contain rounded-2xl select-none pointer-events-none"
+          />
           {phase === 'intro' && (
             <span className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/40 to-transparent animate-premium-splash-shimmer pointer-events-none" />
           )}

@@ -6,6 +6,7 @@ import { TABLES } from '../repositories/migrations';
 import {
   setSession, getSession, revokeSession, revokeUserSessions,
   setPasswordChangeOtp, getPasswordChangeOtp, recordFailedPasswordChangeOtpAttempt, clearPasswordChangeOtp,
+  registerPasswordResetToken, consumePasswordResetToken, revokeAllUserResetTokens,
 } from '../utils/session';
 import { logger } from '../utils/logger';
 import { ACTIVITY_ACTIONS, ROLES } from '../constants/activityActions';
@@ -68,69 +69,6 @@ export async function issueSession(user: { id: string; email: string }) {
   return { accessToken, refreshToken };
 }
 
-export async function login(identifier: string, password: string) {
-  const trimmed = identifier.trim();
-  const isEmail = trimmed.includes('@');
-  const user = await commonDao.getOneDataByCond<any>(
-    TABLES.USERS,
-    isEmail ? { email: trimmed.toLowerCase() } : { mobile_number: trimmed }
-  );
-  if (!user) {
-    logger.warn('Authentication failure: User not found', { identifier });
-    throw new AppError(HttpStatus.UNAUTHORIZED, 'Invalid credentials', 'INVALID_CREDENTIALS');
-  }
-
-  if (user.is_active === false) {
-    logger.warn('Authentication failure: Account inactive', { identifier });
-    throw new AppError(HttpStatus.FORBIDDEN, 'This account has been deactivated. Contact an administrator.', 'ACCOUNT_INACTIVE');
-  }
-
-  if (!user.password_hash) {
-    // Registered via Google — verifyPassword would throw on a null hash rather
-    // than cleanly returning false, so this must be checked explicitly first.
-    throw new AppError(HttpStatus.FORBIDDEN, 'This account uses Google Sign-In. Use "Continue with Google" to log in.', 'OAUTH_ONLY_ACCOUNT');
-  }
-
-  const isMatch = await verifyPassword(password, user.password_hash);
-  if (!isMatch) {
-    logger.warn('Authentication failure: Incorrect password', { identifier });
-    throw new AppError(HttpStatus.UNAUTHORIZED, 'Invalid credentials', 'INVALID_CREDENTIALS');
-  }
-
-  // This account's hash was computed at an old BCRYPT_SALT_ROUNDS value — move it onto
-  // the current one so every login after this one verifies at today's (faster) cost
-  // instead of paying the old cost forever. Fire-and-forget: doesn't block this login,
-  // and re-hashing needs the plaintext password, which only exists during this request.
-  if (needsRehash(user.password_hash)) {
-    hashPassword(password)
-      .then((newHash) => commonDao.updateData(TABLES.USERS, { password_hash: newHash }, { id: user.id }))
-      .catch((err: any) => logger.error('Failed to rehash password on login', { userId: user.id, error: err.message }));
-  }
-
-  const { accessToken, refreshToken } = await issueSession(user);
-
-  // Bookkeeping only (last_login + audit log) — neither is needed to answer this
-  // request, so it shouldn't cost the caller a second pool.connect()+transaction
-  // round-trip on the critical path. Fire-and-forget, same pattern as
-  // updateUserGeoAndIp below.
-  transaction(async (trx) => {
-    await trx.updateData(TABLES.USERS, { last_login: new Date() }, { id: user.id });
-    await trx.addData(TABLES.ACTIVITY_LOGS, { user_id: user.id, action: ACTIVITY_ACTIONS.LOGIN, resource: 'auth' });
-  }).catch((err: any) => {
-    logger.error('Failed to record last_login/activity log after login', { userId: user.id, error: err.message });
-  });
-
-  logger.info('User logged in successfully', { userId: user.id, identifier });
-
-  updateUserGeoAndIp(user.id, getRequestIp());
-
-  return {
-    accessToken,
-    refreshToken,
-    user: { id: user.id, email: user.email, name: user.name, role: user.role, mobile_number: user.mobile_number },
-  };
-}
-
 export async function register(email: string, password: string, name?: string, mobileNumber?: string) {
   const existingUser = await commonDao.getOneDataByCond<any>(TABLES.USERS, { email });
   if (existingUser) {
@@ -167,6 +105,60 @@ export async function register(email: string, password: string, name?: string, m
 
   // Fire-and-forget — never blocks or fails registration if email delivery is slow/down.
   sendWelcomeEmail(user.email, user.name || user.email);
+
+  updateUserGeoAndIp(user.id, getRequestIp());
+
+  return {
+    accessToken,
+    refreshToken,
+    user: { id: user.id, email: user.email, name: user.name, role: user.role, mobile_number: user.mobile_number },
+  };
+}
+
+export async function login(identifier: string, password: string) {
+  const trimmed = identifier.trim();
+  const isEmail = trimmed.includes('@');
+  const user = await commonDao.getOneDataByCond<any>(
+    TABLES.USERS,
+    isEmail ? { email: trimmed.toLowerCase() } : { mobile_number: trimmed }
+  );
+  if (!user) {
+    logger.warn('Authentication failure: User not found', { identifier });
+    throw new AppError(HttpStatus.UNAUTHORIZED, 'Invalid credentials', 'INVALID_CREDENTIALS');
+  }
+
+  if (user.is_active === false) {
+    logger.warn('Authentication failure: Account inactive', { identifier });
+    throw new AppError(HttpStatus.FORBIDDEN, 'This account has been deactivated. Contact an administrator.', 'ACCOUNT_INACTIVE');
+  }
+
+  if (!user.password_hash) {
+    throw new AppError(HttpStatus.FORBIDDEN, 'This account uses Google Sign-In. Use "Continue with Google" to log in.', 'OAUTH_ONLY_ACCOUNT');
+  }
+
+  const isMatch = await verifyPassword(password, user.password_hash);
+  if (!isMatch) {
+    logger.warn('Authentication failure: Incorrect password', { identifier });
+    throw new AppError(HttpStatus.UNAUTHORIZED, 'Invalid credentials', 'INVALID_CREDENTIALS');
+  }
+
+  if (needsRehash(user.password_hash)) {
+    hashPassword(password)
+      .then((newHash) => commonDao.updateData(TABLES.USERS, { password_hash: newHash }, { id: user.id }))
+      .catch((err: any) => logger.error('Failed to rehash password on login', { userId: user.id, error: err.message }));
+  }
+
+  const { accessToken, refreshToken } = await issueSession(user);
+
+  transaction(async (trx) => {
+    await trx.updateData(TABLES.USERS, { last_login: new Date() }, { id: user.id });
+    await trx.addData(TABLES.ACTIVITY_LOGS, { user_id: user.id, action: ACTIVITY_ACTIONS.LOGIN, resource: 'auth' });
+  }).catch((err: any) => {
+    logger.error('Failed to record last_login/activity log after login', { userId: user.id, error: err.message });
+  });
+
+  logger.info('User logged in successfully', { userId: user.id, identifier });
+
   updateUserGeoAndIp(user.id, getRequestIp());
 
   return {
@@ -181,7 +173,8 @@ export async function requestPasswordReset(email: string) {
   
   if (!user) {
     logger.info('Password reset request for non-existent user, generating dummy token', { email });
-    // Don't return the dummy token, just act like it worked
+    // Equalize execution timing and prevent user enumeration
+    generatePasswordResetToken({ userId: '00000000-0000-0000-0000-000000000000', email, tokenId: crypto.randomUUID(), action: 'password_reset' });
     return;
   }
 
@@ -192,24 +185,34 @@ export async function requestPasswordReset(email: string) {
 
   if (user.is_active === false) {
     logger.warn('Security warning: Attempt to trigger forgot password for inactive user blocked', { email });
-    // Still don't throw an error to prevent enumeration
     return;
   }
 
   if (!user.password_hash) {
     logger.info('Password reset request for a Google-only account, ignoring (no password to reset)', { email });
-    // Same "act like it worked" non-enumeration behavior as the other guards above.
     return;
   }
 
-  const resetToken = generatePasswordResetToken({ userId: user.id, email: user.email, action: 'password_reset' });
+  const tokenId = crypto.randomUUID();
+  const resetTokenTtlSeconds = PASSWORD_RESET_TOKEN_TTL_MINUTES * 60;
 
-  await commonDao.addData(TABLES.ACTIVITY_LOGS, { user_id: user.id, action: ACTIVITY_ACTIONS.REQUEST_PASSWORD_RESET, resource: 'auth' });
+  // Single-use token tracking in Redis / memory
+  await registerPasswordResetToken(tokenId, user.id, resetTokenTtlSeconds);
 
-  // The reset link deep-links straight into the existing reset form (pre-filling email
-  // + token) rather than requiring the user to copy-paste — see storage/page.tsx's
-  // resetToken/email URL-param handling. The raw token is also included in the email
-  // body as a fallback in case the link itself doesn't carry the params through cleanly.
+  const resetToken = generatePasswordResetToken({
+    userId: user.id,
+    email: user.email,
+    tokenId,
+    issuedAt: Date.now(),
+    action: 'password_reset',
+  });
+
+  await commonDao.addData(TABLES.ACTIVITY_LOGS, {
+    user_id: user.id,
+    action: ACTIVITY_ACTIONS.REQUEST_PASSWORD_RESET,
+    resource: 'auth',
+  });
+
   const resetUrl = `${WEB_APP_ORIGIN}/storage?resetToken=${encodeURIComponent(resetToken)}&email=${encodeURIComponent(user.email)}`;
   sendForgotPasswordEmail(user.email, user.name || user.email, resetUrl, resetToken, PASSWORD_RESET_TOKEN_TTL_MINUTES);
 
@@ -221,6 +224,12 @@ export async function completePasswordReset(email: string, token: string, newPas
 
   if (decoded.action !== 'password_reset' || decoded.email !== email) {
     throw new AppError(HttpStatus.BAD_REQUEST, 'Invalid password reset token context', 'INVALID_RESET_TOKEN');
+  }
+
+  // Atomically consume token (prevents replay attacks)
+  const isConsumed = await consumePasswordResetToken(decoded.tokenId);
+  if (!isConsumed) {
+    throw new AppError(HttpStatus.UNAUTHORIZED, 'This password reset link has already been used or has expired.', 'RESET_TOKEN_EXPIRED_OR_USED');
   }
 
   const user = await commonDao.getOneDataByCond<any>(TABLES.USERS, { email });
@@ -240,6 +249,17 @@ export async function completePasswordReset(email: string, token: string, newPas
     throw new AppError(HttpStatus.FORBIDDEN, 'This account uses Google Sign-In and has no password to reset.', 'OAUTH_ONLY_ACCOUNT');
   }
 
+  // Check if token was superseded by a newer password change
+  if (user.password_changed_at && decoded.issuedAt && new Date(user.password_changed_at).getTime() > decoded.issuedAt) {
+    throw new AppError(HttpStatus.UNAUTHORIZED, 'This password reset link was invalidated by a subsequent password change.', 'RESET_TOKEN_SUPERSEDED');
+  }
+
+  // Prevent reusing the same password
+  const isSamePassword = await verifyPassword(newPassword, user.password_hash);
+  if (isSamePassword) {
+    throw new AppError(HttpStatus.BAD_REQUEST, 'New password cannot be identical to your current password.', 'PASSWORD_REUSE_FORBIDDEN');
+  }
+
   const newHash = await hashPassword(newPassword);
 
   await transaction(async (trx) => {
@@ -248,9 +268,17 @@ export async function completePasswordReset(email: string, token: string, newPas
     await trx.addData(TABLES.ACTIVITY_LOGS, { user_id: user.id, action: ACTIVITY_ACTIONS.RESET_PASSWORD_COMPLETED, resource: 'auth' });
   });
 
+  // Security teardown: Kick out all active sessions & purge outstanding reset tokens
   await revokeUserSessions(user.id);
+  await revokeAllUserResetTokens(user.id);
 
-  logger.info('Password reset successfully completed for user', { userId: user.id });
+  // Security confirmation email to account owner
+  sendPasswordChangedEmail(user.email, user.name || user.email, {
+    ip: getRequestIp(),
+    deviceType: detectDeviceType(getRequestUserAgent()),
+  });
+
+  logger.info('Password reset successfully completed and all sessions revoked', { userId: user.id });
 }
 
 export async function refreshSession(refreshToken: string) {

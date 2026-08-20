@@ -504,12 +504,12 @@ export function Header() {
       <div className="container flex h-14 items-center justify-between">
         {/* Logo */}
         <Link href="/" className="flex items-center gap-2 font-bold text-lg">
-          <div
+          <img
             id="header-logo-mark"
-            className="flex h-7 w-7 items-center justify-center rounded-md bg-gradient-to-br from-blue-600 via-blue-500 to-purple-600 text-xs font-black text-white"
-          >
-            DK
-          </div>
+            src="/logo.svg"
+            alt="DevKits"
+            className="h-7 w-7 rounded-md object-contain shrink-0"
+          />
           <span className="hidden sm:inline">
             DevKits
           </span>

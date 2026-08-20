@@ -111,15 +111,24 @@ export function verifyRefreshToken(token: string): TokenPayload {
 export interface ResetTokenPayload {
   userId: string;
   email: string;
+  tokenId: string;
+  issuedAt?: number;
   action: 'password_reset';
 }
 
-export function generatePasswordResetToken(payload: ResetTokenPayload): string {
+export function generatePasswordResetToken(payload: Omit<ResetTokenPayload, 'action'> & { action?: 'password_reset' }): string {
   if (!resetSecret) throw new AppError(HttpStatus.INTERNAL_SERVER_ERROR, 'JWT Configuration is missing', 'JWT_CONFIG_ERROR');
-  return sign(payload, resetSecret, PASSWORD_RESET_TOKEN_TTL);
+  const fullPayload: ResetTokenPayload = {
+    userId: payload.userId,
+    email: payload.email,
+    tokenId: payload.tokenId,
+    issuedAt: payload.issuedAt || Date.now(),
+    action: 'password_reset',
+  };
+  return sign(fullPayload, resetSecret, PASSWORD_RESET_TOKEN_TTL);
 }
 
-export function verifyPasswordResetToken(token: string): ResetTokenPayload {
+export function verifyPasswordResetToken(token: string): ResetTokenPayload & { iat?: number; exp?: number } {
   if (!resetSecret) throw new AppError(HttpStatus.INTERNAL_SERVER_ERROR, 'JWT Configuration is missing', 'JWT_CONFIG_ERROR');
   try {
     return verify<ResetTokenPayload>(token, resetSecret);

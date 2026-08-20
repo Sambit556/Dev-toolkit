@@ -1,12 +1,20 @@
-import { renderEmailLayout, paragraph, ctaButton, codeBlock, infoBox, escapeHtml } from './layout';
+import {
+  renderEmailLayout,
+  paragraph,
+  highlightText,
+  ctaButton,
+  otpBlock,
+  codeBlock,
+  infoBox,
+  escapeHtml,
+} from './layout';
 
 export interface EmailContent {
   subject: string;
   html: string;
+  text?: string;
 }
 
-// Optional context included when available (see utils/geo.ts / requestContext) — every
-// field is optional so callers never need to block on IP/geo lookups to send an email.
 export interface SecurityEventContext {
   ip?: string;
   country?: string;
@@ -16,133 +24,302 @@ export interface SecurityEventContext {
 function contextRows(ctx?: SecurityEventContext): Array<{ label: string; value: string }> {
   if (!ctx) return [];
   const rows: Array<{ label: string; value: string }> = [];
-  if (ctx.ip) rows.push({ label: 'IP address', value: ctx.ip });
+  if (ctx.ip) rows.push({ label: 'IP Address', value: ctx.ip });
   if (ctx.country) rows.push({ label: 'Location', value: ctx.country });
-  if (ctx.deviceType) rows.push({ label: 'Device', value: ctx.deviceType });
-  rows.push({ label: 'Time', value: new Date().toUTCString() });
+  if (ctx.deviceType) rows.push({ label: 'Device / Browser', value: ctx.deviceType });
+  rows.push({ label: 'Timestamp', value: new Date().toUTCString() });
   return rows;
 }
 
-const BLUE = { from: '#3b82f6', to: '#8b5cf6' };
-const AMBER = { from: '#f59e0b', to: '#ef4444' };
+const BLUE = { from: '#2563eb', to: '#7c3aed' };
+const AMBER = { from: '#f59e0b', to: '#ea580c' };
 const RED = { from: '#ef4444', to: '#b91c1c' };
+const EMERALD = { from: '#10b981', to: '#059669' };
 
+/**
+ * 1. Password Change OTP Email (Superadmin Password Change Verification)
+ */
+export function passwordChangeOtpEmail(params: {
+  name: string;
+  email: string;
+  otp: string;
+  expiresInMinutes: number;
+}): EmailContent {
+  const displayName = params.name || params.email;
+  const body =
+    paragraph(`Hello ${highlightText(escapeHtml(displayName))},`) +
+    paragraph(
+      `A security verification was triggered to ${highlightText(
+        'change your Superadmin account password'
+      )} on DevKits Vault.`
+    ) +
+    otpBlock(params.otp, 'Superadmin Authorization Code') +
+    paragraph(
+      `Enter the 6-digit code above in your active browser session to confirm this password change. This code will expire in ${highlightText(
+        `${params.expiresInMinutes} minutes`
+      )}.`
+    ) +
+    `<div style="margin:20px 0 10px 0;padding:14px 18px;border-left:3px solid #f59e0b;background-color:#1c1409;border-radius:0 10px 10px 0;font-size:12px;color:#cbd5e1;line-height:20px;">
+      <strong style="color:#fbbf24;">Didn't request this change?</strong> If you did not initiate this request, your account credentials may have been targeted. You should immediately review active sessions and rotate your access keys.
+    </div>`;
+
+  const text = `Hello ${displayName},
+
+A security verification was triggered to change your Superadmin account password on DevKits Vault.
+
+Your Verification Code: ${params.otp}
+(Expires in ${params.expiresInMinutes} minutes)
+
+Enter this 6-digit code in your active browser session to confirm the password change.
+
+Didn't request this? If you did not initiate this change, please review your active sessions and rotate your access keys.
+
+DevKits Security Team
+https://devkits.space`;
+
+  return {
+    subject: 'DevKits Vault · Superadmin Password Verification Code',
+    text,
+    html: renderEmailLayout({
+      preheader: `Your verification code is ${params.otp}. Expires in ${params.expiresInMinutes} minutes.`,
+      accentFrom: AMBER.from,
+      accentTo: AMBER.to,
+      heading: 'Change Password · Verification Required',
+      badgeText: 'Security Verification',
+      badgeTone: 'amber',
+      bodyHtml: body,
+    }),
+  };
+}
+
+/**
+ * 2. Forgot Password Email (Account Password Reset)
+ */
+export function forgotPasswordEmail(params: {
+  name: string;
+  email: string;
+  resetUrl: string;
+  token: string;
+  expiresInMinutes: number;
+}): EmailContent {
+  const displayName = params.name || params.email;
+  const body =
+    paragraph(`Hello ${highlightText(escapeHtml(displayName))},`) +
+    paragraph(
+      `We received an authorized request to reset the password for your DevKits account (${highlightText(
+        escapeHtml(params.email)
+      )}).`
+    ) +
+    paragraph(
+      'Click the secure button below to choose a new password. This link will prefill your reset token in the browser:'
+    ) +
+    ctaButton('Reset My Password', params.resetUrl, BLUE.from, BLUE.to) +
+    paragraph(
+      'Alternatively, if you already have the reset form open, you can copy and paste this verification token directly:'
+    ) +
+    codeBlock(params.token) +
+    paragraph(
+      `This password reset link and token are valid for ${highlightText(
+        `${params.expiresInMinutes} minutes`
+      )}. If you did not request this, you can safely disregard this email — your account remains fully secure.`
+    );
+
+  const text = `Hello ${displayName},
+
+We received a request to reset the password for your DevKits Vault account (${params.email}).
+
+Reset your password using this link:
+${params.resetUrl}
+
+Or copy and paste this verification token:
+${params.token}
+
+This token expires in ${params.expiresInMinutes} minutes. If you did not request this, you can safely ignore this email.
+
+DevKits Security Team
+https://devkits.space`;
+
+  return {
+    subject: 'DevKits Vault · Password Reset Request',
+    text,
+    html: renderEmailLayout({
+      preheader: 'Choose a new password for your DevKits Vault account.',
+      accentFrom: BLUE.from,
+      accentTo: BLUE.to,
+      heading: 'Reset Your Account Password',
+      badgeText: 'Action Required',
+      badgeTone: 'blue',
+      bodyHtml: body,
+    }),
+  };
+}
+
+/**
+ * 3. Welcome Email
+ */
 export function welcomeEmail(params: { name: string; email: string }): EmailContent {
   const displayName = params.name || params.email;
   const body =
-    paragraph(`Hi ${escapeHtml(displayName)},`) +
-    paragraph(`Your DevKits Vault account for <strong style="color:#e2e8f0;">${escapeHtml(params.email)}</strong> has been created successfully. Your vault is private, encrypted in transit, and only ever accessible with your credentials.`) +
-    paragraph('A few things worth knowing:') +
-    `<ul style="margin:0 0 24px 0;padding-left:20px;">
-      <li style="margin-bottom:6px;">Uploaded files are scanned before storage and never executed — even previews render through isolated, sandboxed viewers.</li>
-      <li style="margin-bottom:6px;">You can deactivate your account any time from Profile &rarr; Danger Zone — it's reversible, and your files are kept safely.</li>
-      <li>If anything about this account looks unfamiliar, contact us immediately using the address below.</li>
-    </ul>`;
+    paragraph(`Hello ${highlightText(escapeHtml(displayName))},`) +
+    paragraph(
+      `Welcome to DevKits Vault! Your private encrypted developer storage workspace for ${highlightText(
+        escapeHtml(params.email)
+      )} has been created.`
+    ) +
+    `<div style="margin:20px 0;padding:16px 20px;background-color:#080e22;border:1px solid #1e293b;border-radius:14px;">
+      <div style="font-size:12px;font-weight:800;color:#f8fafc;margin-bottom:8px;text-transform:uppercase;letter-spacing:0.05em;">
+        Your Vault Features
+      </div>
+      <div style="font-size:12px;color:#94a3b8;line-height:22px;">
+        &bull; AES-GCM encrypted client-side storage<br/>
+        &bull; Isolated browser sandboxing for file previews<br/>
+        &bull; Excalidraw diagrams, text notes & time-capsule events<br/>
+        &bull; Real-time cryptographic key validation
+      </div>
+    </div>` +
+    ctaButton('Open DevKits Vault', 'https://devkits.space/storage', EMERALD.from, EMERALD.to);
+
+  const text = `Hello ${displayName},
+
+Welcome to DevKits Vault! Your encrypted developer workspace for ${params.email} is ready.
+
+Access your vault at:
+https://devkits.space/storage
+
+DevKits Security Team
+https://devkits.space`;
+
   return {
-    subject: 'Welcome to DevKits Vault — your account is ready',
+    subject: 'Welcome to DevKits Vault — Your workspace is ready',
+    text,
     html: renderEmailLayout({
-      preheader: 'Your DevKits Vault account was just created.',
-      accentFrom: BLUE.from,
-      accentTo: BLUE.to,
+      preheader: 'Your DevKits Vault account is active and ready.',
+      accentFrom: EMERALD.from,
+      accentTo: EMERALD.to,
       heading: 'Welcome to DevKits Vault',
+      badgeText: 'Account Created',
+      badgeTone: 'emerald',
       bodyHtml: body,
     }),
   };
 }
 
-export function accountDeactivatedEmail(params: { name: string; email: string; context?: SecurityEventContext }): EmailContent {
+/**
+ * 4. Password Changed Notification Email
+ */
+export function passwordChangedEmail(params: {
+  name: string;
+  email: string;
+  context?: SecurityEventContext;
+}): EmailContent {
   const displayName = params.name || params.email;
   const body =
-    paragraph(`Hi ${escapeHtml(displayName)},`) +
-    paragraph(`Your DevKits Vault account has just been <strong style="color:#f8fafc;">deactivated</strong>. You've been signed out of every device, and no one can sign back in until it's reactivated.`) +
-    infoBox(contextRows(params.context), 'warning') +
-    paragraph('This is reversible — your files and settings have been kept exactly as they were. Only an administrator can reactivate the account.') +
-    paragraph("<strong style=\"color:#f87171;\">Didn't do this?</strong> Contact us immediately using the address below — this may mean someone else has access to your account.");
+    paragraph(`Hello ${highlightText(escapeHtml(displayName))},`) +
+    paragraph(
+      'The password for your DevKits Vault account was recently updated. As a security measure, all other active sessions and access tokens were revoked.'
+    ) +
+    (params.context ? infoBox(contextRows(params.context)) : '') +
+    `<div style="margin:20px 0 10px 0;padding:14px 18px;border-left:3px solid #ef4444;background-color:#1c0909;border-radius:0 10px 10px 0;font-size:12px;color:#cbd5e1;line-height:20px;">
+      <strong style="color:#f87171;">Didn't perform this update?</strong> If this was not you, your account may be compromised. Please contact our security team immediately at <a href="mailto:support@devkits.space" style="color:#60a5fa;text-decoration:none;font-weight:700;">support@devkits.space</a>.
+    </div>`;
+
+  const text = `Hello ${displayName},
+
+The password for your DevKits Vault account was recently updated. All other active sessions and access tokens have been revoked.
+
+Didn't do this? Contact support@devkits.space immediately.
+
+DevKits Security Team
+https://devkits.space`;
+
   return {
-    subject: 'Your DevKits Vault account has been deactivated',
+    subject: 'DevKits Vault · Security Alert: Password Updated',
+    text,
     html: renderEmailLayout({
-      preheader: 'Your account was just deactivated and every session was signed out.',
+      preheader: 'Your account password was just updated.',
+      accentFrom: BLUE.from,
+      accentTo: BLUE.to,
+      heading: 'Password Successfully Updated',
+      badgeText: 'Security Notice',
+      badgeTone: 'blue',
+      bodyHtml: body,
+    }),
+  };
+}
+
+/**
+ * 5. Account Deactivated Email
+ */
+export function accountDeactivatedEmail(params: {
+  name: string;
+  email: string;
+  context?: SecurityEventContext;
+}): EmailContent {
+  const displayName = params.name || params.email;
+  const body =
+    paragraph(`Hello ${highlightText(escapeHtml(displayName))},`) +
+    paragraph(
+      `Your DevKits Vault account has been ${highlightText(
+        'deactivated'
+      )}. You have been logged out of all devices and access is suspended.`
+    ) +
+    (params.context ? infoBox(contextRows(params.context), 'warning') : '') +
+    paragraph(
+      'Your encrypted data remains secure and intact. Contact an administrator to reactivate your access.'
+    );
+
+  const text = `Hello ${displayName},
+
+Your DevKits Vault account has been deactivated. You have been signed out of all devices. Your data remains secure. Contact an administrator to reactivate.
+
+DevKits Security Team
+https://devkits.space`;
+
+  return {
+    subject: 'DevKits Vault · Account Deactivated',
+    text,
+    html: renderEmailLayout({
+      preheader: 'Your DevKits Vault account was deactivated.',
       accentFrom: AMBER.from,
       accentTo: AMBER.to,
       heading: 'Account Deactivated',
+      badgeText: 'Deactivated',
+      badgeTone: 'amber',
       bodyHtml: body,
     }),
   };
 }
 
+/**
+ * 6. Account Deleted Email
+ */
 export function accountDeletedEmail(params: { name: string; email: string }): EmailContent {
   const displayName = params.name || params.email;
   const body =
-    paragraph(`Hi ${escapeHtml(displayName)},`) +
-    paragraph(`Your DevKits Vault account (<strong style="color:#f8fafc;">${escapeHtml(params.email)}</strong>) and everything in it — files, folders, and settings — have been <strong style="color:#f87171;">permanently deleted</strong>. This cannot be undone.`) +
-    paragraph('If you believe this was a mistake, contact us right away — we may be able to help depending on how recently this happened, but deleted files themselves cannot be recovered.');
+    paragraph(`Hello ${highlightText(escapeHtml(displayName))},`) +
+    paragraph(
+      `Your DevKits Vault account (${highlightText(
+        escapeHtml(params.email)
+      )}) and all associated data have been ${highlightText('permanently deleted')}.`
+    );
+
+  const text = `Hello ${displayName},
+
+Your DevKits Vault account (${params.email}) and all associated files have been permanently deleted.
+
+DevKits Security Team
+https://devkits.space`;
+
   return {
-    subject: 'Your DevKits Vault account has been deleted',
+    subject: 'DevKits Vault · Account Deleted',
+    text,
     html: renderEmailLayout({
-      preheader: 'Your account and all of its files have been permanently deleted.',
+      preheader: 'Your DevKits Vault account was deleted.',
       accentFrom: RED.from,
       accentTo: RED.to,
       heading: 'Account Deleted',
-      bodyHtml: body,
-    }),
-  };
-}
-
-export function passwordChangedEmail(params: { name: string; email: string; context?: SecurityEventContext }): EmailContent {
-  const displayName = params.name || params.email;
-  const body =
-    paragraph(`Hi ${escapeHtml(displayName)},`) +
-    paragraph('The password for your DevKits Vault account was just changed. You&rsquo;ve been signed out on every other device as a precaution.') +
-    infoBox(contextRows(params.context)) +
-    paragraph("<strong style=\"color:#f87171;\">Didn't do this?</strong> Your account may be compromised — contact us immediately using the address below.");
-  return {
-    subject: 'Your DevKits Vault password was changed',
-    html: renderEmailLayout({
-      preheader: 'Your password was just changed — you were signed out everywhere else.',
-      accentFrom: BLUE.from,
-      accentTo: BLUE.to,
-      heading: 'Password Changed',
-      bodyHtml: body,
-    }),
-  };
-}
-
-export function passwordChangeOtpEmail(params: { name: string; email: string; otp: string; expiresInMinutes: number }): EmailContent {
-  const displayName = params.name || params.email;
-  const body =
-    paragraph(`Hi ${escapeHtml(displayName)},`) +
-    paragraph('A password change was requested for your DevKits Vault <strong style="color:#f8fafc;">Superadmin</strong> account. Enter this code in the Change Password form to continue:') +
-    codeBlock(params.otp) +
-    paragraph(`This code expires in ${params.expiresInMinutes} minutes and can only be used a few times before it's invalidated.`) +
-    paragraph("<strong style=\"color:#f87171;\">Didn't request this?</strong> Ignore this email — your password will not be changed without the code above — and consider rotating the account's credentials as a precaution.");
-  return {
-    subject: 'Your DevKits Vault Superadmin password-change code',
-    html: renderEmailLayout({
-      preheader: 'Use this code to confirm your Superadmin password change.',
-      accentFrom: AMBER.from,
-      accentTo: AMBER.to,
-      heading: 'Password Change Verification',
-      bodyHtml: body,
-    }),
-  };
-}
-
-export function forgotPasswordEmail(params: { name: string; email: string; resetUrl: string; token: string; expiresInMinutes: number }): EmailContent {
-  const displayName = params.name || params.email;
-  const body =
-    paragraph(`Hi ${escapeHtml(displayName)},`) +
-    paragraph('We received a request to reset the password for your DevKits Vault account. Click below to choose a new one — this link fills in the reset form for you.') +
-    ctaButton('Reset My Password', params.resetUrl, BLUE.from, BLUE.to) +
-    paragraph("If the button doesn't work, open the vault and paste this code into the Reset Password form instead:") +
-    codeBlock(params.token) +
-    paragraph(`This link and code expire in ${params.expiresInMinutes} minutes. If you didn&rsquo;t request this, you can safely ignore this email — your password will not be changed.`);
-  return {
-    subject: 'Reset your DevKits Vault password',
-    html: renderEmailLayout({
-      preheader: 'Use this link to choose a new DevKits Vault password.',
-      accentFrom: BLUE.from,
-      accentTo: BLUE.to,
-      heading: 'Reset Your Password',
+      badgeText: 'Deleted',
+      badgeTone: 'rose',
       bodyHtml: body,
     }),
   };
