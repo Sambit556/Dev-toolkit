@@ -13,18 +13,20 @@ import { QuickAccess } from './QuickAccess';
 // below the sticky Header via `flex-1` (the <body> is already a flex column).
 export function ChromeGate({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const isCloudIde = pathname?.startsWith('/cloud-ide') ?? false;
   const isStorageVault = pathname?.startsWith('/storage') ?? false;
 
-  if (isStorageVault) {
-    // `<body>` is only `min-h-screen` (a floor, no ceiling) so normal marketing pages can
-    // grow taller than the viewport and scroll — but that means `flex-1 min-h-0` below has
-    // no actual height to shrink against, so the vault's content could grow past 100dvh and
-    // the whole *window* would scroll instead of just this container's internal lists. That
-    // dragged the sticky Header along with it, making it look like it was hiding as you
-    // scrolled toward the vault's own top bar. Pin this subtree to exactly one viewport
-    // height so Header + the vault split it and only the vault's internal areas ever scroll.
+  if (isCloudIde) {
     return (
-      <div className="h-dvh w-full flex flex-col overflow-hidden">
+      <div className="h-dvh w-screen flex flex-col overflow-hidden bg-black">
+        <div className="flex-1 min-h-0 w-full overflow-hidden flex flex-col">{children}</div>
+      </div>
+    );
+  }
+
+  if (isStorageVault) {
+    return (
+      <div className="h-dvh w-full flex flex-col overflow-hidden bg-black">
         <Header />
         <div className="flex-1 min-h-0 w-full overflow-hidden flex flex-col">{children}</div>
         <StickyNotes />

@@ -18,6 +18,8 @@ import jsonRouter from './routes/json';
 import httpInspectRouter from './routes/httpInspect';
 import webhookRouter from './routes/webhook';
 import emailRouter from './routes/email';
+import tempmailRouter from './routes/tempmail';
+import sandboxRouter from './routes/sandbox';
 import { swaggerSpec } from './swagger';
 import { logger } from './utils/logger';
 import { getEnvWithDefault } from './utils/env';
@@ -107,6 +109,8 @@ app.use('/api/time', timeRouter);
 app.use('/api/json', jsonRouter);
 app.use('/api/http-inspect', httpInspectRouter);
 app.use('/api/webhook', webhookRouter);
+app.use('/api/tempmail', tempmailRouter);
+app.use('/api/sandbox', sandboxRouter);
 
 // OpenAPI JSON spec
 app.get('/openapi.json', (_req, res) => res.json(swaggerSpec));

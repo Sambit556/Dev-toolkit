@@ -5,6 +5,7 @@ import { AppError } from '../middleware/errorHandler';
 import * as emailService from '../services/email.service';
 import { SendEmailSchema, SendBatchEmailSchema, UpdateScheduledEmailSchema } from '../validators/email.validators';
 import { HttpStatus } from '../utils/httpStatus';
+import { deliverInboundToTempMail } from './tempmail';
 
 const router = Router();
 
@@ -61,6 +62,15 @@ router.post('/send', async (req: Request, res: Response, next: NextFunction) => 
       throw new AppError(HttpStatus.BAD_REQUEST, 'Invalid email payload', 'VALIDATION_ERROR', parseResult.error.flatten().fieldErrors);
     }
 
+    // Direct loopback delivery for @devkits.space addresses
+    deliverInboundToTempMail(
+      parseResult.data.to,
+      (req as any).user?.email || 'sender@devkits.space',
+      parseResult.data.subject,
+      parseResult.data.html,
+      parseResult.data.text
+    );
+
     const data = await emailService.sendSingleEmail(parseResult.data);
     res.json({ success: true, data, message: 'Email sent successfully via Resend' });
   } catch (err: any) {
@@ -82,6 +92,17 @@ router.post('/batch', async (req: Request, res: Response, next: NextFunction) =>
     const parseResult = SendBatchEmailSchema.safeParse(req.body);
     if (!parseResult.success) {
       throw new AppError(HttpStatus.BAD_REQUEST, 'Invalid batch email payload', 'VALIDATION_ERROR', parseResult.error.flatten().fieldErrors);
+    }
+
+    // Direct loopback delivery for batch emails
+    for (const item of parseResult.data.emails) {
+      deliverInboundToTempMail(
+        item.to,
+        (req as any).user?.email || 'sender@devkits.space',
+        item.subject,
+        item.html,
+        item.text
+      );
     }
 
     const data = await emailService.sendBatchEmails(parseResult.data.emails);

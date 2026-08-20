@@ -105,6 +105,8 @@ import { AvatarEditorModal } from '@/components/profile/AvatarEditorModal';
 import { getFileColor } from '@/lib/fileColor';
 import { FileViewerModal, type FileViewerItem } from '@/components/storage/FileViewerModal';
 import { CopyButton } from '@/components/ui/copy-button';
+import { EmailTemplateGallery } from '@/components/email/EmailTemplateGallery';
+import { TempInbox } from '@/components/email/TempInbox';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
@@ -478,7 +480,7 @@ export default function StoragePage() {
   const [adminEmails, setAdminEmails] = useState<ResendEmailItem[]>([]);
   const [isLoadingEmails, setIsLoadingEmails] = useState(false);
   const [emailSearchQuery, setEmailSearchQuery] = useState('');
-  const [emailSubTab, setEmailSubTab] = useState<'list' | 'compose' | 'batch'>('list');
+  const [emailSubTab, setEmailSubTab] = useState<'inbox' | 'templates' | 'compose' | 'batch' | 'list'>('inbox');
 
   // Single Send State
   const [sendTo, setSendTo] = useState('');
@@ -4435,7 +4437,7 @@ export default function StoragePage() {
               { tab: 'events' as const, icon: Calendar, label: 'Events', badge: null },
               { tab: 'notes' as const, icon: FileText, label: 'Text Notes', badge: null },
               { tab: 'diagrams' as const, icon: Palette, label: 'Diagrams', badge: null },
-              { tab: 'admin-emails' as const, icon: Mail, label: 'Temp Email', badge: null },
+              { tab: 'admin-emails' as const, icon: Mail, label: 'Mail', badge: null },
               { tab: 'uploads' as const, icon: Upload, label: 'Upload Queue', badge: uploadsList.filter(u => u.status === 'uploading').length || null },
               { tab: 'trash' as const, icon: Trash2, label: 'Trash', badge: null },
             ].map(({ tab, icon: Icon, label, badge }) => (
@@ -5121,7 +5123,7 @@ export default function StoragePage() {
               <div>
                 <div className="flex items-center gap-2">
                   <h2 className="text-sm font-bold text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
-                    <Mail className="h-4 w-4 text-blue-600 dark:text-blue-400" /> Batch Email Console
+                    <Mail className="h-4 w-4 text-blue-600 dark:text-blue-400" /> Email Console
                   </h2>
                   <span className="text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
                     <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" /> Resend Active
@@ -5135,19 +5137,28 @@ export default function StoragePage() {
               {/* Subtabs & Refresh */}
               <div className="flex items-center gap-2">
                 <div className="flex bg-slate-100 dark:bg-slate-900 p-1 rounded-xl border border-slate-200 dark:border-slate-800 text-xs">
-                  {userRole === 'superadmin' && (
-                    <button
-                      onClick={() => setEmailSubTab('list')}
-                      className={cn(
-                        "px-3 py-1.5 rounded-lg font-bold transition-all cursor-pointer flex items-center gap-1.5 text-xs",
-                        emailSubTab === 'list'
-                          ? "bg-white dark:bg-slate-800 text-blue-600 dark:text-blue-400 shadow-sm"
-                          : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100"
-                      )}
-                    >
-                      <Inbox className="h-3.5 w-3.5" /> Activity Log
-                    </button>
-                  )}
+                  <button
+                    onClick={() => setEmailSubTab('inbox')}
+                    className={cn(
+                      "px-3 py-1.5 rounded-lg font-bold transition-all cursor-pointer flex items-center gap-1.5 text-xs",
+                      emailSubTab === 'inbox'
+                        ? "bg-white dark:bg-slate-800 text-blue-600 dark:text-blue-400 shadow-sm"
+                        : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100"
+                    )}
+                  >
+                    <Mail className="h-3.5 w-3.5 text-emerald-500" /> Temp Inbox
+                  </button>
+                  <button
+                    onClick={() => setEmailSubTab('templates')}
+                    className={cn(
+                      "px-3 py-1.5 rounded-lg font-bold transition-all cursor-pointer flex items-center gap-1.5 text-xs",
+                      emailSubTab === 'templates'
+                        ? "bg-white dark:bg-slate-800 text-blue-600 dark:text-blue-400 shadow-sm"
+                        : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100"
+                    )}
+                  >
+                    <Sparkles className="h-3.5 w-3.5 text-amber-500" /> Template Gallery
+                  </button>
                   <button
                     onClick={() => setEmailSubTab('compose')}
                     className={cn(
@@ -5170,9 +5181,22 @@ export default function StoragePage() {
                   >
                     <Layers className="h-3.5 w-3.5" /> Batch Send
                   </button>
+                  {userRole === 'superadmin' && (
+                    <button
+                      onClick={() => setEmailSubTab('list')}
+                      className={cn(
+                        "px-3 py-1.5 rounded-lg font-bold transition-all cursor-pointer flex items-center gap-1.5 text-xs",
+                        emailSubTab === 'list'
+                          ? "bg-white dark:bg-slate-800 text-blue-600 dark:text-blue-400 shadow-sm"
+                          : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100"
+                      )}
+                    >
+                      <Inbox className="h-3.5 w-3.5" /> Activity Log
+                    </button>
+                  )}
                 </div>
 
-                {userRole === 'superadmin' && (
+                {userRole === 'superadmin' && emailSubTab === 'list' && (
                   <button
                     onClick={() => fetchAdminEmails(true)}
                     title="Force refresh from Resend API"
@@ -5183,6 +5207,11 @@ export default function StoragePage() {
                 )}
               </div>
             </div>
+
+            {/* Subtab 0: Real-Time Disposable Temp Mailbox */}
+            {emailSubTab === 'inbox' && (
+              <TempInbox currentUserEmail={userEmail} currentUserName={userName} />
+            )}
 
             {/* Subtab 1: Activity Log Table (Superadmin Only) */}
             {emailSubTab === 'list' && userRole === 'superadmin' && (
@@ -5383,9 +5412,17 @@ export default function StoragePage() {
                         <label className="text-[10px] uppercase tracking-widest font-black text-slate-700 dark:text-slate-300">
                           HTML Content *
                         </label>
-                        <button
-                          type="button"
-                          onClick={() => setSendHtml(`<!DOCTYPE html>
+                        <div className="flex items-center gap-3">
+                          <button
+                            type="button"
+                            onClick={() => setEmailSubTab('templates')}
+                            className="text-[10px] font-bold text-amber-600 dark:text-amber-400 hover:underline cursor-pointer flex items-center gap-1"
+                          >
+                            <Sparkles className="h-3 w-3" /> Browse Template Gallery
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setSendHtml(`<!DOCTYPE html>
 <html>
   <body style="font-family: system-ui, -apple-system, sans-serif; background-color: #f8fafc; padding: 24px;">
     <div style="max-width: 540px; margin: 0 auto; background: white; border-radius: 12px; padding: 24px; border: 1px solid #e2e8f0;">
@@ -5398,10 +5435,11 @@ export default function StoragePage() {
     </div>
   </body>
 </html>`)}
-                          className="text-[10px] font-bold text-blue-600 dark:text-blue-400 hover:underline cursor-pointer"
-                        >
-                          Load Clean Starter Template
-                        </button>
+                            className="text-[10px] font-bold text-blue-600 dark:text-blue-400 hover:underline cursor-pointer"
+                          >
+                            Load Clean Starter Template
+                          </button>
+                        </div>
                       </div>
                       <textarea
                         required
@@ -5546,6 +5584,35 @@ export default function StoragePage() {
                   </div>
                 </form>
               </div>
+            )}
+
+            {/* Subtab 4: Interactive Email Template Gallery */}
+            {emailSubTab === 'templates' && (
+              <EmailTemplateGallery
+                currentUserEmail={userEmail}
+                onUseTemplate={(subject, html) => {
+                  setSendSubject(subject);
+                  setSendHtml(html);
+                  setEmailSubTab('compose');
+                }}
+                onQuickTestSend={async (to, subject, html) => {
+                  try {
+                    const res = await apiFetch(`${API_BASE}/api/emails/send`, {
+                      method: 'POST',
+                      headers: getHeaders(),
+                      body: JSON.stringify({
+                        to: [to],
+                        subject,
+                        html,
+                      }),
+                    });
+                    const json = await res.json();
+                    return json.success;
+                  } catch {
+                    return false;
+                  }
+                }}
+              />
             )}
           </main>
         ) : sidebarTab === 'uploads' ? (
