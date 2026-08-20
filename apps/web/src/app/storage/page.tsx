@@ -3611,17 +3611,19 @@ export default function StoragePage() {
             <div className="bg-slate-900/95 dark:bg-slate-950/95 border border-indigo-500/30 text-slate-100 text-[9px] font-semibold px-2.5 py-1.5 rounded-md shadow-xl shadow-indigo-950/50 backdrop-blur-md whitespace-nowrap">Scan QR to upload from mobile</div>
           </div>
         </div>
-        <div className="relative group/tooltip">
-          <button
-            onClick={openManageLinksModal}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-800/50 hover:bg-slate-700/50 text-slate-300 rounded-lg transition-colors border border-slate-700/50 cursor-pointer text-[10px] font-bold"
-          >
-            <Link2 className="h-3.5 w-3.5" /> Active Scans
-          </button>
-          <div className="pointer-events-none absolute top-full left-1/2 -translate-x-1/2 mt-2 opacity-0 group-hover/tooltip:opacity-100 transition-all duration-200 scale-95 group-hover/tooltip:scale-100 z-50">
-            <div className="bg-slate-900/95 dark:bg-slate-950/95 border border-slate-200/10 dark:border-slate-800/40 text-slate-200 dark:text-slate-100 text-[9px] font-semibold px-2 py-1 rounded-md shadow-xl backdrop-blur-md whitespace-nowrap">Manage active mobile links</div>
+        {userRole === 'superadmin' && (
+          <div className="relative group/tooltip">
+            <button
+              onClick={openManageLinksModal}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-800/50 hover:bg-slate-700/50 text-slate-300 rounded-lg transition-colors border border-slate-700/50 cursor-pointer text-[10px] font-bold"
+            >
+              <Link2 className="h-3.5 w-3.5" /> Active Scans
+            </button>
+            <div className="pointer-events-none absolute top-full left-1/2 -translate-x-1/2 mt-2 opacity-0 group-hover/tooltip:opacity-100 transition-all duration-150 scale-95 group-hover/tooltip:scale-100 z-50">
+              <div className="bg-slate-900/95 dark:bg-slate-900/95 border border-slate-700/60 dark:border-slate-800/80 text-white text-[10px] font-semibold px-2.5 py-1 rounded-lg shadow-xl shadow-black/20 backdrop-blur-md whitespace-nowrap">Manage all active mobile scan links</div>
+            </div>
           </div>
-        </div>
+        )}
       </div>
       <div className="flex items-center gap-4 relative z-10">
         {/* Sync Pipeline - Clickable Refresh Button */}
@@ -6618,23 +6620,34 @@ export default function StoragePage() {
                         <Smartphone className={cn("h-4 w-4", link.connected_at ? "text-emerald-400" : "text-slate-500")} />
                       </div>
                       <div className="min-w-0">
-                        <div className={cn("text-xs font-bold truncate", link.connected_at ? "text-slate-100" : "text-slate-400")}>
-                          {link.device_label || 'Not connected yet'}
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <div className={cn("text-xs font-bold truncate", link.connected_at ? "text-slate-100" : "text-slate-400")}>
+                            {link.device_label || 'Not connected yet'}
+                          </div>
+                          {(link as any).user_email && (
+                            <span className="text-[9px] px-1.5 py-0.5 rounded bg-indigo-500/20 text-indigo-300 font-mono font-bold">
+                              {(link as any).user_email}
+                            </span>
+                          )}
                         </div>
-                        <div className="text-slate-500 text-[9px] font-bold uppercase tracking-wider flex items-center gap-2 flex-wrap">
+                        <div className="text-slate-500 text-[9px] font-bold uppercase tracking-wider flex items-center gap-2 flex-wrap mt-0.5">
                           {link.last_seen_at && <span>Seen {formatTimeAgo(link.last_seen_at)}</span>}
                           {link.ip_address && <span>&middot; {link.ip_address}</span>}
                           <span>&middot; Expires {new Date(link.expires_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
                         </div>
                       </div>
                     </div>
-                    <button
-                      onClick={() => revokeMobileLink(link.id)}
-                      className="p-2 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-400 opacity-0 group-hover:opacity-100 transition-all cursor-pointer border border-red-500/20 shrink-0"
-                      title="Revoke Link"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </button>
+                    <div className="relative group/rev">
+                      <button
+                        onClick={() => revokeMobileLink(link.id)}
+                        className="p-2 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-400 opacity-0 group-hover:opacity-100 transition-all cursor-pointer border border-red-500/20 shrink-0"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                      <div className="pointer-events-none absolute bottom-full right-0 mb-1.5 opacity-0 group-hover/rev:opacity-100 transition-all duration-150 scale-95 group-hover/rev:scale-100 z-50">
+                        <div className="bg-rose-950/95 dark:bg-rose-950/95 border border-rose-700/60 dark:border-rose-800/80 text-rose-100 text-[10px] font-semibold px-2.5 py-1 rounded-lg shadow-xl shadow-black/20 backdrop-blur-md whitespace-nowrap">Revoke Link</div>
+                      </div>
+                    </div>
                   </div>
                 ))
               )}

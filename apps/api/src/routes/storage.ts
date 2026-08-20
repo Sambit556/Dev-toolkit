@@ -1,6 +1,7 @@
 import { requireMobileAuth } from '../middleware/mobileAuth';
 import { Router, Request, Response, NextFunction } from 'express';
-import { requireAuth } from '../middleware/auth';
+import { requireAuth, requireRole } from '../middleware/auth';
+import { ROLES } from '../constants/activityActions';
 import { AppError } from '../middleware/errorHandler';
 import { s3Client, isS3Healthy, ensureS3Initialized } from '../utils/s3';
 import * as storageService from '../services/storage.service';
@@ -825,16 +826,20 @@ router.post('/mobile-links/create', requireAuth, async (req: Request, res: Respo
   } catch (err) { next(err); }
 });
 
-router.get('/mobile-links', requireAuth, async (req: Request, res: Response, next: NextFunction) => {
+router.get('/mobile-links', requireAuth, requireRole(ROLES.SUPERADMIN), async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const data = await storageService.getActiveMobileLinks(getUser(req).id);
+    const user = getUser(req);
+    const isSuperAdmin = user.role === ROLES.SUPERADMIN;
+    const data = await storageService.getActiveMobileLinks(user.id, isSuperAdmin);
     res.json({ success: true, data });
   } catch (err) { next(err); }
 });
 
-router.post('/mobile-links/revoke/:id', requireAuth, async (req: Request, res: Response, next: NextFunction) => {
+router.post('/mobile-links/revoke/:id', requireAuth, requireRole(ROLES.SUPERADMIN), async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const data = await storageService.revokeMobileLink(getUser(req).id, req.params.id);
+    const user = getUser(req);
+    const isSuperAdmin = user.role === ROLES.SUPERADMIN;
+    const data = await storageService.revokeMobileLink(user.id, req.params.id, isSuperAdmin);
     res.json({ success: true, data });
   } catch (err) { next(err); }
 });

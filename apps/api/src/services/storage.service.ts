@@ -832,7 +832,18 @@ export async function createMobileLink(userId: string, folderId: string | null) 
   return { token, expiresAt: link.expires_at };
 }
 
-export async function getActiveMobileLinks(userId: string) {
+export async function getActiveMobileLinks(userId: string, isSuperAdmin = false) {
+  if (isSuperAdmin) {
+    const query = `
+      SELECT m.*, u.email as user_email, u.name as user_name
+      FROM ${TABLES.MOBILE_UPLOAD_LINKS} m
+      LEFT JOIN ${TABLES.USERS} u ON m.user_id = u.id
+      WHERE m.is_revoked = false AND m.expires_at > NOW()
+      ORDER BY m.created_at DESC
+    `;
+    return await commonDao.rawQuery(query, []);
+  }
+
   const query = `
     SELECT * FROM ${TABLES.MOBILE_UPLOAD_LINKS}
     WHERE user_id = $1 AND is_revoked = false AND expires_at > NOW()
@@ -841,9 +852,9 @@ export async function getActiveMobileLinks(userId: string) {
   return await commonDao.rawQuery(query, [userId]);
 }
 
-export async function revokeMobileLink(userId: string, linkId: string) {
+export async function revokeMobileLink(userId: string, linkId: string, isSuperAdmin = false) {
   const link = await commonDao.getOneDataByCond<any>(TABLES.MOBILE_UPLOAD_LINKS, { id: linkId });
-  if (!link || link.user_id !== userId) {
+  if (!link || (!isSuperAdmin && link.user_id !== userId)) {
     throw new AppError(HttpStatus.NOT_FOUND, 'Link not found', 'VALIDATION_ERROR');
   }
   
