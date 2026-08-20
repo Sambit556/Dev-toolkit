@@ -5060,16 +5060,21 @@ export default function StoragePage() {
                                     >
                                       <KeyRound className="h-3 w-3" /> Reset Pwd
                                     </button>
-                                    <div className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 opacity-0 group-hover/tooltip:opacity-100 transition-all duration-200 scale-95 group-hover/tooltip:scale-100 z-50">
-                                      <div className="bg-slate-900/95 dark:bg-slate-950/95 border border-slate-200/10 dark:border-slate-800/40 text-slate-200 dark:text-slate-100 text-[9px] font-semibold px-2 py-1 rounded-md shadow-xl backdrop-blur-md whitespace-nowrap">Change Password</div>
+                                    <div className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 opacity-0 group-hover/tooltip:opacity-100 transition-all duration-150 scale-95 group-hover/tooltip:scale-100 z-50">
+                                      <div className="bg-slate-900/95 dark:bg-slate-900/95 border border-slate-700/60 dark:border-slate-800/80 text-white text-[10px] font-semibold px-2.5 py-1 rounded-lg shadow-xl shadow-black/20 backdrop-blur-md whitespace-nowrap">Change Password</div>
                                     </div>
                                   </div>
-                                  <button
-                                    onClick={() => setDeleteConfirmUser(u)}
-                                    className="p-1.5 rounded bg-red-500/10 text-red-600 dark:text-red-400 hover:bg-red-500/20 cursor-pointer"
-                                  >
-                                    <Trash2 className="h-3.5 w-3.5" />
-                                  </button>
+                                  <div className="relative group/deluser">
+                                    <button
+                                      onClick={() => setDeleteConfirmUser(u)}
+                                      className="p-1.5 rounded bg-red-500/10 text-red-600 dark:text-red-400 hover:bg-red-500/20 cursor-pointer"
+                                    >
+                                      <Trash2 className="h-3.5 w-3.5" />
+                                    </button>
+                                    <div className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 opacity-0 group-hover/deluser:opacity-100 transition-all duration-150 scale-95 group-hover/deluser:scale-100 z-50">
+                                      <div className="bg-rose-950/95 dark:bg-rose-950/95 border border-rose-700/60 dark:border-rose-800/80 text-rose-100 text-[10px] font-semibold px-2.5 py-1 rounded-lg shadow-xl shadow-black/20 backdrop-blur-md whitespace-nowrap">Delete user</div>
+                                    </div>
+                                  </div>
                                 </div>
                               )}
                             </td>
@@ -5290,12 +5295,17 @@ export default function StoragePage() {
                                   </div>
                                 </td>
                                 <td className="py-3 px-4 text-right">
-                                  <button
-                                    onClick={() => fetchEmailDetails(em.id)}
-                                    className="px-2.5 py-1 rounded bg-blue-500/10 hover:bg-blue-500/20 text-blue-600 dark:text-blue-400 text-[10px] font-bold transition-all cursor-pointer inline-flex items-center gap-1"
-                                  >
-                                    <Eye className="h-3 w-3" /> Inspect
-                                  </button>
+                                  <div className="relative group/inspect inline-block">
+                                    <button
+                                      onClick={() => fetchEmailDetails(em.id)}
+                                      className="px-2.5 py-1 rounded bg-blue-500/10 hover:bg-blue-500/20 text-blue-600 dark:text-blue-400 text-[10px] font-bold transition-all cursor-pointer inline-flex items-center gap-1"
+                                    >
+                                      <Eye className="h-3 w-3" /> Inspect
+                                    </button>
+                                    <div className="pointer-events-none absolute bottom-full right-0 mb-2 opacity-0 group-hover/inspect:opacity-100 transition-all duration-150 scale-95 group-hover/inspect:scale-100 z-50">
+                                      <div className="bg-slate-900/95 dark:bg-slate-900/95 border border-slate-700/60 dark:border-slate-800/80 text-white text-[10px] font-semibold px-2.5 py-1 rounded-lg shadow-xl shadow-black/20 backdrop-blur-md whitespace-nowrap">Inspect email details & telemetry</div>
+                                    </div>
+                                  </div>
                                 </td>
                               </tr>
                             );
@@ -5829,9 +5839,9 @@ export default function StoragePage() {
                   >
                     <ArrowUpDown className="h-4 w-4" />
                   </button>
-                  <div className="pointer-events-none absolute top-full left-1/2 -translate-x-1/2 mt-2 opacity-0 group-hover/sort:opacity-100 transition-opacity duration-150 z-50">
-                    <div className="bg-slate-200 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-800 dark:text-slate-200 text-[10px] font-semibold px-2.5 py-1.5 rounded-lg shadow-xl whitespace-nowrap">
-                      Toggle sort order ({sortOrder === 'asc' ? '↑ Ascending' : '↓ Descending'})
+                  <div className="pointer-events-none absolute top-full left-1/2 -translate-x-1/2 mt-2 opacity-0 group-hover/sort:opacity-100 transition-all duration-150 scale-95 group-hover/sort:scale-100 z-50">
+                    <div className="bg-slate-900/95 dark:bg-slate-900/95 border border-slate-700/60 dark:border-slate-800/80 text-white text-[10px] font-semibold px-2.5 py-1 rounded-lg shadow-xl shadow-black/20 backdrop-blur-md whitespace-nowrap">
+                      Toggle sort ({sortOrder === 'asc' ? '↑ Ascending' : '↓ Descending'})
                     </div>
                   </div>
                 </div>
@@ -5847,8 +5857,8 @@ export default function StoragePage() {
                     >
                       <Grid className="h-4 w-4" />
                     </button>
-                    <div className="pointer-events-none absolute top-full left-1/2 -translate-x-1/2 mt-2 opacity-0 group-hover/grid:opacity-100 transition-opacity duration-150 z-50">
-                      <div className="bg-slate-200 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-800 dark:text-slate-200 text-[10px] font-semibold px-2.5 py-1.5 rounded-lg shadow-xl whitespace-nowrap">Grid view</div>
+                    <div className="pointer-events-none absolute top-full left-1/2 -translate-x-1/2 mt-2 opacity-0 group-hover/grid:opacity-100 transition-all duration-150 scale-95 group-hover/grid:scale-100 z-50">
+                      <div className="bg-slate-900/95 dark:bg-slate-900/95 border border-slate-700/60 dark:border-slate-800/80 text-white text-[10px] font-semibold px-2.5 py-1 rounded-lg shadow-xl shadow-black/20 backdrop-blur-md whitespace-nowrap">Grid view</div>
                     </div>
                   </div>
                   <div className="relative group/list">
@@ -5861,8 +5871,8 @@ export default function StoragePage() {
                     >
                       <List className="h-4 w-4" />
                     </button>
-                    <div className="pointer-events-none absolute top-full left-1/2 -translate-x-1/2 mt-2 opacity-0 group-hover/list:opacity-100 transition-opacity duration-150 z-50">
-                      <div className="bg-slate-200 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-800 dark:text-slate-200 text-[10px] font-semibold px-2.5 py-1.5 rounded-lg shadow-xl whitespace-nowrap">List view</div>
+                    <div className="pointer-events-none absolute top-full left-1/2 -translate-x-1/2 mt-2 opacity-0 group-hover/list:opacity-100 transition-all duration-150 scale-95 group-hover/list:scale-100 z-50">
+                      <div className="bg-slate-900/95 dark:bg-slate-900/95 border border-slate-700/60 dark:border-slate-800/80 text-white text-[10px] font-semibold px-2.5 py-1 rounded-lg shadow-xl shadow-black/20 backdrop-blur-md whitespace-nowrap">List view</div>
                     </div>
                   </div>
                 </div>
@@ -6038,8 +6048,8 @@ export default function StoragePage() {
                                 >
                                   <FileText className="h-3 w-3" />
                                 </button>
-                                <div className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 opacity-0 group-hover/edit:opacity-100 transition-all duration-200 scale-95 group-hover/edit:scale-100 z-50">
-                                  <div className="bg-slate-900/95 dark:bg-slate-950/95 border border-slate-200/10 dark:border-slate-800/40 text-slate-200 dark:text-slate-100 text-[9px] font-semibold px-2 py-1 rounded-md shadow-xl backdrop-blur-md whitespace-nowrap">Edit note</div>
+                                <div className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 opacity-0 group-hover/edit:opacity-100 transition-all duration-150 scale-95 group-hover/edit:scale-100 z-50">
+                                  <div className="bg-slate-900/95 dark:bg-slate-900/95 border border-slate-700/60 dark:border-slate-800/80 text-white text-[10px] font-semibold px-2.5 py-1 rounded-lg shadow-xl shadow-black/20 backdrop-blur-md whitespace-nowrap">Edit note</div>
                                 </div>
                               </div>
                             )}
@@ -6052,8 +6062,8 @@ export default function StoragePage() {
                                 >
                                   <Upload className="h-3 w-3 rotate-180" />
                                 </button>
-                                <div className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 opacity-0 group-hover/dl:opacity-100 transition-all duration-200 scale-95 group-hover/dl:scale-100 z-50">
-                                  <div className="bg-slate-900/95 dark:bg-slate-950/95 border border-slate-200/10 dark:border-slate-800/40 text-slate-200 dark:text-slate-100 text-[9px] font-semibold px-2 py-1 rounded-md shadow-xl backdrop-blur-md whitespace-nowrap">Download</div>
+                                <div className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 opacity-0 group-hover/dl:opacity-100 transition-all duration-150 scale-95 group-hover/dl:scale-100 z-50">
+                                  <div className="bg-slate-900/95 dark:bg-slate-900/95 border border-slate-700/60 dark:border-slate-800/80 text-white text-[10px] font-semibold px-2.5 py-1 rounded-lg shadow-xl shadow-black/20 backdrop-blur-md whitespace-nowrap">Download</div>
                                 </div>
                               </div>
                             )}
@@ -6067,8 +6077,8 @@ export default function StoragePage() {
                                 >
                                   {shareLoadingId === item.id ? <LogoSpinner size={14} /> : <Share2 className="h-3 w-3" />}
                                 </button>
-                                <div className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 opacity-0 group-hover/share:opacity-100 transition-all duration-200 scale-95 group-hover/share:scale-100 z-50">
-                                  <div className="bg-slate-900/95 dark:bg-slate-950/95 border border-slate-200/10 dark:border-slate-800/40 text-slate-200 dark:text-slate-100 text-[9px] font-semibold px-2 py-1 rounded-md shadow-xl backdrop-blur-md whitespace-nowrap">Share (10 min link)</div>
+                                <div className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 opacity-0 group-hover/share:opacity-100 transition-all duration-150 scale-95 group-hover/share:scale-100 z-50">
+                                  <div className="bg-slate-900/95 dark:bg-slate-900/95 border border-slate-700/60 dark:border-slate-800/80 text-white text-[10px] font-semibold px-2.5 py-1 rounded-lg shadow-xl shadow-black/20 backdrop-blur-md whitespace-nowrap">Share (10 min link)</div>
                                 </div>
                               </div>
                             )}
@@ -6081,8 +6091,8 @@ export default function StoragePage() {
                                 >
                                   <Tag className="h-3 w-3" />
                                 </button>
-                                <div className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 opacity-0 group-hover/tag:opacity-100 transition-all duration-200 scale-95 group-hover/tag:scale-100 z-50">
-                                  <div className="bg-slate-900/95 dark:bg-slate-950/95 border border-slate-200/10 dark:border-slate-800/40 text-slate-200 dark:text-slate-100 text-[9px] font-semibold px-2 py-1 rounded-md shadow-xl backdrop-blur-md whitespace-nowrap">Tags</div>
+                                <div className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 opacity-0 group-hover/tag:opacity-100 transition-all duration-150 scale-95 group-hover/tag:scale-100 z-50">
+                                  <div className="bg-slate-900/95 dark:bg-slate-900/95 border border-slate-700/60 dark:border-slate-800/80 text-white text-[10px] font-semibold px-2.5 py-1 rounded-lg shadow-xl shadow-black/20 backdrop-blur-md whitespace-nowrap">Tags</div>
                                 </div>
                               </div>
                             )}
@@ -6095,8 +6105,8 @@ export default function StoragePage() {
                                 >
                                   <RotateCcw className="h-3 w-3" />
                                 </button>
-                                <div className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 opacity-0 group-hover/restore:opacity-100 transition-all duration-200 scale-95 group-hover/restore:scale-100 z-50">
-                                  <div className="bg-slate-900/95 dark:bg-slate-950/95 border border-slate-200/10 dark:border-slate-800/40 text-slate-200 dark:text-slate-100 text-[9px] font-semibold px-2 py-1 rounded-md shadow-xl backdrop-blur-md whitespace-nowrap">Restore item</div>
+                                <div className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 opacity-0 group-hover/restore:opacity-100 transition-all duration-150 scale-95 group-hover/restore:scale-100 z-50">
+                                  <div className="bg-slate-900/95 dark:bg-slate-900/95 border border-slate-700/60 dark:border-slate-800/80 text-white text-[10px] font-semibold px-2.5 py-1 rounded-lg shadow-xl shadow-black/20 backdrop-blur-md whitespace-nowrap">Restore item</div>
                                 </div>
                               </div>
                             )}
@@ -6108,8 +6118,8 @@ export default function StoragePage() {
                               >
                                 <Pencil className="h-3 w-3" />
                               </button>
-                              <div className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 opacity-0 group-hover/rename:opacity-100 transition-all duration-200 scale-95 group-hover/rename:scale-100 z-50">
-                                <div className="bg-slate-900/95 dark:bg-slate-950/95 border border-slate-200/10 dark:border-slate-800/40 text-slate-200 dark:text-slate-100 text-[9px] font-semibold px-2 py-1 rounded-md shadow-xl backdrop-blur-md whitespace-nowrap">Rename</div>
+                              <div className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 opacity-0 group-hover/rename:opacity-100 transition-all duration-150 scale-95 group-hover/rename:scale-100 z-50">
+                                <div className="bg-slate-900/95 dark:bg-slate-900/95 border border-slate-700/60 dark:border-slate-800/80 text-white text-[10px] font-semibold px-2.5 py-1 rounded-lg shadow-xl shadow-black/20 backdrop-blur-md whitespace-nowrap">Rename</div>
                               </div>
                             </div>
                             <div className="relative group/del">
@@ -6120,8 +6130,8 @@ export default function StoragePage() {
                               >
                                 <Trash2 className="h-3 w-3" />
                               </button>
-                              <div className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 opacity-0 group-hover/del:opacity-100 transition-all duration-200 scale-95 group-hover/del:scale-100 z-50">
-                                <div className="bg-red-950 border border-red-800/60 text-red-300 text-[9px] font-semibold px-2 py-1 rounded-md shadow-xl whitespace-nowrap">{sidebarTab === 'trash' ? 'Delete permanently' : 'Move to trash'}</div>
+                              <div className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 opacity-0 group-hover/del:opacity-100 transition-all duration-150 scale-95 group-hover/del:scale-100 z-50">
+                                <div className="bg-rose-950/95 dark:bg-rose-950/95 border border-rose-700/60 dark:border-rose-800/80 text-rose-100 text-[10px] font-semibold px-2.5 py-1 rounded-lg shadow-xl shadow-black/20 backdrop-blur-md whitespace-nowrap">{sidebarTab === 'trash' ? 'Delete permanently' : 'Move to trash'}</div>
                               </div>
                             </div>
                           </div>
@@ -6269,8 +6279,8 @@ export default function StoragePage() {
                                   >
                                     <FileText className="h-3.5 w-3.5" />
                                   </button>
-                                  <div className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 opacity-0 group-hover/edit:opacity-100 transition-all duration-200 scale-95 group-hover/edit:scale-100 z-50">
-                                    <div className="bg-slate-900/95 dark:bg-slate-950/95 border border-slate-200/10 dark:border-slate-800/40 text-slate-200 dark:text-slate-100 text-[9px] font-semibold px-2 py-1 rounded-md shadow-xl backdrop-blur-md whitespace-nowrap">Edit note</div>
+                                  <div className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 opacity-0 group-hover/edit:opacity-100 transition-all duration-150 scale-95 group-hover/edit:scale-100 z-50">
+                                    <div className="bg-slate-900/95 dark:bg-slate-900/95 border border-slate-700/60 dark:border-slate-800/80 text-white text-[10px] font-semibold px-2.5 py-1 rounded-lg shadow-xl shadow-black/20 backdrop-blur-md whitespace-nowrap">Edit note</div>
                                   </div>
                                 </div>
                               )}
@@ -6283,8 +6293,8 @@ export default function StoragePage() {
                                   >
                                     <Upload className="h-3.5 w-3.5 rotate-180" />
                                   </button>
-                                  <div className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 opacity-0 group-hover/dl:opacity-100 transition-all duration-200 scale-95 group-hover/dl:scale-100 z-50">
-                                    <div className="bg-slate-900/95 dark:bg-slate-950/95 border border-slate-200/10 dark:border-slate-800/40 text-slate-200 dark:text-slate-100 text-[9px] font-semibold px-2 py-1 rounded-md shadow-xl backdrop-blur-md whitespace-nowrap">Download</div>
+                                  <div className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 opacity-0 group-hover/dl:opacity-100 transition-all duration-150 scale-95 group-hover/dl:scale-100 z-50">
+                                    <div className="bg-slate-900/95 dark:bg-slate-900/95 border border-slate-700/60 dark:border-slate-800/80 text-white text-[10px] font-semibold px-2.5 py-1 rounded-lg shadow-xl shadow-black/20 backdrop-blur-md whitespace-nowrap">Download</div>
                                   </div>
                                 </div>
                               )}
@@ -6298,8 +6308,8 @@ export default function StoragePage() {
                                   >
                                     {shareLoadingId === item.id ? <LogoSpinner size={16} /> : <Share2 className="h-3.5 w-3.5" />}
                                   </button>
-                                  <div className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 opacity-0 group-hover/share:opacity-100 transition-all duration-200 scale-95 group-hover/share:scale-100 z-50">
-                                    <div className="bg-slate-900/95 dark:bg-slate-950/95 border border-slate-200/10 dark:border-slate-800/40 text-slate-200 dark:text-slate-100 text-[9px] font-semibold px-2 py-1 rounded-md shadow-xl backdrop-blur-md whitespace-nowrap">Share (10 min link)</div>
+                                  <div className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 opacity-0 group-hover/share:opacity-100 transition-all duration-150 scale-95 group-hover/share:scale-100 z-50">
+                                    <div className="bg-slate-900/95 dark:bg-slate-900/95 border border-slate-700/60 dark:border-slate-800/80 text-white text-[10px] font-semibold px-2.5 py-1 rounded-lg shadow-xl shadow-black/20 backdrop-blur-md whitespace-nowrap">Share (10 min link)</div>
                                   </div>
                                 </div>
                               )}
@@ -6312,8 +6322,8 @@ export default function StoragePage() {
                                   >
                                     <Tag className="h-3.5 w-3.5" />
                                   </button>
-                                  <div className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 opacity-0 group-hover/tag:opacity-100 transition-all duration-200 scale-95 group-hover/tag:scale-100 z-50">
-                                    <div className="bg-slate-900/95 dark:bg-slate-950/95 border border-slate-200/10 dark:border-slate-800/40 text-slate-200 dark:text-slate-100 text-[9px] font-semibold px-2 py-1 rounded-md shadow-xl backdrop-blur-md whitespace-nowrap">Tags</div>
+                                  <div className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 opacity-0 group-hover/tag:opacity-100 transition-all duration-150 scale-95 group-hover/tag:scale-100 z-50">
+                                    <div className="bg-slate-900/95 dark:bg-slate-900/95 border border-slate-700/60 dark:border-slate-800/80 text-white text-[10px] font-semibold px-2.5 py-1 rounded-lg shadow-xl shadow-black/20 backdrop-blur-md whitespace-nowrap">Tags</div>
                                   </div>
                                 </div>
                               )}
@@ -6326,8 +6336,8 @@ export default function StoragePage() {
                                   >
                                     <RotateCcw className="h-3.5 w-3.5" />
                                   </button>
-                                  <div className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 opacity-0 group-hover/restore:opacity-100 transition-all duration-200 scale-95 group-hover/restore:scale-100 z-50">
-                                    <div className="bg-slate-900/95 dark:bg-slate-950/95 border border-slate-200/10 dark:border-slate-800/40 text-slate-200 dark:text-slate-100 text-[9px] font-semibold px-2 py-1 rounded-md shadow-xl backdrop-blur-md whitespace-nowrap">Restore item</div>
+                                  <div className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 opacity-0 group-hover/restore:opacity-100 transition-all duration-150 scale-95 group-hover/restore:scale-100 z-50">
+                                    <div className="bg-slate-900/95 dark:bg-slate-900/95 border border-slate-700/60 dark:border-slate-800/80 text-white text-[10px] font-semibold px-2.5 py-1 rounded-lg shadow-xl shadow-black/20 backdrop-blur-md whitespace-nowrap">Restore item</div>
                                   </div>
                                 </div>
                               )}
@@ -6339,8 +6349,8 @@ export default function StoragePage() {
                                 >
                                   <Pencil className="h-3.5 w-3.5" />
                                 </button>
-                                <div className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 opacity-0 group-hover/rename:opacity-100 transition-all duration-200 scale-95 group-hover/rename:scale-100 z-50">
-                                  <div className="bg-slate-900/95 dark:bg-slate-950/95 border border-slate-200/10 dark:border-slate-800/40 text-slate-200 dark:text-slate-100 text-[9px] font-semibold px-2 py-1 rounded-md shadow-xl backdrop-blur-md whitespace-nowrap">Rename</div>
+                                <div className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 opacity-0 group-hover/rename:opacity-100 transition-all duration-150 scale-95 group-hover/rename:scale-100 z-50">
+                                  <div className="bg-slate-900/95 dark:bg-slate-900/95 border border-slate-700/60 dark:border-slate-800/80 text-white text-[10px] font-semibold px-2.5 py-1 rounded-lg shadow-xl shadow-black/20 backdrop-blur-md whitespace-nowrap">Rename</div>
                                 </div>
                               </div>
                               <div className="relative group/del">
@@ -6351,8 +6361,8 @@ export default function StoragePage() {
                                 >
                                   <Trash2 className="h-3.5 w-3.5" />
                                 </button>
-                                <div className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 opacity-0 group-hover/del:opacity-100 transition-all duration-200 scale-95 group-hover/del:scale-100 z-50">
-                                  <div className="bg-red-950 border border-red-800/60 text-red-300 text-[9px] font-semibold px-2 py-1 rounded-md shadow-xl whitespace-nowrap">{sidebarTab === 'trash' ? 'Delete permanently' : 'Move to trash'}</div>
+                                <div className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 opacity-0 group-hover/del:opacity-100 transition-all duration-150 scale-95 group-hover/del:scale-100 z-50">
+                                  <div className="bg-rose-950/95 dark:bg-rose-950/95 border border-rose-700/60 dark:border-rose-800/80 text-rose-100 text-[10px] font-semibold px-2.5 py-1 rounded-lg shadow-xl shadow-black/20 backdrop-blur-md whitespace-nowrap">{sidebarTab === 'trash' ? 'Delete permanently' : 'Move to trash'}</div>
                                 </div>
                               </div>
                             </div>
