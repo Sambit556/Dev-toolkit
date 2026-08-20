@@ -304,25 +304,13 @@ const NoteBulletList = BulletList.extend({
   },
 });
 
-// A miniature, animated version of the app's own logo mark (the gradient rounded
-// square from SplashScreen.tsx) used as the loading indicator across this page: it
-// smiles, turns sad, then spins around — on a continuous loop. Pure CSS (see the
-// .animate-logo-spin-* keyframes in globals.css), no JS timer, so it never jitters.
+// Standard spinner indicator used across this page
 function LogoSpinner({ size = 18, className = '' }: { size?: number; className?: string }) {
   return (
-    <span
-      role="status"
-      aria-label="Loading"
-      className={cn('inline-flex shrink-0 items-center justify-center rounded-[30%] bg-gradient-to-br from-blue-600 via-blue-500 to-purple-600 animate-logo-spin-rotate', className)}
+    <Loader2
       style={{ width: size, height: size }}
-    >
-      <svg viewBox="0 0 24 24" width={size * 0.65} height={size * 0.65} aria-hidden>
-        <circle cx="8.5" cy="10" r="1.5" fill="white" />
-        <circle cx="15.5" cy="10" r="1.5" fill="white" />
-        <path d="M7 15 Q12 19.5 17 15" stroke="white" strokeWidth="1.8" fill="none" strokeLinecap="round" className="animate-logo-spin-smile" />
-        <path d="M7 18.5 Q12 14.5 17 18.5" stroke="white" strokeWidth="1.8" fill="none" strokeLinecap="round" className="animate-logo-spin-sad" />
-      </svg>
-    </span>
+      className={cn('animate-spin shrink-0 text-current', className)}
+    />
   );
 }
 

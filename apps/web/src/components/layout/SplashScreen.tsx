@@ -173,7 +173,7 @@ export function SplashScreen() {
         >
           <span className="relative z-10 select-none">DK</span>
           {phase === 'intro' && (
-            <span className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/40 to-transparent animate-premium-splash-shimmer" />
+            <span className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/40 to-transparent animate-premium-splash-shimmer pointer-events-none" />
           )}
         </div>
 
