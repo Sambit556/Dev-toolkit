@@ -469,7 +469,7 @@ export function CalendarTool() {
               <Plus className="h-4.5 w-4.5 text-primary" /> Schedule New Event
             </h4>
 
-            <form onSubmit={handleAddEvent} className="space-y-3.5 text-xs">
+            <form onSubmit={handleAddEvent} noValidate className="space-y-3.5 text-xs">
               <div className="space-y-1.5">
                 <Label htmlFor="event-title">Event Title</Label>
                 <Input

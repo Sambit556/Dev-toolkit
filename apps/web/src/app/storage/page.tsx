@@ -1738,8 +1738,16 @@ export default function StoragePage() {
 
   const handleSendSingleEmail = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!sendTo || !sendSubject || !sendHtml) {
-      toast.error('Please enter To, Subject, and HTML Content');
+    if (!sendTo.trim()) {
+      toast.error('Recipient email address is required');
+      return;
+    }
+    if (!sendSubject.trim()) {
+      toast.error('Subject line is required');
+      return;
+    }
+    if (!sendHtml.trim()) {
+      toast.error('Email HTML body is required');
       return;
     }
     setIsSendingEmail(true);
@@ -1782,11 +1790,26 @@ export default function StoragePage() {
 
   const handleSendBatchEmails = async (e: React.FormEvent) => {
     e.preventDefault();
-    const validItems = batchItems.filter(item => item.to.trim() && item.subject.trim() && item.html.trim());
-    if (validItems.length === 0) {
-      toast.error('Please add at least 1 valid email with To, Subject, and Body');
+    if (batchItems.length === 0) {
+      toast.error('Please add at least 1 email item');
       return;
     }
+    for (let i = 0; i < batchItems.length; i++) {
+      const it = batchItems[i];
+      if (!it.to.trim()) {
+        toast.error(`Recipient email is required for Item #${i + 1}`);
+        return;
+      }
+      if (!it.subject.trim()) {
+        toast.error(`Subject line is required for Item #${i + 1}`);
+        return;
+      }
+      if (!it.html.trim()) {
+        toast.error(`HTML body is required for Item #${i + 1}`);
+        return;
+      }
+    }
+    const validItems = batchItems.filter(item => item.to.trim() && item.subject.trim() && item.html.trim());
     setIsSendingBatch(true);
     try {
       const payload = {
@@ -3588,7 +3611,7 @@ export default function StoragePage() {
   // Holographic Diagnostic Panel — shown at the top of every /storage view (files, notes, diagrams, events, admin, uploads).
   // `insetMargin` negates padding on <main> containers that pad their own content, so the bar still sits flush.
   const renderDiagnosticBar = (insetMargin = '') => (
-    <div className={cn("bg-[#0c152d]/95 dark:bg-[#070e1f]/95 border-b border-blue-900/30 dark:border-blue-950/40 px-5 py-3 flex flex-wrap items-center justify-between gap-4 font-mono text-[10px] text-slate-350 dark:text-slate-400 relative backdrop-blur-md shrink-0", insetMargin)}>
+    <div className={cn("bg-slate-100/90 dark:bg-[#070e1f]/95 border-b border-slate-200 dark:border-blue-950/40 px-5 py-2.5 flex flex-wrap items-center justify-between gap-4 font-mono text-[10px] text-slate-600 dark:text-slate-400 relative backdrop-blur-md shrink-0", insetMargin)}>
       {/* Decorative glow gets its own clipped layer — the bar itself must stay
           overflow-visible so hover tooltips positioned below its buttons aren't cut off. */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
@@ -3596,14 +3619,14 @@ export default function StoragePage() {
       </div>
       <div className="flex items-center gap-6 relative z-10">
         <div className="flex items-center gap-2">
-          <Shield className="h-3.5 w-3.5 text-blue-400" />
-          <span className="text-slate-400">Security Standard:</span>
-          <span className="text-blue-400 font-bold">AES-GCM-256</span>
+          <Shield className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400" />
+          <span className="text-slate-600 dark:text-slate-400">Security Standard:</span>
+          <span className="text-blue-600 dark:text-blue-400 font-bold">AES-GCM-256</span>
         </div>
         <div className="relative group/tooltip">
           <button
             onClick={generateMobileUploadLink}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white rounded-lg transition-all shadow-md shadow-indigo-950/50 hover:shadow-indigo-500/30 cursor-pointer text-[10px] font-bold"
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white rounded-lg transition-all shadow-md shadow-indigo-950/20 hover:shadow-indigo-500/30 cursor-pointer text-[10px] font-bold"
           >
             <Smartphone className="h-3.5 w-3.5" /> Mobile Upload
           </button>
@@ -3615,7 +3638,7 @@ export default function StoragePage() {
           <div className="relative group/tooltip">
             <button
               onClick={openManageLinksModal}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-800/50 hover:bg-slate-700/50 text-slate-300 rounded-lg transition-colors border border-slate-700/50 cursor-pointer text-[10px] font-bold"
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-200/80 hover:bg-slate-300/80 dark:bg-slate-800/50 dark:hover:bg-slate-700/50 text-slate-800 dark:text-slate-300 rounded-lg transition-colors border border-slate-300 dark:border-slate-700/50 cursor-pointer text-[10px] font-bold"
             >
               <Link2 className="h-3.5 w-3.5" /> Active Scans
             </button>
@@ -3625,7 +3648,7 @@ export default function StoragePage() {
           </div>
         )}
       </div>
-      <div className="flex items-center gap-4 relative z-10">
+      <div className="flex items-center gap-3 relative z-10">
         {/* Sync Pipeline - Clickable Refresh Button */}
         <button
           onClick={() => loadStorageItems()}
@@ -3635,7 +3658,8 @@ export default function StoragePage() {
           <span className="text-blue-700 dark:text-blue-300 transition-colors text-[10px] font-bold font-mono tracking-wide uppercase">Sync Pipeline</span>
         </button>
 
-        <div className="flex items-center gap-1.5 bg-blue-500/10 border border-blue-500/20 text-blue-450 px-2.5 py-0.5 rounded-full font-bold">
+        <div className="flex items-center gap-1.5 bg-blue-500/15 dark:bg-blue-500/15 border border-blue-500/30 dark:border-blue-500/30 text-blue-700 dark:text-blue-300 px-2.5 py-1 rounded-full font-bold shadow-sm text-[10px]">
+          <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 shrink-0 animate-pulse" />
           <span>SSL v3</span>
         </div>
       </div>
@@ -4411,7 +4435,7 @@ export default function StoragePage() {
               { tab: 'events' as const, icon: Calendar, label: 'Events', badge: null },
               { tab: 'notes' as const, icon: FileText, label: 'Text Notes', badge: null },
               { tab: 'diagrams' as const, icon: Palette, label: 'Diagrams', badge: null },
-              { tab: 'admin-emails' as const, icon: Mail, label: 'Transactional Email', badge: null },
+              { tab: 'admin-emails' as const, icon: Mail, label: 'Temp Email', badge: null },
               { tab: 'uploads' as const, icon: Upload, label: 'Upload Queue', badge: uploadsList.filter(u => u.status === 'uploading').length || null },
               { tab: 'trash' as const, icon: Trash2, label: 'Trash', badge: null },
             ].map(({ tab, icon: Icon, label, badge }) => (
@@ -5097,14 +5121,14 @@ export default function StoragePage() {
               <div>
                 <div className="flex items-center gap-2">
                   <h2 className="text-sm font-bold text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
-                    <Mail className="h-4 w-4 text-blue-600 dark:text-blue-400" /> Resend Email Console
+                    <Mail className="h-4 w-4 text-blue-600 dark:text-blue-400" /> Batch Email Console
                   </h2>
                   <span className="text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
                     <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" /> Resend Active
                   </span>
                 </div>
                 <div className="text-[10px] text-slate-500 dark:text-slate-500 mt-0.5">
-                  Compose single & batch transactional emails, schedule future dispatches, and inspect delivery telemetry
+                  Compose single & batch emails, schedule future dispatches, and inspect delivery telemetry
                 </div>
               </div>
 
@@ -5174,32 +5198,32 @@ export default function StoragePage() {
                       className="w-full pl-9 pr-3 py-1.5 text-xs rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/60 text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:border-blue-500/50"
                     />
                   </div>
-                  <div className="text-[11px] text-slate-500 font-mono">
-                    Total: {adminEmails.length} logged
+                  <div className="text-[10px] text-slate-400 font-mono">
+                    {adminEmails.length} logged
                   </div>
                 </div>
 
-                <div className="flex-1 overflow-y-auto border border-slate-200 dark:border-slate-800 rounded-xl bg-slate-100/5 dark:bg-slate-900/5">
+                <div className="flex-1 overflow-y-auto border border-slate-200 dark:border-slate-800 rounded-xl">
                   {isLoadingEmails ? (
-                    <div className="h-64 flex items-center justify-center text-slate-500 gap-2 font-mono text-xs">
-                      <Loader2 className="h-5 w-5 animate-spin text-blue-500" /> Querying Resend emails...
+                    <div className="py-16 text-center text-slate-400 flex flex-col items-center gap-2">
+                      <Loader2 className="h-6 w-6 animate-spin text-blue-500" />
+                      <span>Fetching real-time email logs...</span>
                     </div>
                   ) : adminEmails.length === 0 ? (
-                    <div className="h-64 flex flex-col items-center justify-center text-slate-500 gap-2 p-6 text-center">
-                      <Mail className="h-8 w-8 text-slate-400 animate-pulse" />
-                      <div className="text-xs font-bold text-slate-700 dark:text-slate-300">No emails found</div>
-                      <div className="text-[10px] text-slate-400 max-w-xs">
-                        Use the "Single Send" or "Batch Send" tab above to dispatch your first transactional email via Resend.
+                    <div className="py-16 text-center text-slate-400 space-y-1">
+                      <div className="text-sm font-bold text-slate-700 dark:text-slate-300">No email logs found</div>
+                      <div className="text-[10px]">
+                        Use the "Single Send" or "Batch Send" tab above to dispatch your first email via Resend.
                       </div>
                     </div>
                   ) : (
-                    <table className="w-full text-left border-collapse">
+                    <table className="w-full text-left border-collapse text-xs font-mono">
                       <thead>
-                        <tr className="border-b border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 uppercase tracking-widest text-[9px] font-black bg-slate-100/15 dark:bg-slate-900/15 sticky top-0 backdrop-blur-md">
-                          <th className="py-2.5 px-4">To Recipient</th>
+                        <tr className="border-b border-slate-200 dark:border-slate-800 bg-slate-100/50 dark:bg-slate-900/50 text-[9px] uppercase tracking-wider text-slate-500 font-black">
+                          <th className="py-2.5 px-4">Recipient</th>
                           <th className="py-2.5 px-4">Subject</th>
                           <th className="py-2.5 px-4">Status</th>
-                          <th className="py-2.5 px-4">Date / Scheduled</th>
+                          <th className="py-2.5 px-4">Dispatched / Scheduled</th>
                           <th className="py-2.5 px-4">Email ID</th>
                           <th className="py-2.5 px-4 text-right">Actions</th>
                         </tr>
@@ -5207,9 +5231,9 @@ export default function StoragePage() {
                       <tbody>
                         {adminEmails
                           .filter((em) => {
-                            if (!emailSearchQuery) return true;
+                            if (!emailSearchQuery.trim()) return true;
                             const q = emailSearchQuery.toLowerCase();
-                            const toStr = Array.isArray(em.to) ? em.to.join(', ') : String(em.to || '');
+                            const toStr = Array.isArray(em.to) ? em.to.join(' ') : String(em.to || '');
                             return (
                               toStr.toLowerCase().includes(q) ||
                               (em.subject || '').toLowerCase().includes(q) ||
@@ -5217,71 +5241,53 @@ export default function StoragePage() {
                             );
                           })
                           .map((em) => {
-                            const toList = Array.isArray(em.to) ? em.to : [em.to];
-                            const isScheduled = Boolean(em.scheduled_at);
-                            const status = em.last_event || (isScheduled ? 'scheduled' : 'sent');
-                            
-                            let statusBadge = (
-                              <span className="text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md border bg-blue-500/10 border-blue-500/30 text-blue-600 dark:text-blue-400">
-                                {status}
-                              </span>
-                            );
-                            if (status === 'delivered') {
-                              statusBadge = (
-                                <span className="text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md border bg-emerald-500/10 border-emerald-500/30 text-emerald-600 dark:text-emerald-400 flex items-center gap-1 w-fit">
-                                  <CheckCheck className="h-3 w-3" /> delivered
-                                </span>
-                              );
-                            } else if (status === 'scheduled') {
-                              statusBadge = (
-                                <span className="text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md border bg-purple-500/10 border-purple-500/30 text-purple-600 dark:text-purple-400 flex items-center gap-1 w-fit">
-                                  <CalendarClock className="h-3 w-3" /> scheduled
-                                </span>
-                              );
-                            } else if (status === 'bounced' || status === 'complained' || status === 'failed') {
-                              statusBadge = (
-                                <span className="text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md border bg-rose-500/10 border-rose-500/30 text-rose-600 dark:text-rose-400">
-                                  {status}
-                                </span>
-                              );
-                            }
+                            const toDisplay = Array.isArray(em.to) ? em.to.join(', ') : String(em.to || '-');
+                            const statusColor =
+                              em.last_event === 'delivered'
+                                ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20'
+                                : em.last_event === 'sent'
+                                ? 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20'
+                                : em.last_event === 'bounced' || em.last_event === 'failed'
+                                ? 'bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/20'
+                                : em.scheduled_at
+                                ? 'bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/20'
+                                : 'bg-slate-500/10 text-slate-600 dark:text-slate-400 border-slate-500/20';
 
                             return (
-                              <tr key={em.id} className="border-b border-slate-100 dark:border-slate-900 hover:bg-slate-100/10 dark:hover:bg-slate-900/10 transition-colors">
-                                <td className="py-3 px-4">
-                                  <div className="flex items-center gap-2">
-                                    <div className="font-bold text-slate-800 dark:text-slate-200 text-xs font-mono truncate max-w-[180px]">
-                                      {toList[0] || 'Unknown'}
-                                    </div>
-                                    {toList.length > 1 && (
-                                      <span className="text-[9px] px-1.5 py-0.5 bg-slate-200 dark:bg-slate-800 rounded font-semibold text-slate-600 dark:text-slate-400">
-                                        +{toList.length - 1}
-                                      </span>
-                                    )}
+                              <tr
+                                key={em.id}
+                                className="border-b border-slate-100 dark:border-slate-900 hover:bg-slate-50/60 dark:hover:bg-slate-900/40 transition-colors"
+                              >
+                                <td className="py-3 px-4 font-bold text-slate-800 dark:text-slate-200">
+                                  <div className="flex items-center gap-1.5">
+                                    <span className="truncate max-w-[180px]">{toDisplay}</span>
                                     <CopyButton
-                                      value={toList.join(', ')}
-                                      tooltip="Copy Recipient(s)"
+                                      value={toDisplay}
+                                      tooltip="Copy recipient"
                                       toastMessage={false}
                                       className="h-4 w-4 p-0 shrink-0"
                                       iconClassName="h-2.5 w-2.5"
                                     />
                                   </div>
                                 </td>
-                                <td className="py-3 px-4">
-                                  <div className="text-xs text-slate-800 dark:text-slate-200 font-medium truncate max-w-[240px]">
-                                    {em.subject || '(No Subject)'}
-                                  </div>
+                                <td className="py-3 px-4 text-slate-600 dark:text-slate-400">
+                                  <span className="truncate max-w-[220px] block">{em.subject || '(no subject)'}</span>
                                 </td>
                                 <td className="py-3 px-4">
-                                  {statusBadge}
+                                  <span className={cn("px-2 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider border", statusColor)}>
+                                    {em.scheduled_at ? 'scheduled' : (em.last_event || 'processed')}
+                                  </span>
                                 </td>
-                                <td className="py-3 px-4 text-[10px] text-slate-500 font-mono">
-                                  {isScheduled && em.scheduled_at ? (
-                                    <div className="text-purple-600 dark:text-purple-400 font-bold">
+                                <td className="py-3 px-4 text-slate-500 text-[10px]">
+                                  {em.scheduled_at ? (
+                                    <div className="flex items-center gap-1 text-purple-600 dark:text-purple-400 font-semibold">
+                                      <Clock className="h-3 w-3" />
                                       {new Date(em.scheduled_at).toLocaleString()}
                                     </div>
-                                  ) : (
+                                  ) : em.created_at ? (
                                     new Date(em.created_at).toLocaleString()
+                                  ) : (
+                                    '-'
                                   )}
                                 </td>
                                 <td className="py-3 px-4">
@@ -5322,11 +5328,11 @@ export default function StoragePage() {
             {/* Subtab 2: Single Email Composer */}
             {emailSubTab === 'compose' && (
               <div className="flex-1 overflow-y-auto max-w-3xl pr-2">
-                <form onSubmit={handleSendSingleEmail} className="space-y-4 font-mono text-xs">
+                <form onSubmit={handleSendSingleEmail} noValidate className="space-y-4 font-mono text-xs">
                   <div className="bg-slate-50/70 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 space-y-4">
                     <div className="flex items-center gap-2 border-b border-slate-200 dark:border-slate-800 pb-3">
                       <Send className="h-4 w-4 text-blue-500" />
-                      <h3 className="font-sans font-bold text-sm text-slate-900 dark:text-slate-100">Compose Transactional Email</h3>
+                      <h3 className="font-sans font-bold text-sm text-slate-900 dark:text-slate-100">Compose Email</h3>
                     </div>
 
                     <div className="space-y-1.5">
@@ -5432,13 +5438,13 @@ export default function StoragePage() {
             {/* Subtab 3: Batch Dispatcher */}
             {emailSubTab === 'batch' && (
               <div className="flex-1 overflow-y-auto max-w-4xl pr-2">
-                <form onSubmit={handleSendBatchEmails} className="space-y-4 font-mono text-xs">
+                <form onSubmit={handleSendBatchEmails} noValidate className="space-y-4 font-mono text-xs">
                   <div className="bg-slate-50/70 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 space-y-4">
                     <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-3">
                       <div className="flex items-center gap-2">
                         <Layers className="h-4 w-4 text-purple-500" />
                         <h3 className="font-sans font-bold text-sm text-slate-900 dark:text-slate-100">
-                          Resend Batch Dispatcher ({batchItems.length} items)
+                          Batch Email Dispatcher ({batchItems.length} items)
                         </h3>
                       </div>
                       <button
@@ -5586,10 +5592,10 @@ export default function StoragePage() {
                         <span
                           className={cn(
                             "px-2 py-0.5 rounded text-[10px] font-bold uppercase",
-                            up.status === 'completed' && "bg-emerald-500/10 text-emerald-450",
-                            up.status === 'uploading' && (isMobile ? "bg-indigo-500/10 text-indigo-500 dark:text-indigo-400 animate-pulse" : "bg-blue-500/10 text-blue-450 animate-pulse"),
+                            up.status === 'completed' && "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400",
+                            up.status === 'uploading' && (isMobile ? "bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 animate-pulse" : "bg-blue-500/10 text-blue-600 dark:text-blue-400 animate-pulse"),
                             up.status === 'paused' && "bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-400",
-                            up.status === 'failed' && "bg-red-500/10 text-red-450"
+                            up.status === 'failed' && "bg-red-500/10 text-red-600 dark:text-red-400"
                           )}
                         >
                           {up.status}
@@ -5854,7 +5860,7 @@ export default function StoragePage() {
                       onClick={() => setViewMode('grid')}
                       className={cn(
                         "p-2 cursor-pointer transition-colors",
-                        viewMode === 'grid' ? "bg-slate-200 dark:bg-slate-800 text-blue-450" : "text-slate-600 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200"
+                        viewMode === 'grid' ? "bg-slate-200 dark:bg-slate-800 text-blue-600 dark:text-blue-400" : "text-slate-600 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200"
                       )}
                     >
                       <Grid className="h-4 w-4" />
@@ -5868,7 +5874,7 @@ export default function StoragePage() {
                       onClick={() => setViewMode('list')}
                       className={cn(
                         "p-2 cursor-pointer transition-colors",
-                        viewMode === 'list' ? "bg-slate-200 dark:bg-slate-800 text-blue-450" : "text-slate-600 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200"
+                        viewMode === 'list' ? "bg-slate-200 dark:bg-slate-800 text-blue-600 dark:text-blue-400" : "text-slate-600 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200"
                       )}
                     >
                       <List className="h-4 w-4" />
