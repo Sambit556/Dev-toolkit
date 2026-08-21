@@ -137,8 +137,11 @@ interface CloudIdeState {
   aiDiffCode: string | null;
   aiDiffOriginal: string | null;
   aiDiffFile: string | null;
-  runAiAssist: (action: 'explain' | 'fix' | 'refactor' | 'optimize' | 'test' | 'docs' | 'generate', customPrompt?: string) => Promise<void>;
-  acceptAiDiff: () => void;
+  aiAppliedNotification: { message: string; originalCode: string; file: string } | null;
+  dismissAiNotification: () => void;
+  revertAiApplied: () => void;
+  runAiAssist: (action: 'explain' | 'fix' | 'refactor' | 'optimize' | 'test' | 'docs' | 'generate' | 'clean' | 'eli5' | 'custom', customPrompt?: string) => Promise<void>;
+  acceptAiDiff: (customCode?: string) => void;
   rejectAiDiff: () => void;
 
   // Code Converter Studio
@@ -498,12 +501,38 @@ export const useCloudIdeStore = create<CloudIdeState>()(
         }
       },
 
-      acceptAiDiff: () => {
-        const { aiDiffFile, aiDiffCode } = get();
-        if (aiDiffFile && aiDiffCode !== null) {
-          get().updateFileContent(aiDiffFile, aiDiffCode);
-          get().createSnapshot(`Applied AI Changes to ${aiDiffFile}`);
-          set({ aiDiffCode: null, aiDiffOriginal: null, aiDiffFile: null });
+      aiAppliedNotification: null,
+      dismissAiNotification: () => set({ aiAppliedNotification: null }),
+
+      acceptAiDiff: (customCode?: string) => {
+        const { aiDiffFile, aiDiffCode, activeFile, files } = get();
+        const targetFile = aiDiffFile || activeFile;
+        const targetCode = customCode !== undefined ? customCode : aiDiffCode;
+        const currentContent = files.find((f) => f.name === targetFile)?.content || '';
+
+        if (targetFile && targetCode !== null && targetCode !== undefined) {
+          get().updateFileContent(targetFile, targetCode);
+          get().createSnapshot(`Applied AI Changes to ${targetFile}`);
+          set({
+            aiDiffCode: null,
+            aiDiffOriginal: null,
+            aiDiffFile: null,
+            diagnostics: { hasError: false },
+            aiAppliedNotification: {
+              message: `AI solution applied to ${targetFile}`,
+              originalCode: currentContent,
+              file: targetFile,
+            },
+          });
+        }
+      },
+
+      revertAiApplied: () => {
+        const { aiAppliedNotification } = get();
+        if (aiAppliedNotification) {
+          get().updateFileContent(aiAppliedNotification.file, aiAppliedNotification.originalCode);
+          get().createSnapshot(`Reverted AI Changes on ${aiAppliedNotification.file}`);
+          set({ aiAppliedNotification: null });
         }
       },
 

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import dynamic from 'next/dynamic';
 import type { Monaco, OnMount } from '@monaco-editor/react';
 import {
@@ -85,6 +85,10 @@ export const EditorPanel: React.FC = () => {
     aiDiffOriginal,
     acceptAiDiff,
     rejectAiDiff,
+    aiDiffFile,
+    aiAppliedNotification,
+    dismissAiNotification,
+    revertAiApplied,
   } = useCloudIdeStore();
 
   const [isFullscreen, setIsFullscreen] = React.useState(false);
@@ -93,6 +97,16 @@ export const EditorPanel: React.FC = () => {
 
   const currentFile = files.find((f) => f.name === activeFile) || files[0];
   const splitCurrentFile = splitFile ? files.find((f) => f.name === splitFile) : null;
+
+  // Synchronize Monaco editor content with external state (e.g. AI diff accept, template change, snapshot restore)
+  useEffect(() => {
+    if (editorRef.current && currentFile) {
+      const currentEditorValue = editorRef.current.getValue();
+      if (currentEditorValue !== currentFile.content) {
+        editorRef.current.setValue(currentFile.content);
+      }
+    }
+  }, [currentFile?.content, activeFile]);
 
   const getMonacoLanguage = (fileName: string) => {
     if (fileName.endsWith('.ts') || fileName.endsWith('.tsx')) return 'typescript';
@@ -107,7 +121,6 @@ export const EditorPanel: React.FC = () => {
     if (fileName.endsWith('.yaml') || fileName.endsWith('.yml')) return 'yaml';
     if (fileName.endsWith('.html')) return 'html';
     if (fileName.endsWith('.css')) return 'css';
-    if (fileName.endsWith('.sh')) return 'shell';
     if (fileName.endsWith('.md')) return 'markdown';
     return 'plaintext';
   };
@@ -246,27 +259,59 @@ export const EditorPanel: React.FC = () => {
         </div>
       </div>
 
-      {/* AI Diff Banner if Active */}
+      {/* AI Diff Suggestion Banner */}
       {aiDiffCode && (
-        <div className="bg-indigo-950/90 border-b border-indigo-500/40 px-4 py-2 flex items-center justify-between text-xs text-indigo-200 z-10">
+        <div className="bg-indigo-950/95 border-b border-indigo-500/50 px-3 py-1.5 flex items-center justify-between text-xs text-indigo-100 z-10 animate-in slide-in-from-top-1">
           <div className="flex items-center gap-2">
-            <Sparkles className="w-4 h-4 text-indigo-400 animate-spin" />
-            <span>AI Code Changes Ready for Review</span>
+            <Sparkles className="w-3.5 h-3.5 text-indigo-400 animate-pulse" />
+            <span className="font-semibold text-indigo-200">
+              AI Solution Ready for <span className="text-white font-mono bg-indigo-900/60 px-1.5 py-0.5 rounded border border-indigo-700/50">{aiDiffFile || activeFile}</span>
+            </span>
           </div>
           <div className="flex items-center gap-2">
             <button
-              onClick={acceptAiDiff}
-              className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-500 text-white rounded font-bold flex items-center gap-1 transition-colors"
+              onClick={() => acceptAiDiff()}
+              className="px-3 py-1 bg-emerald-600 hover:bg-emerald-500 text-white rounded-md font-bold text-[11px] flex items-center gap-1.5 transition-colors shadow-sm"
+              title="Apply AI changes to active editor"
             >
               <Check className="w-3.5 h-3.5" />
-              Accept Changes
+              Apply to IDE
             </button>
             <button
               onClick={rejectAiDiff}
-              className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded font-semibold flex items-center gap-1 transition-colors"
+              className="px-2.5 py-1 bg-neutral-800 hover:bg-neutral-700 text-slate-300 rounded-md font-semibold text-[11px] flex items-center gap-1 transition-colors"
             >
-              <RotateCcw className="w-3.5 h-3.5" />
+              <RotateCcw className="w-3 h-3" />
               Discard
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* AI Solution Applied Success Banner */}
+      {aiAppliedNotification && (
+        <div className="bg-emerald-950/95 border-b border-emerald-500/50 px-3 py-1.5 flex items-center justify-between text-xs text-emerald-100 z-10 animate-in slide-in-from-top-1">
+          <div className="flex items-center gap-2">
+            <Check className="w-3.5 h-3.5 text-emerald-400" />
+            <span className="font-semibold text-emerald-200">
+              {aiAppliedNotification.message}
+            </span>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={revertAiApplied}
+              className="px-2.5 py-1 bg-amber-700/80 hover:bg-amber-600 text-amber-100 rounded-md font-bold text-[11px] flex items-center gap-1 transition-colors"
+              title="Revert back to original code"
+            >
+              <RotateCcw className="w-3 h-3" />
+              Revert
+            </button>
+            <button
+              onClick={dismissAiNotification}
+              className="p-1 hover:bg-emerald-900 rounded text-emerald-300 hover:text-white transition-colors"
+              title="Dismiss"
+            >
+              <X className="w-3.5 h-3.5" />
             </button>
           </div>
         </div>

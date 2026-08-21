@@ -63,8 +63,16 @@ You MUST structure your response with these exact 4 sections:
         }
 
         if (outputText) {
-          const match = outputText.match(/```[a-zA-Z0-9_-]*\n([\s\S]*?)```/);
-          const diffCode = match ? match[1].trim() : code;
+          let diffCode: string | undefined = undefined;
+          if (!['explain', 'eli5', 'explain_simple'].includes(action)) {
+            const matches = [...outputText.matchAll(/```(?:[a-zA-Z0-9_-]*\n)?([\s\S]*?)```/g)];
+            const validBlocks = matches
+              .map((m) => m[1].trim())
+              .filter((b) => b.length > 0 && !b.startsWith('#') && !b.startsWith('1.') && !b.startsWith('📍'));
+            if (validBlocks.length > 0) {
+              diffCode = validBlocks[validBlocks.length - 1];
+            }
+          }
 
           return {
             action,

@@ -1,9 +1,23 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { GoogleGenAI } from '@google/genai';
 
-function extractCodeBlock(markdown: string): string {
-  const match = markdown.match(/```[a-zA-Z0-9_-]*\n([\s\S]*?)```/);
-  return match ? match[1].trim() : markdown.trim();
+function extractCodeBlock(markdown: string, action: string): string | null {
+  // Explanations should not generate code diffs
+  if (action === 'explain' || action === 'eli5' || action === 'explain_simple') {
+    return null;
+  }
+
+  const matches = [...markdown.matchAll(/```(?:[a-zA-Z0-9_-]*\n)?([\s\S]*?)```/g)];
+  if (matches.length === 0) return null;
+
+  const validBlocks = matches
+    .map((m) => m[1].trim())
+    .filter((b) => b.length > 0 && !b.startsWith('#') && !b.startsWith('1.') && !b.startsWith('📍'));
+
+  if (validBlocks.length === 0) return null;
+
+  // In 4-part diagnostics, the last block is Section 4: "Apply the solution"
+  return validBlocks[validBlocks.length - 1];
 }
 
 export async function POST(req: NextRequest) {
@@ -41,12 +55,12 @@ You MUST structure your response with these exact 4 sections:
 1. 📍 **Where the error is**: Specify the exact line number, column, and the problematic code snippet.
 2. 🔍 **Why it came**: Explain the precise root cause (syntax violation, type mismatch, logic exception).
 3. 💡 **What's the solution**: Clear, step-by-step explanation of what was modified and why.
-4. 🛠️ **Apply the solution**: Provide the complete, production-ready fixed code inside a markdown code block (\`\`\`${language} ... \`\`\`).`;
+4. 🛠️ **Apply the solution**: Provide the complete, production-ready fixed code inside a markdown code block (\`\`\`${language}\n<complete_fixed_code>\n\`\`\`).`;
         } else if (action === 'clean') {
           promptText = `Refactor and clean this ${language.toUpperCase()} code in file "${filePath}".
 - Remove dead code, redundant variables, and formatting inconsistencies.
 - Enforce modern clean code standards, naming conventions, and modular design.
-- Explain the cleanup improvements, then provide the full clean code in a markdown block:
+- Explain the cleanup improvements, then provide the full complete clean code in a markdown block:
 \`\`\`${language}
 ${code}
 \`\`\``;
@@ -76,17 +90,17 @@ ${code}
 1. ⚡ **Identified Bottlenecks**: Inefficiencies in current implementation.
 2. 🚀 **Optimization Strategy**: Algorithmic improvements, reduced allocations, caching.
 3. 📊 **Complexity Before vs After**: Time/space complexity comparison.
-4. 💻 **Optimized Code**: Full optimized code in a markdown code block:
+4. 💻 **Optimized Code**: Full complete optimized code in a markdown code block:
 \`\`\`${language}
 ${code}
 \`\`\``;
         } else if (action === 'docs') {
-          promptText = `Generate production-grade documentation headers, docstrings, and parameter annotations for this ${language.toUpperCase()} code:
+          promptText = `Generate production-grade documentation headers, docstrings, and parameter annotations for this ${language.toUpperCase()} code. Provide the complete documented code in a markdown block:
 \`\`\`${language}
 ${code}
 \`\`\``;
         } else if (action === 'test') {
-          promptText = `Write a comprehensive, automated unit test suite with edge cases, invalid inputs, and boundary testing for this ${language.toUpperCase()} code:
+          promptText = `Write a comprehensive, automated unit test suite with edge cases, invalid inputs, and boundary testing for this ${language.toUpperCase()} code in a markdown block:
 \`\`\`${language}
 ${code}
 \`\`\``;
@@ -101,7 +115,7 @@ Current Code:
 ${code}
 \`\`\`
 
-Provide an explanation and any modified/generated code inside a markdown block.`;
+Provide an explanation and the full updated code inside a markdown block.`;
         }
 
         let outputText = '';
@@ -120,11 +134,11 @@ Provide an explanation and any modified/generated code inside a markdown block.`
         }
 
         if (outputText) {
-          const diffCode = extractCodeBlock(outputText);
+          const diffCode = extractCodeBlock(outputText, action);
           return NextResponse.json({
             action,
             content: outputText,
-            diffCode: diffCode || code,
+            diffCode: diffCode,
             confidence: 0.99,
             provider: 'google:gemini-3.7-flash',
           });
