@@ -85,7 +85,7 @@ export async function POST(req: NextRequest) {
 
     if (['html', 'react', 'vue', 'angular', 'svelte'].includes(normLang)) {
       return NextResponse.json({
-        stdout: `⚡ [Go Live Live Preview Active]\n- Framework: ${language.toUpperCase()}\n- Runtime: DevKits In-Browser DOM Engine\n- Local Preview URL: http://localhost:3000/preview\n- State: Live Reload & Hot Component Mounting Active`,
+        stdout: `⚡ [Go Live Live Preview Active]\n- Framework: ${language.toUpperCase()}\n- Runtime: DevKits In-Browser DOM Engine\n- Preview Route: live://preview/${normLang}\n- State: Hot Component Mounting Active`,
         stderr: '',
         exitCode: 0,
         executionTimeMs: 12,

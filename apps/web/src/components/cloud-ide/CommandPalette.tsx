@@ -163,7 +163,7 @@ export const CommandPalette: React.FC = () => {
     },
     {
       id: 'toggle-golive',
-      title: 'Toggle Go Live Browser Sandbox (Port 3000)',
+      title: 'Toggle Go Live Browser Sandbox',
       category: 'Frontend & Preview',
       icon: Globe,
       action: () => toggleLivePreview(),

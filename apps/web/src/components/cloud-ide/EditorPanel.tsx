@@ -253,7 +253,7 @@ export const EditorPanel: React.FC = () => {
           {isFrontendRuntime && (
             <button
               onClick={() => toggleLivePreview()}
-              title={isLivePreviewOpen ? 'Close Live Web Preview' : 'Launch Go Live Browser Sandbox (Port 3000)'}
+              title={isLivePreviewOpen ? 'Close Live Web Preview' : 'Launch Go Live Browser Sandbox'}
               className={`px-2.5 py-1 rounded-lg border text-xs font-bold flex items-center gap-1.5 transition-all shadow-sm ${
                 isLivePreviewOpen
                   ? 'bg-emerald-950/90 text-emerald-300 border-emerald-500/60 shadow-emerald-500/10'
@@ -263,10 +263,7 @@ export const EditorPanel: React.FC = () => {
               {isLivePreviewOpen ? (
                 <>
                   <Radio className="w-3.5 h-3.5 text-emerald-400 animate-pulse" />
-                  <span className="flex items-center gap-1">
-                    <span>● LIVE</span>
-                    <span className="text-[10px] text-emerald-400/80 font-mono hidden sm:inline">:3000</span>
-                  </span>
+                  <span>● Live Preview</span>
                 </>
               ) : (
                 <>

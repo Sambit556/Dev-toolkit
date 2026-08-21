@@ -112,7 +112,7 @@ export const ActivityBar: React.FC = () => {
       <div className="flex flex-col items-center gap-1.5 w-full pt-3 border-t border-slate-800/60">
         <button
           onClick={() => toggleLivePreview()}
-          title={isLivePreviewOpen ? 'Hide Go Live Browser Preview' : 'Open Go Live Browser Preview (Port 3000)'}
+          title={isLivePreviewOpen ? 'Hide Go Live Browser Preview' : 'Open Go Live Browser Preview'}
           className={`p-2.5 rounded-xl transition-colors ${
             isLivePreviewOpen
               ? 'text-emerald-400 bg-emerald-500/20 border border-emerald-500/40 shadow-sm shadow-emerald-500/10'

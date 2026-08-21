@@ -282,7 +282,7 @@ export const LiveBrowserPreview: React.FC<LiveBrowserPreviewProps> = ({ onClose 
   };
 
   const handleCopyUrl = () => {
-    navigator.clipboard.writeText('http://localhost:3000/preview');
+    navigator.clipboard.writeText('live://preview/app');
     setCopiedUrl(true);
     setTimeout(() => setCopiedUrl(false), 2000);
   };
@@ -318,8 +318,8 @@ export const LiveBrowserPreview: React.FC<LiveBrowserPreviewProps> = ({ onClose 
           {/* Browser Address Bar */}
           <div className="flex-1 flex items-center bg-slate-950 border border-slate-800 hover:border-slate-700 rounded-xl px-3 py-1 text-xs text-slate-300 font-mono transition-colors group">
             <Globe className="w-3.5 h-3.5 text-emerald-400 mr-2 shrink-0" />
-            <span className="text-emerald-400 font-semibold mr-1">http://</span>
-            <span className="text-slate-200 truncate">localhost:3000/preview</span>
+            <span className="text-emerald-400 font-semibold mr-1">live://</span>
+            <span className="text-slate-200 truncate">preview/{currentLanguage.toLowerCase()}</span>
             <span className="ml-auto flex items-center gap-1 text-[10px] text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-1.5 py-0.5 rounded-full font-sans font-bold">
               <Radio className="w-2.5 h-2.5 animate-pulse text-emerald-400" />
               LIVE
