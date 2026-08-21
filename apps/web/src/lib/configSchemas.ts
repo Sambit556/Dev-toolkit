@@ -170,19 +170,19 @@ CMD ["node", "dist/server.js"]
     monacoLanguage: 'ini',
     icon: '🔒',
     description: 'Key-value environment variables with validation and masking',
-    sample: `# DevKits Cloud Workspace Secrets
+    sample: `# DevKits Cloud Workspace Secrets (Sample)
 APP_ENV=production
 PORT=4001
-API_URL=https://api.devkits.space
+API_URL=https://api.example.com
 
-# Upstash Isolated Box Configuration
-UPSTASH_BOX_API_KEY=box_0875b313b2b5bce7d01b7a12fc5ddb24e4f822747f328671f7015552c733fc63
-UPSTASH_REDIS_REST_URL=https://glad-goblin-107253.upstash.io
+# Isolated Sandbox Configuration (Masked Demo)
+UPSTASH_BOX_API_KEY=box_sec_99x8a7f1b8c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6
+UPSTASH_REDIS_REST_URL=https://sample-isolated-cluster.upstash.io
 
 # Security Bounds
 SANDBOX_TIMEOUT_MS=15000
 SANDBOX_MAX_MEMORY_MB=256
-CORS_ALLOWED_ORIGINS=https://devkits.space
+CORS_ALLOWED_ORIGINS=https://example.com
 `,
   },
   {

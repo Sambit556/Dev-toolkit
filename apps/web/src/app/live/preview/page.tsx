@@ -1,50 +1,22 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
-import {
-  RefreshCw,
-  ExternalLink,
-  Laptop,
-  Tablet,
-  Smartphone,
-  X,
-  Globe,
-  Radio,
-  Copy,
-  Check,
-  Maximize2,
-  Minimize2,
-} from 'lucide-react';
-import { useCloudIdeStore } from '../../store/useCloudIdeStore';
+import React, { useState, useEffect, useRef, Suspense } from 'react';
+import { useSearchParams } from 'next/navigation';
 
-interface LiveBrowserPreviewProps {
-  onClose?: () => void;
-}
-
-export const LiveBrowserPreview: React.FC<LiveBrowserPreviewProps> = ({ onClose }) => {
-  const {
-    files,
-    currentLanguage,
-    addTerminalLog,
-    addStderrLog,
-    isLivePreviewOpen,
-    toggleLivePreview,
-  } = useCloudIdeStore();
-
-  const [viewport, setViewport] = useState<'desktop' | 'tablet' | 'mobile'>('desktop');
-  const [copiedUrl, setCopiedUrl] = useState(false);
-  const [isRefreshing, setIsRefreshing] = useState(false);
-  const [iframeSrcDoc, setIframeSrcDoc] = useState('');
-  const [isFullscreen, setIsFullscreen] = useState(false);
+function LivePreviewContent() {
+  const searchParams = useSearchParams();
+  const [bundleHtml, setBundleHtml] = useState<string>('');
+  const [loading, setLoading] = useState(true);
+  const [statusMessage, setStatusMessage] = useState('Initializing Live Sandbox...');
   const iframeRef = useRef<HTMLIFrameElement>(null);
 
-  // Generate live bundle HTML based on language runtime and files
-  const generateLiveBundle = (): string => {
-    const normLang = currentLanguage.toLowerCase();
+  // Helper to compile project files into executable sandbox HTML
+  const buildExecutableHtml = (language: string, files: Array<{ name: string; content: string }>): string => {
+    const normLang = (language || '').toLowerCase();
     const indexHtml = files.find((f) => f.name === 'index.html')?.content || '';
     const styleCss = files.find((f) => f.name.endsWith('.css'))?.content || '';
 
-    // Message passing script for console logging inside the preview iframe
+    // Console bridge for developer feedback
     const consoleBridgeScript = `
       <script>
         (function() {
@@ -81,6 +53,7 @@ export const LiveBrowserPreview: React.FC<LiveBrowserPreviewProps> = ({ onClose 
         })();
       </script>
     `;
+
     const fallbackCss = `
       * { box-sizing: border-box; }
       body { margin: 0; padding: 0; background: #020617; color: #f8fafc; font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
@@ -347,7 +320,7 @@ export const LiveBrowserPreview: React.FC<LiveBrowserPreviewProps> = ({ onClose 
       </script>
     `;
 
-    // 1. React.js (18) & Next.js 14 Runtime with Babel & Self-Contained Fallback
+    // 1. React 18 & Next.js 14
     if (normLang === 'react' || normLang === 'nextjs' || normLang === 'next') {
       const reactFile =
         files.find((f) => f.name === 'app/page.tsx' || f.name.endsWith('page.tsx'))?.content ||
@@ -368,14 +341,13 @@ export const LiveBrowserPreview: React.FC<LiveBrowserPreviewProps> = ({ onClose 
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${normLang.includes('next') ? 'Next.js 14' : 'React 18'} Live Preview</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="/vendor/react.production.min.js" onerror="this.src='https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js'"></script>
   <script src="/vendor/react-dom.production.min.js" onerror="this.src='https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js'"></script>
   <script src="/vendor/babel.min.js" onerror="this.src='https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.24.0/babel.min.js'"></script>
   ${embeddedEngineScript}
-  <style>
-    ${combinedCss}
-  </style>
+  <style>${combinedCss}</style>
   ${consoleBridgeScript}
 </head>
 <body class="bg-slate-950 text-slate-100 min-h-screen">
@@ -444,7 +416,7 @@ export const LiveBrowserPreview: React.FC<LiveBrowserPreviewProps> = ({ onClose 
 </html>`;
     }
 
-    // 2. Vue.js (3) Runtime
+    // 2. Vue 3
     if (normLang === 'vue') {
       const vueFile = files.find((f) => f.name.endsWith('.vue'))?.content || '';
       const templateMatch = vueFile.match(/<template>([\s\S]*?)<\/template>/);
@@ -452,7 +424,7 @@ export const LiveBrowserPreview: React.FC<LiveBrowserPreviewProps> = ({ onClose 
       const styleMatch = vueFile.match(/<style>([\s\S]*?)<\/style>/);
 
       const templateContent = templateMatch ? templateMatch[1] : '<div class="p-8 text-center text-white"><h1>Vue 3 App Ready</h1></div>';
-      let scriptContent = scriptMatch ? scriptMatch[1].replace(/export\s+default\s+/, 'const ComponentOptions = ') : 'const ComponentOptions = {};';
+      const scriptContent = scriptMatch ? scriptMatch[1].replace(/export\s+default\s+/, 'const ComponentOptions = ') : 'const ComponentOptions = {};';
 
       return `<!DOCTYPE html>
 <html lang="en">
@@ -480,7 +452,7 @@ export const LiveBrowserPreview: React.FC<LiveBrowserPreviewProps> = ({ onClose 
         const app = Vue.createApp(typeof ComponentOptions !== 'undefined' ? ComponentOptions : {});
         app.mount('#app');
       } catch(err) {
-        document.getElementById('app').innerHTML = '<div style="padding: 20px; color: #f87171; font-family: monospace; font-size: 13px;"><strong>Vue 3 Error:</strong><br/>' + err.message + '</div>';
+        document.getElementById('app').innerHTML = '<div style="padding:24px;color:#f87171;font-family:monospace;"><b>Vue 3 Error:</b><br/>' + err.message + '</div>';
         console.error(err);
       }
     }
@@ -494,7 +466,7 @@ export const LiveBrowserPreview: React.FC<LiveBrowserPreviewProps> = ({ onClose 
 </html>`;
     }
 
-    // 3. Angular Standalone Component / PHP / Laravel Blade
+    // 3. Angular Standalone / PHP / Laravel Blade
     if (normLang === 'angular' || normLang === 'php') {
       if (indexHtml) {
         return indexHtml.includes('<!DOCTYPE')
@@ -503,7 +475,7 @@ export const LiveBrowserPreview: React.FC<LiveBrowserPreviewProps> = ({ onClose 
       }
     }
 
-    // 4. Svelte Component Runtime (Native Dedicated Svelte Engine)
+    // 4. Svelte (Native Dedicated Engine)
     if (normLang === 'svelte') {
       const svelteFile = files.find((f) => f.name.endsWith('.svelte'))?.content || '';
 
@@ -514,9 +486,7 @@ export const LiveBrowserPreview: React.FC<LiveBrowserPreviewProps> = ({ onClose 
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Svelte Live Preview</title>
   <script src="https://cdn.tailwindcss.com"></script>
-  <style>
-    ${combinedCss}
-  </style>
+  <style>${combinedCss}</style>
   ${consoleBridgeScript}
 </head>
 <body class="bg-slate-950 text-slate-100 min-h-screen">
@@ -678,7 +648,7 @@ export const LiveBrowserPreview: React.FC<LiveBrowserPreviewProps> = ({ onClose 
 </html>`;
     }
 
-    // 5. HTML5 / CSS / Vanilla JS Playground
+    // 5. HTML5 / CSS / Vanilla JS
     if (indexHtml) {
       let finalHtml = indexHtml;
       const jsFile = files.find((f) => f.name.endsWith('.js') && f.name !== 'index.html')?.content || '';
@@ -696,225 +666,128 @@ export const LiveBrowserPreview: React.FC<LiveBrowserPreviewProps> = ({ onClose 
       return finalHtml;
     }
 
-    return `<!DOCTYPE html><html><body style="background:#090d16; color:#94a3b8; font-family:sans-serif; display:flex; justify-content:center; align-items:center; height:100vh; margin:0;"><div style="text-align:center;"><h2>Preview Ready</h2><p>Select HTML, React, Vue, or Angular to preview live.</p></div></body></html>`;
+    return `<!DOCTYPE html><html><body style="background:#090d16;color:#94a3b8;font-family:sans-serif;display:flex;justify-content:center;align-items:center;height:100vh;margin:0;"><div style="text-align:center;"><h2>Preview Ready</h2><p>Live sandbox loaded successfully.</p></div></body></html>`;
   };
 
-  // Live compilation, localStorage sync, and BroadcastChannel multi-tab real-time sync
+  // Synchronize state from URL, BroadcastChannel, or LocalStorage
   useEffect(() => {
-    const bundle = generateLiveBundle();
-    setIframeSrcDoc(bundle);
-
-    try {
-      if (typeof window !== 'undefined') {
-        localStorage.setItem('devkits_live_preview_bundle', bundle);
-        const channel = new BroadcastChannel('devkits_live_preview');
-        channel.postMessage({ language: currentLanguage, files, html: bundle });
-        channel.close();
-      }
-    } catch (e) {}
-  }, [files, currentLanguage]);
-
-  // Listen for console bridge messages from the iframe
-  useEffect(() => {
-    const handleWindowMessage = (event: MessageEvent) => {
-      if (event.data && event.data.source === 'devkits-preview-frame') {
-        const { type, payload } = event.data;
-        if (type === 'error') {
-          addStderrLog(`[Live Browser Error] ${payload}`);
-        } else if (type === 'warn') {
-          addTerminalLog(`[Live Browser Warning] ${payload}`);
-        } else {
-          addTerminalLog(`[Live Browser Log] ${payload}`);
+    const loadState = () => {
+      // 1. Check if URL contains query data parameter
+      const snapshotParam = searchParams.get('data') || searchParams.get('snapshot') || searchParams.get('state');
+      if (snapshotParam) {
+        try {
+          const decoded = JSON.parse(decodeURIComponent(escape(atob(decodeURIComponent(snapshotParam)))));
+          if (decoded && decoded.files) {
+            const html = buildExecutableHtml(decoded.language || 'html', decoded.files);
+            setBundleHtml(html);
+            setLoading(false);
+            return;
+          }
+        } catch (e) {
+          console.warn('Could not parse snapshot parameter:', e);
         }
       }
+
+      // 2. Check local preview bundle in localStorage
+      try {
+        const localBundle = localStorage.getItem('devkits_live_preview_bundle');
+        if (localBundle) {
+          setBundleHtml(localBundle);
+          setLoading(false);
+          return;
+        }
+
+        const ideStorage = localStorage.getItem('devkits_cloud_ide_storage');
+        if (ideStorage) {
+          const parsed = JSON.parse(ideStorage);
+          const state = parsed.state || parsed;
+          if (state && state.files && state.files.length > 0) {
+            const html = buildExecutableHtml(state.currentLanguage || 'react', state.files);
+            setBundleHtml(html);
+            setLoading(false);
+            return;
+          }
+        }
+      } catch (e) {}
+
+      // Default fallback
+      setBundleHtml(
+        buildExecutableHtml('html', [
+          {
+            name: 'index.html',
+            content: `<!DOCTYPE html><html><body style="background:#090d16;color:#f8fafc;font-family:system-ui,sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;"><div style="text-align:center;padding:32px;background:#131b2e;border:1px solid #1e293b;border-radius:16px;box-shadow:0 20px 40px rgba(0,0,0,0.5);"><h1>⚡ DevKits Live Preview</h1><p style="color:#94a3b8;">Start the Cloud IDE to see your live application render here.</p></div></body></html>`,
+          },
+        ]),
+      );
+      setLoading(false);
     };
 
-    window.addEventListener('message', handleWindowMessage);
-    return () => window.removeEventListener('message', handleWindowMessage);
-  }, [addTerminalLog, addStderrLog]);
+    loadState();
 
-  // Generate real, self-contained standalone shareable preview URL
-  const getLivePreviewUrl = (): string => {
-    if (typeof window === 'undefined') return '/live/preview';
+    // 3. Listen for BroadcastChannel updates from Cloud IDE in real-time
+    let channel: BroadcastChannel | null = null;
     try {
-      const payload = {
-        language: currentLanguage,
-        files: files.map((f) => ({ name: f.name, content: f.content })),
-        timestamp: Date.now(),
+      channel = new BroadcastChannel('devkits_live_preview');
+      channel.onmessage = (event) => {
+        if (event.data) {
+          const { language, files, html } = event.data;
+          if (html) {
+            setBundleHtml(html);
+          } else if (files) {
+            setBundleHtml(buildExecutableHtml(language, files));
+          }
+          setLoading(false);
+        }
       };
-      const encoded = encodeURIComponent(btoa(unescape(encodeURIComponent(JSON.stringify(payload)))));
-      return `${window.location.origin}/live/preview?data=${encoded}`;
-    } catch (e) {
-      return `${window.location.origin}/live/preview`;
-    }
-  };
-
-  const handleRefresh = () => {
-    setIsRefreshing(true);
-    const bundle = generateLiveBundle();
-    setIframeSrcDoc('');
-    try {
-      localStorage.setItem('devkits_live_preview_bundle', bundle);
-      const channel = new BroadcastChannel('devkits_live_preview');
-      channel.postMessage({ language: currentLanguage, files, html: bundle });
-      channel.close();
     } catch (e) {}
 
-    setTimeout(() => {
-      setIframeSrcDoc(bundle);
-      setIsRefreshing(false);
-    }, 150);
-  };
+    // 4. Listen for postMessage from parent window if embedded in iframe
+    const handleMessage = (event: MessageEvent) => {
+      if (event.data && event.data.type === 'devkits_preview_update') {
+        const { language, files, html } = event.data;
+        if (html) setBundleHtml(html);
+        else if (files) setBundleHtml(buildExecutableHtml(language, files));
+        setLoading(false);
+      }
+    };
+    window.addEventListener('message', handleMessage);
 
-  const handleOpenExternal = () => {
-    const liveUrl = getLivePreviewUrl();
-    window.open(liveUrl, '_blank');
-  };
-
-  const handleCopyUrl = () => {
-    const liveUrl = getLivePreviewUrl();
-    navigator.clipboard.writeText(liveUrl);
-    setCopiedUrl(true);
-    setTimeout(() => setCopiedUrl(false), 2000);
-  };
-
-  const currentHost = typeof window !== 'undefined' ? window.location.host : 'devkits.space';
-
-  const viewportWidths = {
-    desktop: 'w-full',
-    tablet: 'w-[768px] max-w-full',
-    mobile: 'w-[375px] max-w-full',
-  };
+    return () => {
+      if (channel) channel.close();
+      window.removeEventListener('message', handleMessage);
+    };
+  }, [searchParams]);
 
   return (
-    <div
-      className={`flex flex-col bg-slate-950 border-l border-neutral-800 text-slate-200 select-none overflow-hidden transition-all duration-200 ${
-        isFullscreen ? 'fixed inset-0 z-50' : 'h-full flex-1'
-      }`}
-    >
-      {/* Mock Browser Top Control Bar */}
-      <div className="flex items-center justify-between px-3 py-2 bg-slate-900/90 border-b border-slate-800 shrink-0 gap-2">
-        {/* Left Browser Actions & URL Bar */}
-        <div className="flex items-center gap-2 flex-1 min-w-0">
-          <div className="flex items-center gap-1">
-            <button
-              onClick={handleRefresh}
-              title="Reload live page"
-              className={`p-1.5 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white transition-colors ${
-                isRefreshing ? 'animate-spin text-indigo-400' : ''
-              }`}
-            >
-              <RefreshCw className="w-3.5 h-3.5" />
-            </button>
-          </div>
-
-          {/* Real Live Browser Address Bar */}
-          <div
-            onClick={handleCopyUrl}
-            title="Click to copy real live deployed URL"
-            className="flex-1 flex items-center bg-slate-950 border border-slate-800 hover:border-indigo-500/60 rounded-xl px-3 py-1 text-xs text-slate-300 font-mono transition-colors group cursor-pointer"
-          >
-            <Globe className="w-3.5 h-3.5 text-emerald-400 mr-2 shrink-0 group-hover:scale-110 transition-transform" />
-            <span className="text-emerald-400 font-semibold mr-1">https://</span>
-            <span className="text-slate-200 font-medium truncate">{currentHost}</span>
-            <span className="text-indigo-400 font-medium truncate">/live/preview</span>
-            <span className="ml-auto flex items-center gap-1 text-[10px] text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-1.5 py-0.5 rounded-full font-sans font-bold">
-              <Radio className="w-2.5 h-2.5 animate-pulse text-emerald-400" />
-              LIVE
-            </span>
-          </div>
-
-          <button
-            onClick={handleCopyUrl}
-            title="Copy real live deployed URL"
-            className="p-1.5 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white transition-colors"
-          >
-            {copiedUrl ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-          </button>
+    <div className="w-screen h-screen m-0 p-0 overflow-hidden bg-black flex flex-col">
+      {loading ? (
+        <div className="flex-1 flex flex-col items-center justify-center bg-slate-950 text-slate-300">
+          <div className="w-8 h-8 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin mb-3" />
+          <p className="text-xs font-mono text-slate-400">{statusMessage}</p>
         </div>
-
-        {/* Viewport & External Controls */}
-        <div className="flex items-center gap-1 shrink-0">
-          {/* Responsive Viewport Switcher */}
-          <div className="flex items-center bg-slate-950 border border-slate-800 rounded-lg p-0.5 gap-0.5">
-            <button
-              onClick={() => setViewport('desktop')}
-              title="Desktop View (100%)"
-              className={`p-1 rounded-md transition-colors ${
-                viewport === 'desktop'
-                  ? 'bg-indigo-600/30 text-indigo-300 border border-indigo-500/40'
-                  : 'text-slate-400 hover:text-slate-200'
-              }`}
-            >
-              <Laptop className="w-3.5 h-3.5" />
-            </button>
-            <button
-              onClick={() => setViewport('tablet')}
-              title="Tablet View (768px)"
-              className={`p-1 rounded-md transition-colors ${
-                viewport === 'tablet'
-                  ? 'bg-indigo-600/30 text-indigo-300 border border-indigo-500/40'
-                  : 'text-slate-400 hover:text-slate-200'
-              }`}
-            >
-              <Tablet className="w-3.5 h-3.5" />
-            </button>
-            <button
-              onClick={() => setViewport('mobile')}
-              title="Mobile View (375px)"
-              className={`p-1 rounded-md transition-colors ${
-                viewport === 'mobile'
-                  ? 'bg-indigo-600/30 text-indigo-300 border border-indigo-500/40'
-                  : 'text-slate-400 hover:text-slate-200'
-              }`}
-            >
-              <Smartphone className="w-3.5 h-3.5" />
-            </button>
-          </div>
-
-          <button
-            onClick={handleOpenExternal}
-            title="Open in new browser tab"
-            className="p-1.5 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-indigo-300 transition-colors"
-          >
-            <ExternalLink className="w-3.5 h-3.5" />
-          </button>
-
-          <button
-            onClick={() => setIsFullscreen(!isFullscreen)}
-            title={isFullscreen ? 'Exit Fullscreen' : 'Fullscreen Preview'}
-            className="p-1.5 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white transition-colors"
-          >
-            {isFullscreen ? <Minimize2 className="w-3.5 h-3.5" /> : <Maximize2 className="w-3.5 h-3.5" />}
-          </button>
-
-          <button
-            onClick={() => {
-              if (onClose) onClose();
-              else toggleLivePreview(false);
-            }}
-            title="Close Live Preview"
-            className="p-1.5 rounded-lg hover:bg-rose-950/40 hover:text-rose-400 text-slate-400 transition-colors"
-          >
-            <X className="w-3.5 h-3.5" />
-          </button>
-        </div>
-      </div>
-
-      {/* Interactive Render Canvas */}
-      <div className="flex-1 bg-neutral-950/80 p-2 flex items-center justify-center overflow-auto">
-        <div
-          className={`${viewportWidths[viewport]} h-full bg-slate-950 shadow-2xl rounded-xl overflow-hidden border border-neutral-800/80 transition-all duration-300 relative`}
-        >
-          <iframe
-            ref={iframeRef}
-            srcDoc={iframeSrcDoc}
-            title="Live Browser Sandbox"
-            sandbox="allow-scripts allow-modals allow-same-origin allow-forms allow-popups"
-            className="w-full h-full border-0 bg-transparent"
-          />
-        </div>
-      </div>
+      ) : (
+        <iframe
+          ref={iframeRef}
+          srcDoc={bundleHtml}
+          title="DevKits Live Preview Web App"
+          sandbox="allow-scripts allow-modals allow-same-origin allow-forms allow-popups"
+          className="w-full h-full border-0 bg-transparent"
+        />
+      )}
     </div>
   );
-};
+}
+
+export default function LivePreviewPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="w-screen h-screen bg-slate-950 flex items-center justify-center text-slate-400 font-mono text-xs">
+          Loading Live Sandbox...
+        </div>
+      }
+    >
+      <LivePreviewContent />
+    </Suspense>
+  );
+}

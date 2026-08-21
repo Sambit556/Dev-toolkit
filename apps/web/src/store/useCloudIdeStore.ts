@@ -126,6 +126,8 @@ interface CloudIdeState {
   }) => void;
   forkWorkspace: () => void;
   setLanguage: (langId: string) => void;
+  resetTemplate: (langId?: string) => void;
+  resetEntireWorkspaceToBrandNew: () => void;
   selectFile: (fileName: string) => void;
   updateFileContent: (fileName: string, content: string) => void;
   createFile: (fileName: string, content?: string) => void;
@@ -299,7 +301,8 @@ export const useCloudIdeStore = create<CloudIdeState>()(
 
       setLanguage: (langId) => {
         const template = LANGUAGE_TEMPLATES.find((t) => t.id === langId) || defaultTypeScriptTemplate;
-        const isFrontend = ['html', 'react', 'vue', 'angular', 'svelte'].includes(langId.toLowerCase());
+        if (template.disabled) return;
+        const isFrontend = ['html', 'react', 'nextjs', 'next', 'vue', 'angular', 'svelte'].includes(langId.toLowerCase());
         set({
           currentLanguage: langId,
           files: template.files,
@@ -315,6 +318,60 @@ export const useCloudIdeStore = create<CloudIdeState>()(
         });
         get().prewarmDaemon(langId);
         get().createSnapshot(`Switched to ${template.name} Starter`);
+      },
+
+      resetTemplate: (langId) => {
+        const targetLang = langId || get().currentLanguage;
+        const template = LANGUAGE_TEMPLATES.find((t) => t.id === targetLang) || defaultTypeScriptTemplate;
+        if (template.disabled) return;
+        const isFrontend = ['html', 'react', 'nextjs', 'next', 'vue', 'angular', 'svelte'].includes(targetLang.toLowerCase());
+        set({
+          currentLanguage: targetLang,
+          files: template.files,
+          activeFile: template.entryPoint,
+          openTabs: [template.entryPoint],
+          splitFile: null,
+          isReadOnlyWorkspace: false,
+          sharedWorkspaceInfo: null,
+          diagnostics: { hasError: false },
+          terminalLogs: [],
+          stderrLogs: [],
+          isLivePreviewOpen: isFrontend,
+        });
+        get().createSnapshot(`Reset to latest ${template.name} Starter`);
+      },
+
+      resetEntireWorkspaceToBrandNew: () => {
+        try {
+          if (typeof window !== 'undefined') {
+            localStorage.removeItem('devkits_cloud_ide_storage');
+          }
+        } catch (e) {}
+
+        const defaultTemplate = defaultTypeScriptTemplate;
+        set({
+          currentLanguage: 'typescript',
+          files: defaultTemplate.files,
+          activeFile: defaultTemplate.entryPoint,
+          openTabs: [defaultTemplate.entryPoint],
+          splitFile: null,
+          isReadOnlyWorkspace: false,
+          sharedWorkspaceInfo: null,
+          diagnostics: { hasError: false },
+          terminalLogs: [],
+          stderrLogs: [],
+          snapshots: [],
+          commitHistory: [],
+          isLivePreviewOpen: false,
+          isBottomPanelOpen: true,
+          metrics: {
+            executionTimeMs: 0,
+            memoryUsageMb: 0,
+            cpuUsagePercent: 0,
+            exitCode: 0,
+            status: 'idle',
+          },
+        });
       },
 
       selectFile: (fileName) => {
@@ -442,7 +499,7 @@ export const useCloudIdeStore = create<CloudIdeState>()(
         const nextIndex = executionCount + 1;
         const now = new Date();
         const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-        const isFrontend = ['html', 'react', 'vue', 'angular', 'svelte'].includes(currentLanguage.toLowerCase());
+        const isFrontend = ['html', 'react', 'nextjs', 'next', 'vue', 'angular', 'svelte'].includes(currentLanguage.toLowerCase());
 
         // Update state to running and trigger Go Live if frontend
         set({
@@ -488,8 +545,8 @@ export const useCloudIdeStore = create<CloudIdeState>()(
           // Format clean execution banner and summary
           const runHeader = `─── [Execution #${nextIndex} • ${currentLanguage.toUpperCase()} • ${activeFile} @ ${timeStr}] ───`;
           const runFooter = exitCode === 0
-            ? `✔ [Execution #${nextIndex}] Finished with Exit Code: 0 (${execTime}ms)`
-            : `✖ [Execution #${nextIndex}] Exited with Error Code: ${exitCode} (${execTime}ms)`;
+            ? `[PASS] [Execution #${nextIndex}] Finished with Exit Code: 0 (${execTime}ms)`
+            : `[FAIL] [Execution #${nextIndex}] Exited with Error Code: ${exitCode} (${execTime}ms)`;
 
           const newLogs = [
             ...get().terminalLogs,

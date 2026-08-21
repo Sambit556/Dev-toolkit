@@ -171,10 +171,12 @@ export const CommandPalette: React.FC = () => {
     // Add language template switchers
     ...LANGUAGE_TEMPLATES.map((tpl) => ({
       id: `lang-${tpl.id}`,
-      title: `Switch Language: ${tpl.name} (${tpl.version})`,
+      title: `Switch Language: ${tpl.name} (${tpl.version})${tpl.disabled ? ' [Disabled]' : ''}`,
       category: 'Languages',
       icon: FileCode,
-      action: () => setLanguage(tpl.id),
+      action: () => {
+        if (!tpl.disabled) setLanguage(tpl.id);
+      },
     })),
   ];
 

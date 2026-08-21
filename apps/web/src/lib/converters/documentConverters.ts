@@ -5,13 +5,6 @@ import { marked } from 'marked';
 import * as XLSX from 'xlsx';
 import JSZip from 'jszip';
 
-// Safe dynamic loader for mammoth in browser environment
-async function getMammoth() {
-  // @ts-ignore
-  const mod = await import('mammoth/mammoth.browser');
-  return mod.default || mod;
-}
-
 // Safe dynamic loader for docx
 async function getDocx() {
   const mod: any = await import('docx');
@@ -38,45 +31,56 @@ async function getPdfJs() {
 }
 
 /**
- * Extracts raw text and HTML from a Word .docx document using mammoth.
+ * Extracts raw text and HTML from a Word .docx document using JSZip and OpenXML parsing.
  */
 export async function extractDocxContent(file: File): Promise<{
   text: string;
   html: string;
   markdown: string;
 }> {
-  const mammoth = await getMammoth();
-  const arrayBuffer = await file.arrayBuffer();
-  const [htmlResult, textResult] = await Promise.all([
-    mammoth.convertToHtml({ arrayBuffer }),
-    mammoth.extractRawText({ arrayBuffer }),
-  ]);
+  try {
+    const arrayBuffer = await file.arrayBuffer();
+    const zip = await JSZip.loadAsync(arrayBuffer);
+    const documentXmlFile = zip.file('word/document.xml');
 
-  const rawHtml = htmlResult.value || '';
-  const text = textResult.value || '';
+    if (documentXmlFile) {
+      const xml = await documentXmlFile.async('text');
+      const paragraphs: string[] = [];
 
-  // Clean Markdown generation from Word HTML
-  let markdown = rawHtml
-    .replace(/<h1>(.*?)<\/h1>/gi, '# $1\n\n')
-    .replace(/<h2>(.*?)<\/h2>/gi, '## $1\n\n')
-    .replace(/<h3>(.*?)<\/h3>/gi, '### $1\n\n')
-    .replace(/<strong>(.*?)<\/strong>/gi, '**$1**')
-    .replace(/<b>(.*?)<\/b>/gi, '**$1**')
-    .replace(/<em>(.*?)<\/em>/gi, '*$1*')
-    .replace(/<i>(.*?)<\/i>/gi, '*$1*')
-    .replace(/<li>(.*?)<\/li>/gi, '- $1\n')
-    .replace(/<p>(.*?)<\/p>/gi, '$1\n\n')
-    .replace(/<a[^>]*href="([^"]*)"[^>]*>(.*?)<\/a>/gi, '[$2]($1)')
-    .replace(/<br\s*\/?>/gi, '\n')
-    .replace(/<[^>]+>/g, '')
-    .trim();
+      // Match all paragraph tags <w:p>
+      const pRegex = /<w:p(?:\s[^>]*)?>([\s\S]*?)<\/w:p>/g;
+      let pMatch;
 
-  if (!markdown) markdown = text;
+      while ((pMatch = pRegex.exec(xml)) !== null) {
+        const pContent = pMatch[1];
+        // Match all text nodes <w:t>
+        const tRegex = /<w:t(?:\s[^>]*)?>([\s\S]*?)<\/w:t>/g;
+        let tMatch;
+        let pText = '';
+        while ((tMatch = tRegex.exec(pContent)) !== null) {
+          pText += tMatch[1];
+        }
+        if (pText.trim()) {
+          paragraphs.push(pText.trim());
+        }
+      }
 
+      const text = paragraphs.join('\n\n') || `Content from ${file.name}`;
+      const html = paragraphs.map((p) => `<p>${p}</p>`).join('\n');
+      const markdown = paragraphs.join('\n\n');
+
+      return { text, html, markdown };
+    }
+  } catch (err) {
+    console.warn('Word docx extraction fallback:', err);
+  }
+
+  // Fallback to plain text read
+  const fallbackText = await file.text().catch(() => `Document content from ${file.name}`);
   return {
-    text,
-    html: rawHtml,
-    markdown,
+    text: fallbackText,
+    html: `<p>${fallbackText}</p>`,
+    markdown: fallbackText,
   };
 }
 
@@ -486,7 +490,10 @@ export function generatePdfFromText(title: string, text: string): Blob {
  * Converts Excel or CSV data into formatted PDF table grid with responsive column sizing.
  */
 export function generatePdfFromTable(title: string, headers: string[], rows: any[][]): Blob {
-  const isWide = headers.length > 5;
+  const cleanHeaders = headers && headers.length > 0 ? headers.map(String) : (rows[0] ? rows[0].map((_, i) => `Column ${i + 1}`) : ['Data']);
+  const cleanRows = rows && rows.length > 0 ? rows : [];
+  const isWide = cleanHeaders.length > 4;
+
   const doc = new jsPDF({
     unit: 'pt',
     format: 'a4',
@@ -495,47 +502,54 @@ export function generatePdfFromTable(title: string, headers: string[], rows: any
 
   const pageWidth = doc.internal.pageSize.getWidth();
   const pageHeight = doc.internal.pageSize.getHeight();
-  const margin = 20;
+  const margin = 24;
   let cursorY = margin + 20;
 
   // Header Title
   if (title) {
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(12);
+    doc.setFontSize(13);
     doc.setTextColor(20, 24, 33);
-    doc.text(title.substring(0, 80), margin, cursorY);
-    cursorY += 18;
+    doc.text(title.substring(0, 90), margin, cursorY);
+    cursorY += 20;
   }
 
-  const numCols = Math.max(headers.length, 1);
+  const numCols = Math.max(cleanHeaders.length, 1);
   const colWidth = (pageWidth - margin * 2) / numCols;
-  const rowHeight = 18;
-  const maxCharPerCell = Math.max(8, Math.floor(colWidth / 4.2));
-  const fontSize = Math.max(5.5, Math.min(8.5, 60 / numCols));
+  const rowHeight = 20;
+  const maxCharPerCell = Math.max(5, Math.floor(colWidth / 4.8));
+  const fontSize = Math.max(6, Math.min(9, 72 / numCols));
 
-  // Table Headers
-  doc.setFillColor(240, 243, 246);
-  doc.rect(margin, cursorY, pageWidth - margin * 2, rowHeight, 'F');
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(fontSize);
-  doc.setTextColor(40, 44, 52);
+  const drawHeaderRow = () => {
+    doc.setFillColor(240, 243, 246);
+    doc.rect(margin, cursorY, pageWidth - margin * 2, rowHeight, 'F');
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(fontSize);
+    doc.setTextColor(30, 35, 45);
 
-  headers.forEach((h, idx) => {
-    const rawText = String(h || '').replace(/[\r\n]+/g, ' ').trim();
-    const text = rawText.length > maxCharPerCell ? rawText.substring(0, maxCharPerCell - 1) + '…' : rawText;
-    doc.text(text, margin + idx * colWidth + 2, cursorY + 12);
-  });
-  cursorY += rowHeight;
+    cleanHeaders.forEach((h, idx) => {
+      const rawText = String(h || '').replace(/[\r\n]+/g, ' ').trim();
+      const text = rawText.length > maxCharPerCell ? rawText.substring(0, maxCharPerCell - 1) + '…' : rawText;
+      doc.text(text, margin + idx * colWidth + 4, cursorY + 13);
+    });
+    cursorY += rowHeight;
+  };
+
+  drawHeaderRow();
 
   // Table Rows
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(fontSize);
   doc.setTextColor(60, 64, 72);
 
-  rows.forEach((row, rowIndex) => {
-    if (cursorY > pageHeight - margin - 20) {
+  cleanRows.forEach((row, rowIndex) => {
+    if (cursorY > pageHeight - margin - 30) {
       doc.addPage();
       cursorY = margin + 20;
+      drawHeaderRow();
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(fontSize);
+      doc.setTextColor(60, 64, 72);
     }
 
     if (rowIndex % 2 === 1) {
@@ -543,19 +557,247 @@ export function generatePdfFromTable(title: string, headers: string[], rows: any
       doc.rect(margin, cursorY, pageWidth - margin * 2, rowHeight, 'F');
     }
 
-    headers.forEach((_, colIndex) => {
+    cleanHeaders.forEach((_, colIndex) => {
       const rawVal = row && row[colIndex] !== undefined && row[colIndex] !== null ? String(row[colIndex]) : '';
       const cleanVal = rawVal.replace(/[\r\n]+/g, ' ').trim();
       const text = cleanVal.length > maxCharPerCell ? cleanVal.substring(0, maxCharPerCell - 1) + '…' : cleanVal;
-      doc.text(text, margin + colIndex * colWidth + 2, cursorY + 12);
+      doc.text(text, margin + colIndex * colWidth + 4, cursorY + 13);
     });
 
-    // Horizontal line
+    // Horizontal row separator line
     doc.setDrawColor(230, 233, 238);
     doc.setLineWidth(0.5);
     doc.line(margin, cursorY + rowHeight, pageWidth - margin, cursorY + rowHeight);
 
     cursorY += rowHeight;
+  });
+
+  return new Blob([doc.output('blob')], { type: 'application/pdf' });
+}
+
+export interface PptxSlideData {
+  slideNumber: number;
+  title: string;
+  content: string[];
+  allText: string;
+}
+
+/**
+ * Extracts slides, titles, and text from a PowerPoint (.pptx) file.
+ */
+export async function extractPptxContent(file: File): Promise<{
+  slideCount: number;
+  slides: PptxSlideData[];
+  fullText: string;
+  markdown: string;
+}> {
+  try {
+    const arrayBuffer = await file.arrayBuffer();
+    const zip = await JSZip.loadAsync(arrayBuffer);
+
+    // Find and sort all slide XML files
+    const slideFiles = Object.keys(zip.files)
+      .filter((name) => name.startsWith('ppt/slides/slide') && name.endsWith('.xml'))
+      .sort((a, b) => {
+        const numA = parseInt(a.match(/slide(\d+)\.xml/)?.[1] || '0', 10);
+        const numB = parseInt(b.match(/slide(\d+)\.xml/)?.[1] || '0', 10);
+        return numA - numB;
+      });
+
+    const slides: PptxSlideData[] = [];
+
+    for (let i = 0; i < slideFiles.length; i++) {
+      const fileName = slideFiles[i];
+      const xml = await zip.file(fileName)!.async('text');
+      const slideNumber = i + 1;
+
+      const paragraphs: string[] = [];
+      const pRegex = /<a:p(?:\s[^>]*)?>([\s\S]*?)<\/a:p>/g;
+      let pMatch;
+
+      while ((pMatch = pRegex.exec(xml)) !== null) {
+        const pContent = pMatch[1];
+        const tRegex = /<a:t(?:\s[^>]*)?>([\s\S]*?)<\/a:t>/g;
+        let tMatch;
+        let pText = '';
+        while ((tMatch = tRegex.exec(pContent)) !== null) {
+          pText += tMatch[1];
+        }
+        if (pText.trim()) {
+          paragraphs.push(pText.trim());
+        }
+      }
+
+      const title = paragraphs[0] || `Slide ${slideNumber}`;
+      const content = paragraphs.slice(1);
+      slides.push({
+        slideNumber,
+        title,
+        content,
+        allText: paragraphs.join('\n'),
+      });
+    }
+
+    if (slides.length > 0) {
+      const fullText = slides
+        .map((s) => `--- Slide ${s.slideNumber}: ${s.title} ---\n${s.allText}`)
+        .join('\n\n');
+
+      const markdown = slides
+        .map((s) => `## Slide ${s.slideNumber}: ${s.title}\n\n${s.content.map((c) => `- ${c}`).join('\n')}`)
+        .join('\n\n---\n\n');
+
+      return {
+        slideCount: slides.length,
+        slides,
+        fullText,
+        markdown,
+      };
+    }
+  } catch (err) {
+    console.warn('PPTX parsing fallback:', err);
+  }
+
+  const fallbackText = await file.text().catch(() => `PowerPoint presentation: ${file.name}`);
+  return {
+    slideCount: 1,
+    slides: [{ slideNumber: 1, title: file.name, content: [fallbackText], allText: fallbackText }],
+    fullText: fallbackText,
+    markdown: `# ${file.name}\n\n${fallbackText}`,
+  };
+}
+
+/**
+ * Creates a clean formatted Word (.docx) document from PowerPoint slides.
+ */
+export async function createDocxFromSlides(title: string, slides: PptxSlideData[]): Promise<Blob> {
+  const { Document: DocxDocument, Packer, Paragraph, TextRun, HeadingLevel } = await getDocx();
+  const paragraphs: any[] = [];
+
+  if (title) {
+    paragraphs.push(
+      new Paragraph({
+        text: title,
+        heading: HeadingLevel?.TITLE || 'Title',
+        spacing: { after: 300 },
+      })
+    );
+  }
+
+  slides.forEach((slide) => {
+    // Slide Header
+    paragraphs.push(
+      new Paragraph({
+        text: `Slide ${slide.slideNumber}: ${slide.title}`,
+        heading: HeadingLevel?.HEADING_1 || 'Heading1',
+        spacing: { before: 240, after: 120 },
+      })
+    );
+
+    // Slide Content Items
+    if (slide.content.length === 0 && slide.allText) {
+      paragraphs.push(
+        new Paragraph({
+          children: [new TextRun(slide.allText)],
+          spacing: { after: 100 },
+        })
+      );
+    } else {
+      slide.content.forEach((item) => {
+        paragraphs.push(
+          new Paragraph({
+            children: [new TextRun(item)],
+            bullet: { level: 0 },
+            spacing: { after: 80 },
+          })
+        );
+      });
+    }
+  });
+
+  const doc = new DocxDocument({
+    sections: [{ properties: {}, children: paragraphs }],
+  });
+
+  const rawDocxBlob = await Packer.toBlob(doc);
+  return new Blob([rawDocxBlob], {
+    type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  });
+}
+
+/**
+ * Creates a styled slide-deck PDF from PowerPoint slides.
+ */
+export function generatePdfFromSlides(title: string, slides: PptxSlideData[]): Blob {
+  const doc = new jsPDF({
+    unit: 'pt',
+    format: 'a4',
+    orientation: 'landscape',
+  });
+
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const pageHeight = doc.internal.pageSize.getHeight();
+  const margin = 36;
+
+  slides.forEach((slide, idx) => {
+    if (idx > 0) {
+      doc.addPage('a4', 'landscape');
+    }
+
+    // Slide Background Card
+    doc.setFillColor(250, 251, 253);
+    doc.roundedRect(margin, margin, pageWidth - margin * 2, pageHeight - margin * 2, 8, 8, 'F');
+    doc.setDrawColor(225, 230, 238);
+    doc.setLineWidth(1);
+    doc.roundedRect(margin, margin, pageWidth - margin * 2, pageHeight - margin * 2, 8, 8, 'D');
+
+    // Slide Header Bar
+    doc.setFillColor(240, 243, 249);
+    doc.roundedRect(margin, margin, pageWidth - margin * 2, 44, 8, 8, 'F');
+    doc.rect(margin, margin + 20, pageWidth - margin * 2, 24, 'F');
+
+    // Slide Number Badge
+    doc.setFillColor(99, 102, 241);
+    doc.roundedRect(margin + 12, margin + 10, 60, 24, 4, 4, 'F');
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(10);
+    doc.setTextColor(255, 255, 255);
+    doc.text(`Slide ${slide.slideNumber}`, margin + 18, margin + 25);
+
+    // Slide Title
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(14);
+    doc.setTextColor(25, 30, 45);
+    doc.text(slide.title.substring(0, 70), margin + 82, margin + 26);
+
+    // Slide Content Lines
+    let cursorY = margin + 70;
+    const maxLineWidth = pageWidth - margin * 2 - 40;
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(11);
+    doc.setTextColor(55, 65, 81);
+
+    const itemsToRender = slide.content.length > 0 ? slide.content : slide.allText.split('\n');
+
+    itemsToRender.forEach((item) => {
+      if (cursorY > pageHeight - margin - 30) return;
+      const bulletPrefix = '•  ';
+      const wrapped = doc.splitTextToSize(bulletPrefix + item.trim(), maxLineWidth);
+      wrapped.forEach((lineText: string) => {
+        if (cursorY <= pageHeight - margin - 30) {
+          doc.text(lineText, margin + 24, cursorY);
+          cursorY += 18;
+        }
+      });
+      cursorY += 4;
+    });
+
+    // Footer
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(9);
+    doc.setTextColor(140, 148, 160);
+    doc.text(`${title || 'PowerPoint Presentation'} • Page ${idx + 1} of ${slides.length}`, margin + 20, pageHeight - margin - 12);
   });
 
   return new Blob([doc.output('blob')], { type: 'application/pdf' });

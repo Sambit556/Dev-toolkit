@@ -19,6 +19,7 @@ import {
   ArrowLeft,
   Lock,
   GitFork,
+  RotateCcw,
 } from 'lucide-react';
 import { useCloudIdeStore } from '../../store/useCloudIdeStore';
 import { ActivityBar } from './ActivityBar';
@@ -35,6 +36,7 @@ import { VersionHistoryModal } from './VersionHistoryModal';
 import { ShareModal } from './ShareModal';
 import { SettingsModal } from './SettingsModal';
 import { CommandPalette } from './CommandPalette';
+import { ResetWorkspaceModal } from './ResetWorkspaceModal';
 import { LANGUAGE_TEMPLATES } from '../../lib/templates';
 
 export const CloudIdeApp: React.FC = () => {
@@ -59,6 +61,7 @@ export const CloudIdeApp: React.FC = () => {
     sharedWorkspaceInfo,
     loadSharedWorkspace,
     forkWorkspace,
+    resetEntireWorkspaceToBrandNew,
   } = useCloudIdeStore();
 
   const [sidebarWidth, setSidebarWidth] = useState(280);
@@ -67,6 +70,7 @@ export const CloudIdeApp: React.FC = () => {
   const [isDraggingSidebar, setIsDraggingSidebar] = useState(false);
   const [isDraggingBottom, setIsDraggingBottom] = useState(false);
   const [isDraggingRightTerminal, setIsDraggingRightTerminal] = useState(false);
+  const [isResetModalOpen, setIsResetModalOpen] = useState(false);
 
   const currentTemplate =
     LANGUAGE_TEMPLATES.find((t) => t.id === currentLanguage) || LANGUAGE_TEMPLATES[0];
@@ -238,19 +242,31 @@ export const CloudIdeApp: React.FC = () => {
           </div>
         </div>
 
-        {/* Center: Command Palette Trigger Bar */}
-        <button
-          onClick={() => setCommandPaletteOpen(true)}
-          className="flex items-center gap-2 px-3 py-1 bg-neutral-900 hover:bg-neutral-800 border border-neutral-800 hover:border-neutral-700 rounded-xl text-xs text-slate-400 hover:text-slate-200 transition-all w-64 md:w-80 justify-between shadow-inner"
-        >
-          <div className="flex items-center gap-2 truncate">
-            <Command className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
-            <span className="truncate">Search commands & files...</span>
-          </div>
-          <kbd className="hidden sm:inline px-1.5 py-0.5 text-[10px] bg-black rounded border border-neutral-800 text-slate-400 font-mono">
-            Ctrl+K
-          </kbd>
-        </button>
+        {/* Center: Command Palette Trigger Bar & Purple Fresh Reset Button */}
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setCommandPaletteOpen(true)}
+            className="flex items-center gap-2 px-3 py-1 bg-neutral-900 hover:bg-neutral-800 border border-neutral-800 hover:border-neutral-700 rounded-xl text-xs text-slate-400 hover:text-slate-200 transition-all w-52 sm:w-64 md:w-80 justify-between shadow-inner"
+          >
+            <div className="flex items-center gap-2 truncate">
+              <Command className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
+              <span className="truncate">Search commands & files...</span>
+            </div>
+            <kbd className="hidden sm:inline px-1.5 py-0.5 text-[10px] bg-black rounded border border-neutral-800 text-slate-400 font-mono">
+              Ctrl+K
+            </kbd>
+          </button>
+
+          {/* Purple Fresh Workspace Reset Button */}
+          <button
+            onClick={() => setIsResetModalOpen(true)}
+            title="Reset Everything to Brand New User"
+            className="flex items-center gap-1.5 px-2.5 py-1 bg-purple-600/20 hover:bg-purple-600/30 text-purple-300 hover:text-purple-100 border border-purple-500/40 hover:border-purple-400 rounded-xl text-xs font-semibold shadow-sm shadow-purple-600/20 transition-all hover:scale-105 active:scale-95"
+          >
+            <RotateCcw className="w-3.5 h-3.5 text-purple-400" />
+            <span className="hidden md:inline">Reset Workspace</span>
+          </button>
+        </div>
 
         {/* Right Header Actions */}
         <div className="flex items-center gap-2">
@@ -273,20 +289,17 @@ export const CloudIdeApp: React.FC = () => {
             </button>
           )}
 
-          {/* Dedicated Hide / Show Terminal / Output Button (Right of Run) */}
+          {/* Dedicated Hide / Show Terminal / Output Button (Right of Run - Icon Only) */}
           <button
             onClick={() => toggleBottomPanel()}
             title={isBottomPanelOpen ? 'Hide Terminal / Output' : 'Show Terminal / Output'}
-            className={`px-2.5 py-1 rounded-lg border text-xs font-medium flex items-center gap-1.5 transition-all ${
+            className={`p-1.5 rounded-lg border transition-all ${
               isBottomPanelOpen
                 ? 'bg-slate-900 text-indigo-300 border-indigo-500/40 hover:bg-slate-800'
                 : 'bg-neutral-900 hover:bg-neutral-800 text-slate-300 border-neutral-800'
             }`}
           >
             <Terminal className="w-3.5 h-3.5 text-indigo-400" />
-            <span className="hidden md:inline">
-              {isBottomPanelOpen ? 'Hide Terminal / Output' : 'Show Terminal / Output'}
-            </span>
           </button>
 
           <div className="h-4 w-px bg-neutral-800 hidden sm:block" />
@@ -459,6 +472,7 @@ export const CloudIdeApp: React.FC = () => {
       <VersionHistoryModal />
       <ShareModal />
       <SettingsModal />
+      <ResetWorkspaceModal isOpen={isResetModalOpen} onClose={() => setIsResetModalOpen(false)} />
     </div>
   );
 };

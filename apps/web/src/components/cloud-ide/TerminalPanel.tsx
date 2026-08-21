@@ -194,7 +194,7 @@ export const TerminalPanel: React.FC = () => {
                   );
                 }
 
-                if (log.startsWith('✔ [Execution #')) {
+                if (log.startsWith('[PASS] [Execution #') || log.startsWith('✔ [Execution #')) {
                   return (
                     <div
                       key={index}
@@ -206,7 +206,7 @@ export const TerminalPanel: React.FC = () => {
                   );
                 }
 
-                if (log.startsWith('✖ [Execution #')) {
+                if (log.startsWith('[FAIL] [Execution #') || log.startsWith('✖ [Execution #')) {
                   return (
                     <div
                       key={index}

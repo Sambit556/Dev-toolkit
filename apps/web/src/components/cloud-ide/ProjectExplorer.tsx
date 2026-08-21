@@ -94,6 +94,16 @@ export const ProjectExplorer: React.FC = () => {
   const [isLangDropdownOpen, setIsLangDropdownOpen] = useState(false);
   const [langSearch, setLangSearch] = useState('');
   const langDropdownRef = React.useRef<HTMLDivElement>(null);
+  const selectedLangItemRef = React.useRef<HTMLButtonElement | null>(null);
+
+  React.useEffect(() => {
+    if (isLangDropdownOpen) {
+      const timer = setTimeout(() => {
+        selectedLangItemRef.current?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      }, 60);
+      return () => clearTimeout(timer);
+    }
+  }, [isLangDropdownOpen]);
 
   React.useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -245,12 +255,17 @@ export const ProjectExplorer: React.FC = () => {
                 {filteredTemplates.map((template) => (
                   <button
                     key={template.id}
+                    ref={currentLanguage === template.id ? selectedLangItemRef : null}
+                    disabled={template.disabled}
                     onClick={() => {
+                      if (template.disabled) return;
                       setLanguage(template.id);
                       setIsLangDropdownOpen(false);
                     }}
                     className={`w-full flex items-center justify-between px-2.5 py-2 rounded-lg text-left text-xs transition-colors ${
-                      currentLanguage === template.id
+                      template.disabled
+                        ? 'opacity-40 cursor-not-allowed bg-neutral-900/30 text-neutral-500'
+                        : currentLanguage === template.id
                         ? 'bg-indigo-600 text-white font-medium'
                         : 'hover:bg-slate-800 text-slate-300'
                     }`}
@@ -259,7 +274,14 @@ export const ProjectExplorer: React.FC = () => {
                       <span>{template.icon}</span>
                       <span>{template.name}</span>
                     </div>
-                    <span className="text-[10px] opacity-70">{template.category}</span>
+                    <div className="flex items-center gap-1.5">
+                      {template.disabled && (
+                        <span className="text-[9px] bg-neutral-800 text-neutral-400 font-medium px-1.5 py-0.5 rounded border border-neutral-700">
+                          {template.disabledReason || 'Disabled'}
+                        </span>
+                      )}
+                      <span className="text-[10px] opacity-70">{template.category}</span>
+                    </div>
                   </button>
                 ))}
               </div>

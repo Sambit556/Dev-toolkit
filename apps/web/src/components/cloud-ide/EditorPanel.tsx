@@ -99,11 +99,12 @@ export const EditorPanel: React.FC = () => {
     forkWorkspace,
     isLivePreviewOpen,
     toggleLivePreview,
+    resetTemplate,
   } = useCloudIdeStore();
 
-  const isFrontendRuntime = ['html', 'react', 'vue', 'angular', 'svelte'].includes(
-    currentLanguage.toLowerCase(),
-  );
+  const isFrontendRuntime =
+    ['html', 'react', 'nextjs', 'next', 'vue', 'angular', 'svelte', 'php'].includes(currentLanguage.toLowerCase()) ||
+    files.some((f) => f.name.endsWith('.html') || f.name.endsWith('.vue') || f.name.endsWith('.svelte') || f.name.endsWith('.tsx'));
 
   const [isFullscreen, setIsFullscreen] = React.useState(false);
   const [showFullscreenTerminal, setShowFullscreenTerminal] = useState(false);
@@ -136,25 +137,207 @@ export const EditorPanel: React.FC = () => {
   }, [currentFile?.content, activeFile]);
 
   const getMonacoLanguage = (fileName: string) => {
-    if (fileName.endsWith('.ts') || fileName.endsWith('.tsx')) return 'typescript';
-    if (fileName.endsWith('.js') || fileName.endsWith('.jsx')) return 'javascript';
-    if (fileName.endsWith('.py')) return 'python';
-    if (fileName.endsWith('.go')) return 'go';
-    if (fileName.endsWith('.rs')) return 'rust';
-    if (fileName.endsWith('.cpp') || fileName.endsWith('.h')) return 'cpp';
-    if (fileName.endsWith('.java')) return 'java';
-    if (fileName.endsWith('.sql')) return 'sql';
-    if (fileName.endsWith('.json')) return 'json';
-    if (fileName.endsWith('.yaml') || fileName.endsWith('.yml')) return 'yaml';
-    if (fileName.endsWith('.html')) return 'html';
-    if (fileName.endsWith('.css')) return 'css';
-    if (fileName.endsWith('.md')) return 'markdown';
+    const lower = fileName.toLowerCase();
+    if (lower.endsWith('.ts') || lower.endsWith('.tsx')) return 'typescript';
+    if (lower.endsWith('.js') || lower.endsWith('.jsx')) return 'javascript';
+    if (lower.endsWith('.py')) return 'python';
+    if (lower.endsWith('.go')) return 'go';
+    if (lower.endsWith('.rs')) return 'rust';
+    if (lower.endsWith('.cpp') || lower.endsWith('.cc') || lower.endsWith('.cxx') || lower.endsWith('.h') || lower.endsWith('.hpp')) return 'cpp';
+    if (lower.endsWith('.c')) return 'c';
+    if (lower.endsWith('.cs')) return 'csharp';
+    if (lower.endsWith('.java')) return 'java';
+    if (lower.endsWith('.sql')) return 'sql';
+    if (lower.endsWith('.sh') || lower.endsWith('.bash') || lower.endsWith('.zsh')) return 'shell';
+    if (lower.endsWith('.sol')) return 'solidity';
+    if (lower.endsWith('.php')) return 'php';
+    if (lower.endsWith('.rb') || lower.endsWith('.ruby')) return 'ruby';
+    if (lower.endsWith('.json')) return 'json';
+    if (lower.endsWith('.yaml') || lower.endsWith('.yml')) return 'yaml';
+    if (lower.endsWith('.html') || lower.endsWith('.vue') || lower.endsWith('.svelte')) return 'html';
+    if (lower.endsWith('.css') || lower.endsWith('.scss') || lower.endsWith('.less')) return 'css';
+    if (lower.endsWith('.md') || lower.endsWith('.markdown')) return 'markdown';
+    if (lower.endsWith('.xml') || lower.endsWith('.svg')) return 'xml';
+    if (lower.endsWith('dockerfile') || lower.startsWith('dockerfile')) return 'dockerfile';
+    if (lower.endsWith('.ini') || lower.endsWith('.env') || lower.startsWith('.env')) return 'ini';
     return 'plaintext';
   };
 
   const handleEditorMount: OnMount = (editor, monaco) => {
     editorRef.current = editor;
     monacoRef.current = monaco;
+
+    // Configure TypeScript & JSX Compiler Options in Monaco
+    if (monaco.languages?.typescript) {
+      monaco.languages.typescript.typescriptDefaults.setCompilerOptions({
+        target: monaco.languages.typescript.ScriptTarget.ESNext,
+        allowNonTsExtensions: true,
+        moduleResolution: monaco.languages.typescript.ModuleResolutionKind.NodeJs,
+        module: monaco.languages.typescript.ModuleKind.CommonJS,
+        noEmit: true,
+        jsx: monaco.languages.typescript.JsxEmit.ReactJSX,
+        allowJs: true,
+        esModuleInterop: true,
+        allowSyntheticDefaultImports: true,
+      });
+
+      monaco.languages.typescript.javascriptDefaults.setCompilerOptions({
+        target: monaco.languages.typescript.ScriptTarget.ESNext,
+        allowNonTsExtensions: true,
+        moduleResolution: monaco.languages.typescript.ModuleResolutionKind.NodeJs,
+        module: monaco.languages.typescript.ModuleKind.CommonJS,
+        noEmit: true,
+        jsx: monaco.languages.typescript.JsxEmit.ReactJSX,
+        allowJs: true,
+        esModuleInterop: true,
+        allowSyntheticDefaultImports: true,
+      });
+
+      // Ignore standard standalone IDE module resolution and JSX missing flag lints
+      monaco.languages.typescript.typescriptDefaults.setDiagnosticsOptions({
+        noSemanticValidation: false,
+        noSyntaxValidation: false,
+        diagnosticCodesToIgnore: [2792, 17004, 2307, 7016, 2686, 2875, 7026],
+      });
+
+      monaco.languages.typescript.javascriptDefaults.setDiagnosticsOptions({
+        noSemanticValidation: false,
+        noSyntaxValidation: false,
+        diagnosticCodesToIgnore: [2792, 17004, 2307, 7016, 2686, 2875, 7026],
+      });
+
+      // Inject React & DOM types to support IntelliSense in React files
+      const reactTypes = `
+        declare namespace React {
+          type ReactNode = any;
+          type FC<P = {}> = (props: P) => any;
+          type FormEvent<T = any> = any;
+          type ChangeEvent<T = any> = any;
+          type MouseEvent<T = any> = any;
+          function useState<T>(initialState: T | (() => T)): [T, (newState: T | ((prevState: T) => T)) => void];
+          function useEffect(effect: () => void | (() => void), deps?: readonly any[]): void;
+          function useRef<T>(initialValue?: T): { current: T };
+          function useMemo<T>(factory: () => T, deps: readonly any[] | undefined): T;
+          function useCallback<T extends (...args: any[]) => any>(callback: T, deps: readonly any[]): T;
+          function useContext<T>(context: any): T;
+          function createContext<T>(defaultValue: T): any;
+          function useReducer<R extends (...args: any[]) => any>(reducer: R, initialState: any): [any, any];
+          function createElement(type: any, props?: any, ...children: any[]): any;
+        }
+        declare namespace JSX {
+          type Element = any;
+          interface IntrinsicElements {
+            [elemName: string]: any;
+          }
+        }
+        declare module 'react' {
+          export = React;
+          export as namespace React;
+        }
+        declare module 'react/jsx-runtime' {
+          export const jsx: any;
+          export const jsxs: any;
+          export const Fragment: any;
+          export namespace JSX {
+            type Element = any;
+            interface IntrinsicElements {
+              [elemName: string]: any;
+            }
+          }
+        }
+        declare module 'react/jsx-dev-runtime' {
+          export const jsxDEV: any;
+          export const Fragment: any;
+          export namespace JSX {
+            type Element = any;
+            interface IntrinsicElements {
+              [elemName: string]: any;
+            }
+          }
+        }
+        declare module 'react-dom' {
+          export function createRoot(container: any): any;
+          export function render(element: any, container: any): void;
+        }
+        declare module 'react-dom/client' {
+          export function createRoot(container: any): any;
+        }
+      `;
+
+      try {
+        monaco.languages.typescript.typescriptDefaults.addExtraLib(reactTypes, 'file:///node_modules/@types/react/index.d.ts');
+        monaco.languages.typescript.typescriptDefaults.addExtraLib(reactTypes, 'file:///node_modules/@types/react/jsx-runtime.d.ts');
+        monaco.languages.typescript.javascriptDefaults.addExtraLib(reactTypes, 'file:///node_modules/@types/react/index.d.ts');
+        monaco.languages.typescript.javascriptDefaults.addExtraLib(reactTypes, 'file:///node_modules/@types/react/jsx-runtime.d.ts');
+      } catch {}
+    }
+
+    // Register Solidity Language & Monarch Tokenizer if not present
+    try {
+      if (!monaco.languages.getLanguages().some((l: any) => l.id === 'solidity')) {
+        monaco.languages.register({ id: 'solidity', extensions: ['.sol'] });
+        monaco.languages.setMonarchTokensProvider('solidity', {
+          keywords: [
+            'pragma', 'solidity', 'contract', 'interface', 'library', 'is', 'abstract',
+            'function', 'modifier', 'event', 'error', 'struct', 'enum',
+            'public', 'private', 'external', 'internal',
+            'pure', 'view', 'payable', 'nonpayable',
+            'virtual', 'override', 'immutable', 'constant',
+            'returns', 'return', 'require', 'revert', 'assert', 'emit',
+            'mapping', 'address', 'bool', 'string', 'bytes', 'byte',
+            'uint', 'uint8', 'uint16', 'uint32', 'uint64', 'uint128', 'uint256',
+            'int', 'int8', 'int16', 'int32', 'int64', 'int128', 'int256',
+            'bytes1', 'bytes2', 'bytes3', 'bytes4', 'bytes32',
+            'memory', 'storage', 'calldata',
+            'new', 'delete', 'this', 'super', 'selfdestruct',
+            'if', 'else', 'for', 'while', 'do', 'break', 'continue',
+            'try', 'catch', 'assembly', 'unchecked'
+          ],
+          operators: [
+            '=', '>', '<', '!', '~', '?', ':', '==', '<=', '>=', '!=',
+            '&&', '||', '++', '--', '+', '-', '*', '/', '&', '|', '^', '%',
+            '<<', '>>', '>>>', '+=', '-=', '*=', '/=', '&=', '|=', '^=',
+            '%=', '<<=', '>>=', '>>>='
+          ],
+          symbols: /[=><!~?:&|+\-*\/\^%]+/,
+          tokenizer: {
+            root: [
+              [/[a-zA-Z_]\w*/, {
+                cases: {
+                  '@keywords': 'keyword',
+                  '@default': 'identifier'
+                }
+              }],
+              { include: '@whitespace' },
+              [/[{}()\[\]]/, '@brackets'],
+              [/@symbols/, {
+                cases: {
+                  '@operators': 'operator',
+                  '@default': ''
+                }
+              }],
+              [/\d*\.\d+([eE][\-+]?\d+)?/, 'number.float'],
+              [/0[xX][0-9a-fA-F]+/, 'number.hex'],
+              [/\d+/, 'number'],
+              [/[;,.]/, 'delimiter'],
+              [/"([^"\\]|\\.)*"/, 'string'],
+              [/'([^'\\]|\\.)*'/, 'string']
+            ],
+            whitespace: [
+              [/[ \t\r\n]+/, 'white'],
+              [/\/\*/, 'comment', '@comment'],
+              [/\/\/.*$/, 'comment']
+            ],
+            comment: [
+              [/[^\/*]+/, 'comment'],
+              [/\/\*/, 'comment', '@push'],
+              ['\\*/', 'comment', '@pop'],
+              [/[\/*]/, 'comment']
+            ]
+          }
+        });
+      }
+    } catch {}
 
     // Define Custom Themes
     monaco.editor.defineTheme('tokyo-night', {
@@ -433,13 +616,21 @@ export const EditorPanel: React.FC = () => {
           )}
           <span className="uppercase">{getMonacoLanguage(currentFile?.name || '')}</span>
           <span>UTF-8</span>
+          <button
+            onClick={() => resetTemplate()}
+            title="Reset files to latest starter template"
+            className="hover:text-indigo-300 text-slate-400 hover:bg-neutral-800 px-1.5 py-0.5 rounded transition-all flex items-center gap-1 text-[10px]"
+          >
+            <RotateCcw className="w-2.5 h-2.5" />
+            <span>Reset Starter</span>
+          </button>
         </div>
       </div>
 
       {/* Monaco Editor Container / Split View */}
-      <div className="flex-1 flex overflow-hidden relative bg-black">
+      <div className="flex-1 flex flex-row overflow-hidden relative bg-black w-full h-full">
         {/* Main Editor */}
-        <div className="flex-1 h-full bg-black">
+        <div className="flex-1 min-w-0 h-full bg-black overflow-hidden relative">
           {currentFile && (
             <MonacoEditor
               key={`editor-${currentLanguage}-${currentFile.name}`}
@@ -474,7 +665,7 @@ export const EditorPanel: React.FC = () => {
 
         {/* Split Editor (if enabled) */}
         {splitCurrentFile && (
-          <div className="flex-1 h-full border-l border-neutral-800 bg-black">
+          <div className="flex-1 min-w-0 h-full border-l border-neutral-800 bg-black overflow-hidden relative">
             <div className="px-3 py-1 bg-neutral-900 text-[11px] text-slate-300 font-semibold border-b border-neutral-800 flex items-center justify-between">
               <span>{splitCurrentFile.name} (Split View)</span>
               <button onClick={() => setSplitFile(null)} className="hover:text-rose-400">
@@ -507,7 +698,7 @@ export const EditorPanel: React.FC = () => {
 
         {/* Live Browser Preview Split Studio (if open) */}
         {isLivePreviewOpen && (
-          <div className="flex-1 h-full min-w-[340px] border-l border-neutral-800 flex flex-col bg-slate-950">
+          <div className="flex-1 min-w-[320px] max-w-[50%] h-full border-l border-neutral-800 flex flex-col bg-slate-950 overflow-hidden relative z-10">
             <LiveBrowserPreview onClose={() => toggleLivePreview(false)} />
           </div>
         )}

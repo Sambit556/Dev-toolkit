@@ -21,7 +21,8 @@ import {
   Check,
   Layers,
   Archive,
-  Plus
+  Plus,
+  Presentation,
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -38,6 +39,9 @@ import {
   generatePdfFromTable,
   rtfToPlainText,
   extractTextFromEpub,
+  extractPptxContent,
+  createDocxFromSlides,
+  generatePdfFromSlides,
 } from '@/lib/converters/documentConverters';
 
 import {
@@ -210,6 +214,9 @@ export function FileConverterTool() {
     if (['xlsx', 'xls', 'csv'].includes(ext)) {
       return <TableIcon className="h-4 w-4 text-emerald-500" />;
     }
+    if (['pptx', 'ppt'].includes(ext)) {
+      return <Presentation className="h-4 w-4 text-orange-500" />;
+    }
     return <FileText className="h-4 w-4 text-blue-500" />;
   };
 
@@ -225,6 +232,16 @@ export function FileConverterTool() {
         { label: 'Plain Text (.txt)', value: 'txt', category: 'Document' },
         { label: 'HTML Webpage (.html)', value: 'html', category: 'Document' },
         { label: 'Markdown Document (.md)', value: 'md', category: 'Document' },
+      ];
+    }
+
+    // 1.5. Presentations: PowerPoint (.pptx, .ppt)
+    if (['pptx', 'ppt'].includes(ext)) {
+      return [
+        { label: 'Word Document (.docx)', value: 'docx', category: 'Document' },
+        { label: 'PDF Slide Deck (.pdf)', value: 'pdf', category: 'Document' },
+        { label: 'Plain Text (.txt)', value: 'txt', category: 'Document' },
+        { label: 'Markdown Outline (.md)', value: 'md', category: 'Document' },
       ];
     }
 
@@ -636,6 +653,28 @@ export function FileConverterTool() {
         }
       }
 
+      // 7.5. PowerPoint (.pptx, .ppt)
+      else if (['pptx', 'ppt'].includes(ext)) {
+        const pptxData = await extractPptxContent(item.file);
+        if (targetFormat === 'docx') {
+          resultBlob = await createDocxFromSlides(baseName, pptxData.slides);
+          outputFilename = `${baseName}.docx`;
+          textPreview = `Converted ${pptxData.slideCount} slides to Word document.`;
+        } else if (targetFormat === 'pdf') {
+          resultBlob = generatePdfFromSlides(baseName, pptxData.slides);
+          outputFilename = `${baseName}.pdf`;
+          textPreview = `Converted ${pptxData.slideCount} slides to PDF slide deck.`;
+        } else if (targetFormat === 'txt') {
+          resultBlob = new Blob([pptxData.fullText], { type: 'text/plain;charset=utf-8;' });
+          outputFilename = `${baseName}.txt`;
+          textPreview = pptxData.fullText.slice(0, 1000);
+        } else if (targetFormat === 'md') {
+          resultBlob = new Blob([pptxData.markdown], { type: 'text/markdown;charset=utf-8;' });
+          outputFilename = `${baseName}.md`;
+          textPreview = pptxData.markdown.slice(0, 1000);
+        }
+      }
+
       // 8. Excel (.xlsx, .xls)
       else if (['xlsx', 'xls'].includes(ext)) {
         const arrayBuf = await item.file.arrayBuffer();
@@ -664,24 +703,60 @@ export function FileConverterTool() {
       // 9. CSV (.csv)
       else if (ext === 'csv') {
         const text = await item.file.text();
-        const wb = XLSX.read(text, { type: 'string', raw: true });
-        const sheetName = wb.SheetNames[0] || 'Sheet1';
-        const sheet = wb.Sheets[sheetName] || {};
+        let aoa: any[][] = [];
+        try {
+          const wb = XLSX.read(text, { type: 'string', raw: true });
+          const sheetName = wb.SheetNames[0] || 'Sheet1';
+          const sheet = wb.Sheets[sheetName] || {};
+          aoa = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as any[][];
+        } catch {
+          // Fallback line-by-line CSV parser
+          aoa = text
+            .split(/\r?\n/)
+            .filter((l) => l.trim().length > 0)
+            .map((line) => {
+              const cells: string[] = [];
+              let insideQuotes = false;
+              let currentCell = '';
+              for (let i = 0; i < line.length; i++) {
+                const char = line[i];
+                if (char === '"' || char === "'") {
+                  insideQuotes = !insideQuotes;
+                } else if (char === ',' && !insideQuotes) {
+                  cells.push(currentCell.trim());
+                  currentCell = '';
+                } else {
+                  currentCell += char;
+                }
+              }
+              cells.push(currentCell.trim());
+              return cells;
+            });
+        }
 
         if (targetFormat === 'xlsx') {
+          const wb = XLSX.utils.book_new();
+          const ws = XLSX.utils.aoa_to_sheet(aoa);
+          XLSX.utils.book_append_sheet(wb, ws, 'Sheet1');
           const wbOut = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
           resultBlob = new Blob([wbOut], {
             type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
           });
           outputFilename = `${baseName}.xlsx`;
         } else if (targetFormat === 'json') {
-          const jsonData = XLSX.utils.sheet_to_json(sheet);
+          const headers = (aoa[0] || []).map(String);
+          const jsonData = aoa.slice(1).map((row) => {
+            const obj: Record<string, any> = {};
+            headers.forEach((h, i) => {
+              obj[h || `column_${i + 1}`] = row[i] !== undefined ? row[i] : '';
+            });
+            return obj;
+          });
           const jsonStr = JSON.stringify(jsonData, null, 2);
           resultBlob = new Blob([jsonStr], { type: 'application/json;charset=utf-8;' });
           outputFilename = `${baseName}.json`;
           textPreview = jsonStr.slice(0, 1000);
         } else if (targetFormat === 'pdf') {
-          const aoa: any[][] = XLSX.utils.sheet_to_json(sheet, { header: 1 });
           if (!aoa || aoa.length === 0) {
             resultBlob = generatePdfFromText(baseName, text);
           } else {

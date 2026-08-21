@@ -5,9 +5,9 @@ import { Separator } from '@/components/ui/separator';
 import { FileConverterTool } from './Lazy';
 
 export const metadata: Metadata = {
-  title: 'File Converter — Documents, Images, Spreadsheets & PDFs',
+  title: 'File Converter — Documents, Presentations, Images, Spreadsheets & PDFs',
   description:
-    'Free file converter. Convert Word, PDF, Excel, RTF, EPUB, Images (JPG, PNG, WebP, SVG, HEIC), Markdown, CSV, JSON, and HTML locally with zero server uploads.',
+    'Free file converter. Convert Word, PowerPoint (PPT/PPTX), PDF, Excel, RTF, EPUB, Images (JPG, PNG, WebP, SVG, HEIC), Markdown, CSV, JSON, and HTML locally with zero server uploads.',
   alternates: { canonical: '/file-converter' },
 };
 
@@ -22,7 +22,7 @@ export default function FileConverterPage() {
           <h1 className="text-2xl font-bold">File Converter</h1>
         </div>
         <p className="text-muted-foreground text-sm">
-          Convert Word documents, PDFs, Excel sheets, images, and data structures 100% locally in your browser with complete privacy.
+          Convert Word documents, PowerPoint presentations, PDFs, Excel sheets, images, and data structures 100% locally in your browser with complete privacy.
         </p>
       </div>
 
