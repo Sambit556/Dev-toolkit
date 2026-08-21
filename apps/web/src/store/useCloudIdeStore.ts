@@ -70,6 +70,18 @@ export interface ExecutionMetrics {
   sandboxId?: string;
 }
 
+export interface ExecutionRecord {
+  id: string;
+  runIndex: number;
+  timestamp: string;
+  language: string;
+  entryPoint: string;
+  stdout: string;
+  stderr: string;
+  exitCode: number;
+  executionTimeMs: number;
+}
+
 export interface ErrorDiagnostics {
   hasError: boolean;
   failingFile?: string;
@@ -127,6 +139,8 @@ interface CloudIdeState {
   // Execution & Terminal
   stdinInput: string;
   setStdinInput: (val: string) => void;
+  executionCount: number;
+  executionHistory: ExecutionRecord[];
   terminalLogs: string[];
   stderrLogs: string[];
   clearTerminal: () => void;
@@ -381,10 +395,12 @@ export const useCloudIdeStore = create<CloudIdeState>()(
       // Execution & Terminal
       stdinInput: '',
       setStdinInput: (val) => set({ stdinInput: val }),
+      executionCount: 0,
+      executionHistory: [],
       isSandboxReady: false,
       terminalLogs: [],
       stderrLogs: [],
-      clearTerminal: () => set({ terminalLogs: [], stderrLogs: [], diagnostics: { hasError: false } }),
+      clearTerminal: () => set({ terminalLogs: [], stderrLogs: [], executionHistory: [], diagnostics: { hasError: false } }),
       addTerminalLog: (log) => set((s) => ({ terminalLogs: [...s.terminalLogs, log].slice(-500) })),
       addStderrLog: (err) => set((s) => ({ stderrLogs: [...s.stderrLogs, err].slice(-200) })),
       metrics: {
@@ -418,12 +434,16 @@ export const useCloudIdeStore = create<CloudIdeState>()(
       },
 
       runCode: async () => {
-        const { currentLanguage, files, activeFile, stdinInput } = get();
-        // Clear stale errors from previous runs on new execution
+        const { currentLanguage, files, activeFile, stdinInput, executionCount, executionHistory } = get();
+        const nextIndex = executionCount + 1;
+        const now = new Date();
+        const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+
+        // Update state to running
         set({
+          executionCount: nextIndex,
           metrics: { ...get().metrics, status: 'running' },
           diagnostics: { hasError: false },
-          stderrLogs: [],
           isBottomPanelOpen: true,
           activeBottomTab: 'terminal',
         });
@@ -442,45 +462,88 @@ export const useCloudIdeStore = create<CloudIdeState>()(
           });
 
           const data = await response.json();
+          const stdout = data.stdout || '';
+          const stderr = data.stderr || '';
+          const exitCode = data.exitCode || 0;
+          const execTime = data.executionTimeMs || 45;
 
-          if (data.exitCode === 0) {
-            if (data.stdout) {
-              get().addTerminalLog(data.stdout);
-            }
-            set({
-              stderrLogs: [],
-              diagnostics: { hasError: false },
-            });
-          } else {
-            if (data.stdout) {
-              get().addTerminalLog(data.stdout);
-            }
-            if (data.stderr) {
-              get().addStderrLog(data.stderr);
-            }
-            if (data.diagnostics && data.diagnostics.hasError) {
-              set({ diagnostics: data.diagnostics });
-            }
-          }
+          const record: ExecutionRecord = {
+            id: `run_${nextIndex}_${Date.now()}`,
+            runIndex: nextIndex,
+            timestamp: timeStr,
+            language: currentLanguage,
+            entryPoint: activeFile,
+            stdout,
+            stderr,
+            exitCode,
+            executionTimeMs: execTime,
+          };
+
+          // Format clean execution banner and summary
+          const runHeader = `─── [Execution #${nextIndex} • ${currentLanguage.toUpperCase()} • ${activeFile} @ ${timeStr}] ───`;
+          const runFooter = exitCode === 0
+            ? `✔ [Execution #${nextIndex}] Finished with Exit Code: 0 (${execTime}ms)`
+            : `✖ [Execution #${nextIndex}] Exited with Error Code: ${exitCode} (${execTime}ms)`;
+
+          const newLogs = [
+            ...get().terminalLogs,
+            runHeader,
+            ...(stdout ? [stdout] : []),
+            ...(stderr ? [`[STDERR] ${stderr}`] : []),
+            runFooter,
+            '',
+          ];
+
+          const newStderrLogs = stderr
+            ? [...get().stderrLogs, `[Execution #${nextIndex} @ ${timeStr}] ${stderr}`]
+            : get().stderrLogs;
 
           set({
+            terminalLogs: newLogs.slice(-600),
+            stderrLogs: newStderrLogs.slice(-200),
+            executionHistory: [record, ...executionHistory].slice(0, 50),
+            diagnostics: data.diagnostics || { hasError: exitCode !== 0 },
             metrics: {
-              executionTimeMs: data.executionTimeMs || 45,
+              executionTimeMs: execTime,
               memoryUsageMb: data.memoryUsageMb || 18,
               cpuUsagePercent: data.cpuUsagePercent || 15,
-              exitCode: data.exitCode || 0,
-              status: data.exitCode === 0 ? 'success' : 'error',
+              exitCode,
+              status: exitCode === 0 ? 'success' : 'error',
               provider: data.provider,
               sandboxId: data.sandboxId,
             },
           });
         } catch (error: any) {
-          get().addStderrLog(`Execution failed: ${error.message}`);
+          const errText = error.message || String(error);
+          const record: ExecutionRecord = {
+            id: `run_${nextIndex}_${Date.now()}`,
+            runIndex: nextIndex,
+            timestamp: timeStr,
+            language: currentLanguage,
+            entryPoint: activeFile,
+            stdout: '',
+            stderr: errText,
+            exitCode: 1,
+            executionTimeMs: 0,
+          };
+
+          const runHeader = `─── [Execution #${nextIndex} • ${currentLanguage.toUpperCase()} • ${activeFile} @ ${timeStr}] ───`;
+          const runFooter = `✖ [Execution #${nextIndex}] Connection/Runtime Error`;
+
           set({
+            executionHistory: [record, ...get().executionHistory].slice(0, 50),
+            terminalLogs: [
+              ...get().terminalLogs,
+              runHeader,
+              `[ERROR] Execution failed: ${errText}`,
+              runFooter,
+              '',
+            ],
+            stderrLogs: [...get().stderrLogs, `[Execution #${nextIndex}] ${errText}`],
             metrics: { ...get().metrics, status: 'error', exitCode: 1 },
             diagnostics: {
               hasError: true,
-              errorMessage: error.message,
+              errorMessage: errText,
               rootCauseAnalysis: 'Network or sandbox runtime connection error.',
               suggestedFix: 'Verify the execution engine is reachable.',
             },

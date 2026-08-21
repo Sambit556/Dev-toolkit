@@ -111,27 +111,216 @@ ${cleaned}
 if (typeof __main === 'function') __main();
 `;
     } else if (normLang === 'python' || normLang === 'python3' || normLang === 'py') {
-      let lines = entryFile.split('\n');
-      const converted = lines.map((line: string) => {
-        line = line.replace(/#\s*(.*)/g, '// $1');
-        line = line.replace(/\bprint\s*\((.*?)\)/g, 'console.log($1)');
-        line = line.replace(/f(["'])(.*?)\1/g, (_m: string, _q: string, content: string) => `\`${content.replace(/\{([a-zA-Z0-9_.]+)\}/g, '${$1}')}\``);
-        line = line.replace(/\bdef\s+([a-zA-Z0-9_]+)\s*\((.*?)\)(\s*->\s*[a-zA-Z0-9_<>\[\], ]+)?\s*:/g, 'function $1($2) {');
+      const rawLines = entryFile.split(/\r?\n/);
+      const outLines: string[] = [];
+      const indentStack: number[] = [0];
+      const declaredVars = new Set<string>([
+        'sum', 'min', 'max', 'len', 'abs', 'round', 'range', 'print',
+        'str', 'int', 'float', 'bool', 'list', 'dict', 'set', 'sorted', 'enumerate', 'zip',
+      ]);
+
+      const convertPythonCondition = (cond: string) => {
+        let c = cond;
+        c = c.replace(/\band\b/g, '&&');
+        c = c.replace(/\bor\b/g, '||');
+        c = c.replace(/\bnot\s+/g, '!');
+        c = c.replace(/\bTrue\b/g, 'true');
+        c = c.replace(/\bFalse\b/g, 'false');
+        c = c.replace(/\bNone\b/g, 'null');
+        return c;
+      };
+
+      for (let i = 0; i < rawLines.length; i++) {
+        const raw = rawLines[i];
+        const trimmed = raw.trim();
+
+        if (!trimmed) {
+          outLines.push('');
+          continue;
+        }
+        if (trimmed.startsWith('#')) {
+          outLines.push('// ' + trimmed.substring(1));
+          continue;
+        }
+
+        const indent = raw.search(/\S/);
+
+        while (indentStack.length > 1 && indent < indentStack[indentStack.length - 1]) {
+          indentStack.pop();
+          const currentIndentLevel = indentStack[indentStack.length - 1];
+          outLines.push(' '.repeat(currentIndentLevel) + '}');
+        }
+
+        let line = trimmed;
+
+        if (line.includes(' #')) {
+          line = line.replace(/(\s+)#(.*)$/, '$1// $2');
+        }
+
+        line = line.replace(/f(["'])((?:\\.|(?!\1).)*)\1/g, (_m: string, _q: string, content: string) => {
+          const interpolated = content.replace(/\{([^{}]+)\}/g, (_fm: string, expr: string) => {
+            return `\${__py_format(${expr.trim()})}`;
+          });
+          return `\`${interpolated}\``;
+        });
+
+        line = line.replace(/\bprint\s*\(([\s\S]*?)\)$/, (_m: string, args: string) => {
+          return `console.log(${args});`;
+        });
+
+        const defMatch = line.match(/^def\s+([a-zA-Z0-9_]+)\s*\((.*?)\)(?:\s*->\s*[^:]+)?\s*:$/);
+        if (defMatch) {
+          const funcName = defMatch[1];
+          const params = defMatch[2];
+          declaredVars.add(funcName);
+          indentStack.push(indent + 4);
+          outLines.push(' '.repeat(indent) + `function ${funcName}(${params}) {`);
+          continue;
+        }
+
+        const ifMatch = line.match(/^if\s+(.*?)\s*:$/);
+        if (ifMatch) {
+          indentStack.push(indent + 4);
+          outLines.push(' '.repeat(indent) + `if (${convertPythonCondition(ifMatch[1])}) {`);
+          continue;
+        }
+
+        const elifMatch = line.match(/^elif\s+(.*?)\s*:$/);
+        if (elifMatch) {
+          outLines.push(' '.repeat(indent) + `else if (${convertPythonCondition(elifMatch[1])}) {`);
+          continue;
+        }
+
+        const elseMatch = line.match(/^else\s*:$/);
+        if (elseMatch) {
+          outLines.push(' '.repeat(indent) + `else {`);
+          continue;
+        }
+
+        const whileMatch = line.match(/^while\s+(.*?)\s*:$/);
+        if (whileMatch) {
+          indentStack.push(indent + 4);
+          outLines.push(' '.repeat(indent) + `while (${convertPythonCondition(whileMatch[1])}) {`);
+          continue;
+        }
+
+        const forRangeMatch = line.match(/^for\s+([a-zA-Z0-9_]+)\s+in\s+range\((.*?)\)\s*:$/);
+        if (forRangeMatch) {
+          const varName = forRangeMatch[1];
+          const rangeArgs: string[] = forRangeMatch[2].split(',').map((s: string) => s.trim());
+          indentStack.push(indent + 4);
+          declaredVars.add(varName);
+          if (rangeArgs.length === 1) {
+            outLines.push(' '.repeat(indent) + `for (let ${varName} = 0; ${varName} < ${rangeArgs[0]}; ${varName}++) {`);
+          } else if (rangeArgs.length === 2) {
+            outLines.push(' '.repeat(indent) + `for (let ${varName} = ${rangeArgs[0]}; ${varName} < ${rangeArgs[1]}; ${varName}++) {`);
+          } else if (rangeArgs.length === 3) {
+            outLines.push(' '.repeat(indent) + `for (let ${varName} = ${rangeArgs[0]}; ${varName} < ${rangeArgs[1]}; ${varName} += ${rangeArgs[2]}) {`);
+          }
+          continue;
+        }
+
+        const forInMatch = line.match(/^for\s+([a-zA-Z0-9_,\s()]+)\s+in\s+(.*?)\s*:$/);
+        if (forInMatch) {
+          let target = forInMatch[1].trim();
+          const iter = forInMatch[2].trim();
+          indentStack.push(indent + 4);
+          if (target.includes(',')) {
+            target = `[${target}]`;
+          }
+          outLines.push(' '.repeat(indent) + `for (const ${target} of ${iter}) {`);
+          continue;
+        }
+
+        const returnMatch = line.match(/^return\s+(.*)$/);
+        if (returnMatch) {
+          let retVal = returnMatch[1].trim();
+          if (retVal.includes(',') && !retVal.startsWith('[') && !retVal.startsWith('(') && !retVal.startsWith('{')) {
+            retVal = `[${retVal}]`;
+          }
+          outLines.push(' '.repeat(indent) + `return ${retVal};`);
+          continue;
+        }
+
+        const tupleAssignMatch = line.match(/^([a-zA-Z0-9_,\s]+)\s*=\s*(.*)$/);
+        if (tupleAssignMatch && tupleAssignMatch[1].includes(',')) {
+          const vars: string[] = tupleAssignMatch[1].split(',').map((s: string) => s.trim()).filter(Boolean);
+          let rhs = tupleAssignMatch[2].trim();
+          if (rhs.includes(',') && !rhs.startsWith('[') && !rhs.startsWith('(') && !rhs.startsWith('{') && !rhs.endsWith(')')) {
+            rhs = `[${rhs}]`;
+          }
+          vars.forEach((v: string) => declaredVars.add(v));
+          outLines.push(' '.repeat(indent) + `let [${vars.join(', ')}] = ${rhs};`);
+          continue;
+        }
+
+        const singleAssignMatch = line.match(/^([a-zA-Z0-9_]+)\s*=\s*(.*)$/);
+        if (singleAssignMatch && !line.startsWith('return') && !line.startsWith('if') && !line.startsWith('console')) {
+          const varName = singleAssignMatch[1];
+          const rhs = singleAssignMatch[2];
+          if (!declaredVars.has(varName)) {
+            declaredVars.add(varName);
+            outLines.push(' '.repeat(indent) + `let ${varName} = ${rhs};`);
+          } else {
+            outLines.push(' '.repeat(indent) + `${varName} = ${rhs};`);
+          }
+          continue;
+        }
+
         line = line
-          .replace(/\belif\s+(.*?):/g, 'else if ($1) {')
-          .replace(/\bif\s+(.*?):/g, 'if ($1) {')
-          .replace(/\belse:/g, 'else {')
-          .replace(/\bwhile\s+(.*?):/g, 'while ($1) {')
-          .replace(/\bfor\s+([a-zA-Z0-9_]+)\s+in\s+range\((.*?)\):/g, 'for (let $1 = 0; $1 < $2; $1++) {')
-          .replace(/\bfor\s+([a-zA-Z0-9_]+)\s+in\s+(.*?):/g, 'for (const $1 of $2) {')
+          .replace(/\bNone\b/g, 'null')
+          .replace(/\bTrue\b/g, 'true')
+          .replace(/\bFalse\b/g, 'false')
           .replace(/\.append\((.*?)\)/g, '.push($1)')
-          .replace(/\breturn\s+(.*?)$/g, 'return $1;');
-        return line;
-      }).join('\n');
+          .replace(/\.pop\(\)/g, '.pop()');
+
+        if (!line.endsWith(';') && !line.endsWith('{') && !line.endsWith('}')) {
+          line += ';';
+        }
+
+        outLines.push(' '.repeat(indent) + line);
+      }
+
+      while (indentStack.length > 1) {
+        indentStack.pop();
+        const currentIndentLevel = indentStack[indentStack.length - 1];
+        outLines.push(' '.repeat(currentIndentLevel) + '}');
+      }
+
       executableJs = `
-const sum = (arr: any[]) => arr.reduce((a, b) => a + b, 0);
-${converted}
-if (typeof main === 'function') main();
+function __py_format(v) {
+  if (v === null) return 'None';
+  if (v === true) return 'True';
+  if (v === false) return 'False';
+  if (Array.isArray(v)) return '[' + v.map(__py_format).join(', ') + ']';
+  if (typeof v === 'object') return JSON.stringify(v);
+  return String(v);
+}
+
+const sum = (arr) => (arr ? arr.reduce((a, b) => a + b, 0) : 0);
+const len = (x) => (x ? (x.length ?? (x.size ?? (typeof x === 'object' ? Object.keys(x).length : 0))) : 0);
+const min = (...args) => (Array.isArray(args[0]) ? Math.min(...args[0]) : Math.min(...args));
+const max = (...args) => (Array.isArray(args[0]) ? Math.max(...args[0]) : Math.max(...args));
+const abs = (x) => Math.abs(x);
+const round = (x, n = 0) => Number(x.toFixed(n));
+const str = (x) => String(x);
+const int = (x) => parseInt(x, 10);
+const float = (x) => parseFloat(x);
+const bool = (x) => Boolean(x);
+const list = (x) => Array.from(x || []);
+const sorted = (arr) => [...arr].sort((a, b) => a - b);
+const range = (start, stop, step = 1) => {
+  if (stop === undefined) { stop = start; start = 0; }
+  const res = [];
+  for (let i = start; step > 0 ? i < stop : i > stop; i += step) res.push(i);
+  return res;
+};
+
+${outLines.join('\n')}
+
+if (typeof main === 'function') {
+  main();
+}
 `;
     } else if (normLang === 'go' || normLang === 'golang') {
       executableJs = entryFile

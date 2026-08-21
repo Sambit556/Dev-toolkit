@@ -170,30 +170,87 @@ export const TerminalPanel: React.FC = () => {
       <ErrorDiagnosticsBanner />
 
       {/* Content Area */}
-      <div ref={scrollContainerRef} className="flex-1 overflow-y-auto font-mono p-3 space-y-1">
+      <div ref={scrollContainerRef} className="flex-1 overflow-y-auto font-mono p-3 space-y-1.5 selection:bg-indigo-500/30">
         {activeBottomTab === 'terminal' && (
           <div className="space-y-1 text-[12px] leading-relaxed">
-            {terminalLogs.length === 0 && stderrLogs.length === 0 && (
-              <div className="text-neutral-500 text-xs py-1">
-                Terminal ready. Click Run or press Ctrl+Enter to execute.
+            {terminalLogs.length === 0 ? (
+              <div className="text-neutral-500 text-xs py-2 flex items-center gap-2 font-sans">
+                <TermIcon className="w-4 h-4 text-neutral-600" />
+                <span>Sandbox console ready. Click <strong>Run</strong> or press <strong>Ctrl+Enter</strong> to execute.</span>
               </div>
+            ) : (
+              terminalLogs.map((log, index) => {
+                if (log.startsWith('─── [Execution #')) {
+                  return (
+                    <div
+                      key={index}
+                      className="my-2 py-1 px-2.5 rounded-lg bg-indigo-950/40 border border-indigo-500/30 text-indigo-300 text-xs font-bold flex items-center justify-between font-sans shadow-sm"
+                    >
+                      <span className="flex items-center gap-1.5">
+                        <Activity className="w-3.5 h-3.5 text-indigo-400" />
+                        {log.replace(/───/g, '').trim()}
+                      </span>
+                    </div>
+                  );
+                }
+
+                if (log.startsWith('✔ [Execution #')) {
+                  return (
+                    <div
+                      key={index}
+                      className="my-1 py-0.5 px-2 rounded bg-emerald-950/30 border border-emerald-800/40 text-emerald-300 text-[11px] font-semibold flex items-center gap-1.5 font-sans"
+                    >
+                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                      <span>{log}</span>
+                    </div>
+                  );
+                }
+
+                if (log.startsWith('✖ [Execution #')) {
+                  return (
+                    <div
+                      key={index}
+                      className="my-1 py-0.5 px-2 rounded bg-rose-950/30 border border-rose-800/40 text-rose-300 text-[11px] font-semibold flex items-center gap-1.5 font-sans"
+                    >
+                      <XCircle className="w-3.5 h-3.5 text-rose-400 shrink-0" />
+                      <span>{log}</span>
+                    </div>
+                  );
+                }
+
+                if (log.startsWith('[STDERR]') || log.startsWith('[ERROR]')) {
+                  return (
+                    <div key={index} className="text-rose-400 font-mono whitespace-pre-wrap pl-2 border-l-2 border-rose-500/50 my-0.5">
+                      {log}
+                    </div>
+                  );
+                }
+
+                if (!log.trim()) {
+                  return <div key={index} className="h-1" />;
+                }
+
+                return (
+                  <div key={index} className="text-slate-100 whitespace-pre-wrap leading-relaxed">
+                    {log}
+                  </div>
+                );
+              })
             )}
-            {terminalLogs.map((log, index) => (
-              <div key={index} className="text-slate-300 whitespace-pre-wrap">
-                {log}
-              </div>
-            ))}
-            {stderrLogs.map((err, index) => (
-              <div key={index} className="text-rose-400 font-mono whitespace-pre-wrap">
-                {err}
-              </div>
-            ))}
           </div>
         )}
 
         {activeBottomTab === 'output' && (
-          <div className="text-[12px] text-emerald-400 whitespace-pre-wrap">
-            {terminalLogs.join('\n') || 'No output recorded yet. Click Run to execute.'}
+          <div className="space-y-1">
+            {terminalLogs.length === 0 ? (
+              <div className="text-neutral-500 text-xs py-2 font-sans">
+                No raw output recorded yet. Click Run to execute code in sandbox.
+              </div>
+            ) : (
+              <pre className="text-[12px] text-emerald-300/90 whitespace-pre-wrap font-mono leading-relaxed select-text">
+                {terminalLogs.join('\n')}
+              </pre>
+            )}
           </div>
         )}
 
