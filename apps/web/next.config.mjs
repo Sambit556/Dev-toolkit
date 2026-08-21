@@ -46,12 +46,13 @@ const nextConfig = {
             key: 'Content-Security-Policy',
             value: [
               "default-src 'self'",
-              "script-src 'self' 'unsafe-eval' 'unsafe-inline' blob:",
-              "style-src 'self' 'unsafe-inline'",
+              "script-src 'self' 'unsafe-eval' 'unsafe-inline' blob: https://cdn.jsdelivr.net",
+              "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net",
               "img-src 'self' data: blob: https://images.unsplash.com https://*.amazonaws.com",
-              "font-src 'self'",
+              "font-src 'self' data: https://cdn.jsdelivr.net",
               "connect-src 'self' " + (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001') +
               lanHosts.map((h) => ` http://${h}:3001 http://${h}:4001`).join('') +
+              " https://cdn.jsdelivr.net" +
               " https://ipapi.co" +
               " https://ipwho.is" +
               " https://api.ipify.org" +
@@ -62,8 +63,8 @@ const nextConfig = {
               // S3 presigned upload/download URLs (Cloud Storage Vault multipart uploads)
               " https://*.amazonaws.com",
               "frame-src 'self' https://www.openstreetmap.org",
-              "child-src 'self' https://www.openstreetmap.org",
-              "worker-src 'self' blob:",
+              "child-src 'self' blob: data: https://cdn.jsdelivr.net https://www.openstreetmap.org",
+              "worker-src 'self' blob: data: https://cdn.jsdelivr.net",
               // <video>/<audio> playing S3 presigned preview URLs — CSP does not fall
               // back from img-src to media-src, so without this it's silently blocked.
               "media-src 'self' blob: https://*.amazonaws.com",

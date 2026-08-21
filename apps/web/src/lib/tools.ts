@@ -33,11 +33,11 @@ export const toolCategories = [
     name: 'Formatters & Viewers',
     items: [
       {
-        href: '/cloud-ide',
-        label: 'Cloud IDE & Sandbox',
+        href: '/code-studio',
+        label: 'Code Studio & Sandbox',
         icon: Code2,
-        desc: 'Multi-language Cloud IDE with Upstash Box, AI assist, converter & debugger',
-        keywords: ['cloud ide', 'online ide', 'code sandbox', 'upstash box', 'isolated sandbox', 'typescript compiler', 'python ide', 'go compiler', 'rust ide', 'monaco editor', 'replit alternative', 'vs code online', 'debugger', 'ai code generator', 'code converter', 'config editor', 'kubernetes yaml'],
+        desc: 'Multi-language Code Studio with isolated sandbox, AI assist, converter & debugger',
+        keywords: ['code studio', 'cloud ide', 'online ide', 'code sandbox', 'upstash box', 'isolated sandbox', 'typescript compiler', 'python ide', 'go compiler', 'rust ide', 'monaco editor', 'replit alternative', 'vs code online', 'debugger', 'ai code generator', 'code converter', 'config editor', 'kubernetes yaml'],
       },
       {
         href: '/json',

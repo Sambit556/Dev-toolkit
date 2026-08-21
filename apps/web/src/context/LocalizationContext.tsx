@@ -429,14 +429,16 @@ export function LocalizationProvider({ children }: { children: React.ReactNode }
     }
   }, []);
 
-  const detectLanguage = useCallback(async () => {
+  const detectLanguage = useCallback(async (isMountedCheck: () => boolean = () => true) => {
     try {
       const savedLanguage = localStorage.getItem(STORAGE_KEY);
       const preferenceLocked = localStorage.getItem(PREFERENCE_LOCK_KEY);
 
       if (savedLanguage && preferenceLocked === 'true') {
-        applyLocaleSettings(savedLanguage);
-        setLoading(false);
+        if (isMountedCheck()) {
+          applyLocaleSettings(savedLanguage);
+          setLoading(false);
+        }
         return;
       }
 
@@ -460,18 +462,17 @@ export function LocalizationProvider({ children }: { children: React.ReactNode }
 
               if (countryCode && REGIONAL_LOCALE_MAP[countryCode]) {
                 const config = REGIONAL_LOCALE_MAP[countryCode];
-                applyLocaleSettings(config.lang);
-                localStorage.setItem(STORAGE_KEY, config.lang);
-                setLoading(false);
+                if (isMountedCheck()) {
+                  applyLocaleSettings(config.lang);
+                  localStorage.setItem(STORAGE_KEY, config.lang);
+                  setLoading(false);
+                }
                 return;
               }
             }
           }
         } catch {
-          // Permission granted but the fix itself failed (no GPS lock, timeout,
-          // OS-level location services off, etc.) — an expected, already-handled
-          // condition, so fall through to the browser-language detection below
-          // instead of logging noise for something that isn't actually a bug.
+          // Fallback to browser languages
         }
       }
 
@@ -480,8 +481,10 @@ export function LocalizationProvider({ children }: { children: React.ReactNode }
       for (const bLang of browserLangs) {
         const primaryCode = bLang.split('-')[0].toLowerCase();
         if (TRANSLATION_BUNDLES[primaryCode]) {
-          applyLocaleSettings(primaryCode);
-          setLoading(false);
+          if (isMountedCheck()) {
+            applyLocaleSettings(primaryCode);
+            setLoading(false);
+          }
           return;
         }
       }
@@ -489,15 +492,18 @@ export function LocalizationProvider({ children }: { children: React.ReactNode }
       console.warn('Persistence check fail:', err);
     }
 
-    applyLocaleSettings('en');
-    setLoading(false);
+    if (isMountedCheck()) {
+      applyLocaleSettings('en');
+      setLoading(false);
+    }
   }, [applyLocaleSettings]);
 
   useEffect(() => {
-    // detectLanguage does genuine async work (geolocation permission + network reverse-geocode
-    // fetch) to pick an initial locale; it can't run synchronously in a lazy state initializer.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    detectLanguage();
+    let isMounted = true;
+    detectLanguage(() => isMounted);
+    return () => {
+      isMounted = false;
+    };
   }, [detectLanguage]);
 
   const setLanguageManual = (lang: string) => {

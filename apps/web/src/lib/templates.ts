@@ -32,51 +32,20 @@ export const LANGUAGE_TEMPLATES: LanguageTemplate[] = [
     files: [
       {
         name: 'index.ts',
-        content: `/**
- * DevKits Cloud IDE - TypeScript Project
- * Isolated Sandbox Powered by Upstash Box
- */
+        content: `// DevKits Online IDE - TypeScript Environment
 
-interface UserMetric {
-  id: string;
-  username: string;
-  requestsHandled: number;
-  avgLatencyMs: number;
-  status: 'active' | 'idle' | 'rate_limited';
+function greet(name: string, count: number): void {
+  console.log(\`Hello, \${name}! Welcome to DevKits Online IDE.\`);
+  console.log(\`Execution count: \${count}\`);
 }
 
-class TelemetryEngine {
-  private metrics: Map<string, UserMetric> = new Map();
+const numbers: number[] = [10, 25, 30, 45, 50];
+const total: number = numbers.reduce((sum, num) => sum + num, 0);
 
-  public register(user: UserMetric): void {
-    this.metrics.set(user.id, user);
-    console.log(\`✅ Registered user telemetry: \${user.username} (ID: \${user.id})\`);
-  }
-
-  public getSummary(): { totalUsers: number; avgLatency: number; healthy: boolean } {
-    let totalLatency = 0;
-    for (const metric of this.metrics.values()) {
-      totalLatency += metric.avgLatencyMs;
-    }
-    const count = this.metrics.size;
-    return {
-      totalUsers: count,
-      avgLatency: count > 0 ? Number((totalLatency / count).toFixed(2)) : 0,
-      healthy: count > 0,
-    };
-  }
-}
-
-// Sandbox execution test
-const engine = new TelemetryEngine();
-engine.register({ id: 'u_101', username: 'alex_dev', requestsHandled: 4200, avgLatencyMs: 14.8, status: 'active' });
-engine.register({ id: 'u_102', username: 'sarah_ops', requestsHandled: 9120, avgLatencyMs: 11.2, status: 'active' });
-engine.register({ id: 'u_103', username: 'bot_crawler', requestsHandled: 120, avgLatencyMs: 45.0, status: 'idle' });
-
-const summary = engine.getSummary();
-console.log('\\n📊 Engine Analytics Summary:');
-console.table(summary);
-console.log(\`\\n🚀 System Status: All \${summary.totalUsers} nodes running inside isolated sandbox!\`);
+greet("Developer", 1);
+console.log("Array values:", numbers);
+console.log("Total Sum:", total);
+console.log("Average:", total / numbers.length);
 `,
       },
       {
@@ -84,19 +53,12 @@ console.log(\`\\n🚀 System Status: All \${summary.totalUsers} nodes running in
         content: `{
   "name": "devkits-typescript-workspace",
   "version": "1.0.0",
-  "type": "module",
-  "scripts": {
-    "start": "ts-node index.ts",
-    "test": "vitest"
-  },
-  "dependencies": {
-    "zod": "^3.22.4"
-  }
+  "main": "index.ts"
 }`,
       },
       {
         name: 'README.md',
-        content: `# TypeScript Cloud IDE Workspace
+        content: `# TypeScript Online IDE Workspace
 Run in isolated VM sandbox with full TypeScript compilation and real-time execution telemetry.`,
       },
     ],
@@ -114,32 +76,21 @@ Run in isolated VM sandbox with full TypeScript compilation and real-time execut
     files: [
       {
         name: 'index.js',
-        content: `// DevKits Cloud IDE - JavaScript / Node.js Environment
-// Isolated execution with real-time stdout/stderr
+        content: `// DevKits Online IDE - JavaScript Environment
 
-const crypto = require('crypto');
-
-function generateSecureSession(username) {
-  const sessionId = crypto.randomBytes(16).toString('hex');
-  const token = crypto.createHash('sha256').update(sessionId + username).digest('hex');
-  
-  return {
-    sessionId,
-    username,
-    token: token.substring(0, 32) + '...',
-    issuedAt: new Date().toISOString(),
-    expiresIn: 3600
-  };
+function calculateStats(numbers) {
+  const sum = numbers.reduce((a, b) => a + b, 0);
+  const avg = sum / numbers.length;
+  return { sum, avg };
 }
 
-console.log('⚡ Initializing DevKits Execution Sandbox...');
-const session = generateSecureSession('developer_one');
-console.log('\\n🔐 Generated Isolated Session:');
-console.log(JSON.stringify(session, null, 2));
+const data = [12, 24, 36, 48, 60];
+const stats = calculateStats(data);
 
-const randomNumbers = Array.from({ length: 5 }, () => Math.floor(Math.random() * 100));
-console.log('\\n🎲 Computed random vector:', randomNumbers);
-console.log('📈 Sum:', randomNumbers.reduce((a, b) => a + b, 0));
+console.log("Hello from JavaScript Online IDE!");
+console.log("Data Points:", data);
+console.log("Total Sum:", stats.sum);
+console.log("Average Value:", stats.avg);
 `,
       },
       {
@@ -165,52 +116,22 @@ console.log('📈 Sum:', randomNumbers.reduce((a, b) => a + b, 0));
     files: [
       {
         name: 'main.py',
-        content: `"""
-DevKits Cloud IDE - Python 3 Sandbox
-Isolated execution with real-time telemetry
-"""
-import math
-import time
+        content: `# DevKits Online IDE - Python 3 Sandbox
 
-class DataProcessor:
-    def __init__(self, name: str):
-        self.name = name
-        self.records = []
+def calculate_stats(numbers):
+    total = sum(numbers)
+    average = total / len(numbers)
+    return total, average
 
-    def ingest(self, values: list[float]):
-        self.records.extend(values)
-        print(f"📥 Ingested {len(values)} records into {self.name}")
+print("Hello from Python 3 Online IDE!")
 
-    def compute_stats(self):
-        if not self.records:
-            return None
-        n = len(self.records)
-        mean = sum(self.records) / n
-        variance = sum((x - mean) ** 2 for x in self.records) / n
-        std_dev = math.sqrt(variance)
-        return {
-            "count": n,
-            "mean": round(mean, 2),
-            "std_dev": round(std_dev, 2),
-            "min": min(self.records),
-            "max": max(self.records)
-        }
+data = [10, 20, 30, 40, 50]
+total, average = calculate_stats(data)
 
-if __name__ == "__main__":
-    print("🐍 Python 3 Cloud Environment Ready.")
-    processor = DataProcessor("Server-Metrics")
-    processor.ingest([14.2, 18.9, 12.5, 34.1, 22.0, 19.8, 15.3])
-    
-    stats = processor.compute_stats()
-    print("\\n📊 Statistical Analysis Results:")
-    for k, v in stats.items():
-        print(f"  • {k.capitalize()}: {v}")
-    print("\\n✨ Execution completed successfully.")
+print(f"Data Points: {data}")
+print(f"Total Sum: {total}")
+print(f"Average: {average}")
 `,
-      },
-      {
-        name: 'requirements.txt',
-        content: `numpy==1.26.4\npandas==2.2.1`,
       },
     ],
   },
@@ -229,35 +150,19 @@ if __name__ == "__main__":
         name: 'main.go',
         content: `package main
 
-import (
-	"fmt"
-	"time"
-)
-
-type WorkerResult struct {
-	ID        int
-	Processed int
-	Duration  time.Duration
-}
+import "fmt"
 
 func main() {
-	fmt.Println("🐹 DevKits Go Sandbox Initialized")
-	fmt.Println("🚀 Spawning concurrent pipeline...")
+	fmt.Println("Hello from Go Sandbox!")
 
-	results := []WorkerResult{
-		{ID: 1, Processed: 1540, Duration: 12 * time.Millisecond},
-		{ID: 2, Processed: 2430, Duration: 18 * time.Millisecond},
-		{ID: 3, Processed: 1890, Duration: 14 * time.Millisecond},
-	}
-
+	numbers := []int{10, 20, 30, 40, 50}
 	total := 0
-	for _, r := range results {
-		fmt.Printf("  • Worker %d processed %d items in %v\\n", r.ID, r.Processed, r.Duration)
-		total += r.Processed
+	for _, n := range numbers {
+		total += n
 	}
 
-	fmt.Printf("\\n📊 Total throughput: %d operations completed.\\n", total)
-	fmt.Println("✅ Go Sandbox execution successful.")
+	fmt.Printf("Numbers: %v\\n", numbers)
+	fmt.Printf("Total Sum: %d\\n", total)
 }
 `,
       },
@@ -280,34 +185,16 @@ func main() {
     files: [
       {
         name: 'src/main.rs',
-        content: `// DevKits Cloud IDE - Rust Environment
-// Compile & execute memory-safe code
-
-#[derive(Debug)]
-struct TaskMetric {
-    id: u32,
-    name: &'static str,
-    latency_us: u64,
-    passed: bool,
-}
+        content: `// DevKits Online IDE - Rust Environment
 
 fn main() {
-    println!("🦀 Rust Isolated Sandbox Online!");
-    
-    let metrics = vec![
-        TaskMetric { id: 1, name: "FastPath-Parser", latency_us: 120, passed: true },
-        TaskMetric { id: 2, name: "Crypto-Signer", latency_us: 840, passed: true },
-        TaskMetric { id: 3, name: "Buffer-Pool", latency_us: 45, passed: true },
-    ];
+    println!("Hello from Rust Sandbox!");
 
-    println!("\\nTelemetry Output:");
-    for m in &metrics {
-        println!("  [{}] {} => {}μs (Status: {:?})", m.id, m.name, m.latency_us, m.passed);
-    }
+    let numbers = vec![10, 20, 30, 40, 50];
+    let total: i32 = numbers.iter().sum();
 
-    let avg_latency: f64 = metrics.iter().map(|m| m.latency_us).sum::<u64>() as f64 / metrics.len() as f64;
-    println!("\\n⚡ Average Execution Latency: {:.2}μs", avg_latency);
-    println!("✨ Process finished with exit code 0");
+    println!("Numbers: {:?}", numbers);
+    println!("Total Sum: {}", total);
 }
 `,
       },
@@ -317,9 +204,6 @@ fn main() {
 name = "devkits-rust-workspace"
 version = "0.1.0"
 edition = "2021"
-
-[dependencies]
-serde = { version = "1.0", features = ["derive"] }
 `,
       },
     ],
@@ -340,32 +224,14 @@ serde = { version = "1.0", features = ["derive"] }
         content: `#include <iostream>
 #include <vector>
 #include <numeric>
-#include <string>
-
-struct NodeMetric {
-    std::string name;
-    double loadAverage;
-    int activeSockets;
-};
 
 int main() {
-    std::cout << "⚙️ C++20 Cloud IDE Execution Sandbox" << std::endl;
-    std::cout << "------------------------------------" << std::endl;
+    std::cout << "Hello from C++ Sandbox!" << std::endl;
 
-    std::vector<NodeMetric> cluster = {
-        {"node-us-east", 0.42, 1280},
-        {"node-eu-central", 0.68, 2450},
-        {"node-ap-south", 0.31, 940}
-    };
+    std::vector<int> numbers = {10, 20, 30, 40, 50};
+    int total = std::accumulate(numbers.begin(), numbers.end(), 0);
 
-    int totalSockets = 0;
-    for (const auto& node : cluster) {
-        std::cout << "  • " << node.name << " | Load: " << node.loadAverage << " | Sockets: " << node.activeSockets << std::endl;
-        totalSockets += node.activeSockets;
-    }
-
-    std::cout << "\\n📊 Total Active Cluster Sockets: " << totalSockets << std::endl;
-    std::cout << "✅ C++ execution completed successfully." << std::endl;
+    std::cout << "Total Sum: " << total << std::endl;
     return 0;
 }
 `,
@@ -385,28 +251,17 @@ int main() {
     files: [
       {
         name: 'Main.java',
-        content: `import java.time.Instant;
-import java.util.List;
+        content: `import java.util.List;
 
 public class Main {
-    record ServiceStatus(String name, int port, boolean healthy) {}
-
     public static void main(String[] args) {
-        System.out.println("☕ DevKits Java Cloud Sandbox (OpenJDK 21)");
-        System.out.println("Timestamp: " + Instant.now());
-        System.out.println("------------------------------------------");
+        System.out.println("Hello from Java Sandbox!");
 
-        var services = List.of(
-            new ServiceStatus("AuthService", 8081, true),
-            new ServiceStatus("StorageVault", 8082, true),
-            new ServiceStatus("SandboxRunner", 8083, true)
-        );
+        List<Integer> numbers = List.of(10, 20, 30, 40, 50);
+        int total = numbers.stream().mapToInt(Integer::intValue).sum();
 
-        for (var s : services) {
-            System.out.println("  • " + s.name() + " [Port " + s.port() + "] Status: " + (s.healthy() ? "HEALTHY" : "DOWN"));
-        }
-
-        System.out.println("\\n✅ All microservices verified in sandbox.");
+        System.out.println("Numbers: " + numbers);
+        System.out.println("Total Sum: " + total);
     }
 }
 `,
@@ -426,44 +281,19 @@ public class Main {
     files: [
       {
         name: 'schema.sql',
-        content: `-- DevKits Cloud IDE - SQL Workspace
--- Table definitions, indexes, and queries
+        content: `-- DevKits Online IDE - SQL Workspace
 
-CREATE TABLE IF NOT EXISTS developers (
-  id SERIAL PRIMARY KEY,
-  name VARCHAR(100) NOT NULL,
-  email VARCHAR(150) UNIQUE NOT NULL,
-  role VARCHAR(50) DEFAULT 'engineer',
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+CREATE TABLE IF NOT EXISTS users (
+  id INT PRIMARY KEY,
+  name VARCHAR(50) NOT NULL,
+  role VARCHAR(50) DEFAULT 'Developer'
 );
 
-CREATE TABLE IF NOT EXISTS projects (
-  id SERIAL PRIMARY KEY,
-  developer_id INT REFERENCES developers(id),
-  title VARCHAR(200) NOT NULL,
-  language VARCHAR(50) NOT NULL,
-  stars INT DEFAULT 0
-);
+INSERT INTO users (id, name, role) VALUES 
+  (1, 'Alex Dev', 'Lead Engineer'),
+  (2, 'Sarah Ops', 'Architect');
 
-INSERT INTO developers (name, email, role) VALUES
-  ('Dev Sarah', 'sarah@devkits.space', 'lead_architect'),
-  ('Dev Alex', 'alex@devkits.space', 'systems_engineer');
-
-INSERT INTO projects (developer_id, title, language, stars) VALUES
-  (1, 'Cloud Sandbox Engine', 'Rust', 450),
-  (2, 'High-Throughput API Gateway', 'Go', 320);
-
--- Query active projects with developer details
-SELECT 
-  p.id,
-  p.title,
-  p.language,
-  p.stars,
-  d.name AS author_name,
-  d.role
-FROM projects p
-JOIN developers d ON p.developer_id = d.id
-ORDER BY p.stars DESC;
+SELECT * FROM users;
 `,
       },
     ],
@@ -482,26 +312,19 @@ ORDER BY p.stars DESC;
       {
         name: 'deploy.sh',
         content: `#!/usr/bin/env bash
-# DevKits Cloud IDE - Shell Automation
+# DevKits Online IDE - Shell Automation
 
-set -euo pipefail
+echo "Hello from Bash Sandbox!"
 
-echo "🐚 Running Cloud Sandbox Deployment Script..."
-echo "=============================================="
+NUMBERS=(10 20 30 40 50)
+TOTAL=0
 
-TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-echo "⏱  Execution Time: $TIMESTAMP"
-echo "🖥  Current Working Dir: $(pwd)"
+for n in "\${NUMBERS[@]}"; do
+  TOTAL=$((TOTAL + n))
+done
 
-echo -e "\\n📦 Checking workspace artifacts:"
-ls -la
-
-echo -e "\\n🚀 Healthcheck verification:"
-echo "  • Sandbox RAM: OK"
-echo "  • CPU Limits: 2 vCPU allocated"
-echo "  • Security Isolation: ENABLED"
-
-echo -e "\\n✅ Deployment sequence completed successfully."
+echo "Numbers: \${NUMBERS[*]}"
+echo "Total Sum: $TOTAL"
 `,
       },
     ],
@@ -520,32 +343,15 @@ echo -e "\\n✅ Deployment sequence completed successfully."
       {
         name: 'index.php',
         content: `<?php
-// DevKits Cloud IDE - PHP 8.3 Sandbox
+// DevKits Online IDE - PHP Sandbox
 
-class CloudResponse {
-    public function __construct(
-        public string $status,
-        public array $data,
-        public string $timestamp
-    ) {}
+echo "Hello from PHP Sandbox!\\n";
 
-    public function toJson(): string {
-        return json_encode([
-            'status' => $this->status,
-            'data' => $this->data,
-            'timestamp' => $this->timestamp,
-        ], JSON_PRETTY_PRINT);
-    }
-}
+$numbers = [10, 20, 30, 40, 50];
+$total = array_sum($numbers);
 
-echo "🐘 PHP 8.3 Isolated Runner\\n\\n";
-$resp = new CloudResponse(
-    'success',
-    ['memory_limit' => '256M', 'version' => PHP_VERSION, 'opcache' => true],
-    gmdate('Y-m-d H:i:s')
-);
-
-echo $resp->toJson() . "\\n";
+echo "Numbers: " . json_encode($numbers) . "\\n";
+echo "Total Sum: " . $total . "\\n";
 `,
       },
     ],
@@ -563,22 +369,15 @@ echo $resp->toJson() . "\\n";
     files: [
       {
         name: 'main.rb',
-        content: `# DevKits Cloud IDE - Ruby Sandbox
-puts "💎 Ruby 3.3 Execution Sandbox"
+        content: `# DevKits Online IDE - Ruby Sandbox
 
-payload = {
-  service: "DevKits Cloud IDE",
-  status: "healthy",
-  latency_ms: 12.4,
-  tags: ["fast", "isolated", "upstash_box"]
-}
+puts "Hello from Ruby Sandbox!"
 
-puts "Parsed Payload Structure:"
-payload.each do |k, v|
-  puts "  • #{k}: #{v}"
-end
+numbers = [10, 20, 30, 40, 50]
+total = numbers.sum
 
-puts "\\n✅ Ruby code executed successfully."
+puts "Numbers: #{numbers}"
+puts "Total Sum: #{total}"
 `,
       },
     ],

@@ -57,11 +57,11 @@ export const ShareModal: React.FC = () => {
       } else {
         // Fallback local share URL
         const shareId = Math.random().toString(36).substring(2, 9);
-        setGeneratedLink(`${window.location.origin}/cloud-ide?share=${shareId}`);
+        setGeneratedLink(`${window.location.origin}/code-studio?share=${shareId}`);
       }
     } catch {
       const shareId = Math.random().toString(36).substring(2, 9);
-      setGeneratedLink(`${window.location.origin}/cloud-ide?share=${shareId}`);
+      setGeneratedLink(`${window.location.origin}/code-studio?share=${shareId}`);
     } finally {
       setLoading(false);
     }

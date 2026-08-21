@@ -1,3 +1,4 @@
+import { GoogleGenAI } from '@google/genai';
 import { logger } from '../utils/logger';
 import { AiCodeAssistParams, AiCodeAssistResult, ConvertCodeParams, ConvertCodeResult } from './sandbox.service';
 
@@ -8,6 +9,74 @@ export class AiCodeService {
   public static async processAssist(params: AiCodeAssistParams): Promise<AiCodeAssistResult> {
     const { action, language, code, prompt, errorContext } = params;
     logger.info(`[AiCodeService] Processing action: ${action} for language: ${language}`);
+
+    const geminiKey = process.env.GEMINI_API_KEY;
+    if (geminiKey) {
+      try {
+        const ai = new GoogleGenAI({ apiKey: geminiKey });
+        let promptText = '';
+
+        if (action === 'fix') {
+          promptText = `You are a Principal Software Engineer & Compiler Specialist. 
+Analyze the following ${language.toUpperCase()} error:
+Error Diagnostics: ${errorContext || 'Compilation/Runtime error detected'}
+
+Code:
+\`\`\`${language}
+${code}
+\`\`\`
+
+You MUST structure your response with these exact 4 sections:
+1. 📍 **Where the error is**: Line number, column, and problematic code snippet.
+2. 🔍 **Why it came**: Technical root cause explanation.
+3. 💡 **What's the solution**: Step-by-step resolution.
+4. 🛠️ **Apply the solution**: Complete, production-ready fixed code inside a markdown code block (\`\`\`${language} ... \`\`\`).`;
+        } else if (action === 'clean') {
+          promptText = `Refactor and clean this ${language.toUpperCase()} code. Remove dead code, modernize syntax, and apply clean code standards:\n\`\`\`${language}\n${code}\n\`\`\``;
+        } else if (action === 'explain') {
+          promptText = `Explain this ${language.toUpperCase()} code step-by-step with architecture, algorithms, and time/space complexity:\n\`\`\`${language}\n${code}\n\`\`\``;
+        } else if (action === 'eli5' || action === 'explain_simple') {
+          promptText = `Explain this ${language.toUpperCase()} code as if I'm a complete beginner (Explain Like I'm 5) using simple everyday analogies and no heavy jargon:\n\`\`\`${language}\n${code}\n\`\`\``;
+        } else if (action === 'optimize') {
+          promptText = `Optimize this ${language.toUpperCase()} code for maximum performance, minimal allocations, and speed:\n\`\`\`${language}\n${code}\n\`\`\``;
+        } else if (action === 'test') {
+          promptText = `Write a comprehensive unit test suite with edge cases for this ${language.toUpperCase()} code:\n\`\`\`${language}\n${code}\n\`\`\``;
+        } else if (action === 'docs') {
+          promptText = `Generate production JSDoc / docstrings and documentation for this ${language.toUpperCase()} code:\n\`\`\`${language}\n${code}\n\`\`\``;
+        } else {
+          promptText = `Task: ${prompt}\nLanguage: ${language}\nCode (if any):\n\`\`\`${language}\n${code}\n\`\`\``;
+        }
+
+        let outputText = '';
+        try {
+          const response = await ai.interactions.create({
+            model: 'gemini-3.7-flash',
+            input: promptText,
+          });
+          outputText = response.output_text || (response as any).text || '';
+        } catch {
+          const response2 = await ai.models.generateContent({
+            model: 'gemini-2.5-flash',
+            contents: promptText,
+          });
+          outputText = response2.text || '';
+        }
+
+        if (outputText) {
+          const match = outputText.match(/```[a-zA-Z0-9_-]*\n([\s\S]*?)```/);
+          const diffCode = match ? match[1].trim() : code;
+
+          return {
+            action,
+            content: outputText,
+            diffCode,
+            confidence: 0.99,
+          };
+        }
+      } catch (err: any) {
+        logger.warn(`[AiCodeService] Google GenAI call notice: ${err.message}, using built-in heuristics`);
+      }
+    }
 
     switch (action) {
       case 'explain':
@@ -201,7 +270,7 @@ Comprehensive unit tests covering nominal scenarios, boundary conditions, and ex
    * Generate documentation & docstrings
    */
   private static generateDocs(code: string, language: string): AiCodeAssistResult {
-    const docHeader = `/**\n * @file Core Service Module\n * @description Production-grade implementation with isolated execution and telemetry.\n * @author DevKits Cloud IDE\n * @version 1.0.0\n */\n\n`;
+    const docHeader = `/**\n * @file Core Service Module\n * @description Production-grade implementation with isolated execution and telemetry.\n * @author DevKits online IDE\n * @version 1.0.0\n */\n\n`;
     return {
       action: 'docs',
       content: `### 📝 Documentation Generated

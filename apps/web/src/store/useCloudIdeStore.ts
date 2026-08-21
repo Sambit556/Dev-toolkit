@@ -258,6 +258,8 @@ export const useCloudIdeStore = create<CloudIdeState>()(
       updateFileContent: (fileName, content) => {
         set((state) => ({
           files: state.files.map((f) => (f.name === fileName ? { ...f, content } : f)),
+          // Automatically clear stale diagnostics/error banner once user edits the code
+          diagnostics: state.diagnostics.hasError ? { hasError: false } : state.diagnostics,
         }));
       },
 
@@ -331,7 +333,7 @@ export const useCloudIdeStore = create<CloudIdeState>()(
       isSandboxReady: false,
       terminalLogs: [],
       stderrLogs: [],
-      clearTerminal: () => set({ terminalLogs: [], stderrLogs: [] }),
+      clearTerminal: () => set({ terminalLogs: [], stderrLogs: [], diagnostics: { hasError: false } }),
       addTerminalLog: (log) => set((s) => ({ terminalLogs: [...s.terminalLogs, log].slice(-500) })),
       addStderrLog: (err) => set((s) => ({ stderrLogs: [...s.stderrLogs, err].slice(-200) })),
       metrics: {
@@ -366,9 +368,11 @@ export const useCloudIdeStore = create<CloudIdeState>()(
 
       runCode: async () => {
         const { currentLanguage, files, activeFile, stdinInput } = get();
+        // Clear stale errors from previous runs on new execution
         set({
           metrics: { ...get().metrics, status: 'running' },
           diagnostics: { hasError: false },
+          stderrLogs: [],
           isBottomPanelOpen: true,
           activeBottomTab: 'terminal',
         });
@@ -388,11 +392,24 @@ export const useCloudIdeStore = create<CloudIdeState>()(
 
           const data = await response.json();
 
-          if (data.stdout) {
-            get().addTerminalLog(data.stdout);
-          }
-          if (data.stderr) {
-            get().addStderrLog(data.stderr);
+          if (data.exitCode === 0) {
+            if (data.stdout) {
+              get().addTerminalLog(data.stdout);
+            }
+            set({
+              stderrLogs: [],
+              diagnostics: { hasError: false },
+            });
+          } else {
+            if (data.stdout) {
+              get().addTerminalLog(data.stdout);
+            }
+            if (data.stderr) {
+              get().addStderrLog(data.stderr);
+            }
+            if (data.diagnostics && data.diagnostics.hasError) {
+              set({ diagnostics: data.diagnostics });
+            }
           }
 
           set({
@@ -406,10 +423,6 @@ export const useCloudIdeStore = create<CloudIdeState>()(
               sandboxId: data.sandboxId,
             },
           });
-
-          if (data.diagnostics && data.diagnostics.hasError) {
-            set({ diagnostics: data.diagnostics });
-          }
         } catch (error: any) {
           get().addStderrLog(`Execution failed: ${error.message}`);
           set({
@@ -467,11 +480,13 @@ export const useCloudIdeStore = create<CloudIdeState>()(
           });
 
           const data = await response.json();
+          const responseText = data.content || '';
+          const diffCode = data.diffCode || null;
 
           set({
             aiLoading: false,
-            aiResponse: data.content,
-            aiDiffCode: data.diffCode || null,
+            aiResponse: responseText,
+            aiDiffCode: diffCode,
             aiDiffOriginal: file.content,
             aiDiffFile: file.name,
           });

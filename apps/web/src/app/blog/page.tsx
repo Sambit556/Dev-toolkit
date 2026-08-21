@@ -1112,7 +1112,7 @@ export default function BlogPage() {
                         <div className="space-y-2">
                           <h3 className="text-lg font-black uppercase tracking-wider text-rose-600 dark:text-rose-400">Compiler Fault</h3>
                           <p className="text-xs text-muted-foreground max-w-xs font-semibold leading-relaxed">
-                            Code execution crashed. Snake collided with a system wall or self-loop pointer segment.
+                            Damn! Snake collided with a wall.
                           </p>
                         </div>
                         <div className="bg-muted/40 border border-border/80 rounded-2xl p-4 w-full max-w-[280px] grid grid-cols-2 gap-2 text-center text-xs font-bold font-mono">

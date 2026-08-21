@@ -29,16 +29,17 @@ const app = express();
 // Trust proxy (for accurate IP behind load balancer)
 app.set('trust proxy', 1);
 
-// Security headers
+// Security headers (permissive for Swagger UI docs and developer tools)
 app.use(
   helmet({
     contentSecurityPolicy: {
       directives: {
         defaultSrc: ["'self'"],
-        scriptSrc: ["'self'"],
-        styleSrc: ["'self'", "'unsafe-inline'"],
-        imgSrc: ["'self'", 'data:'],
-        connectSrc: ["'self'"],
+        scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'", 'https://cdnjs.cloudflare.com', 'https://cdn.jsdelivr.net'],
+        styleSrc: ["'self'", "'unsafe-inline'", 'https://cdnjs.cloudflare.com', 'https://cdn.jsdelivr.net', 'https://fonts.googleapis.com'],
+        fontSrc: ["'self'", 'data:', 'https://fonts.gstatic.com', 'https://cdnjs.cloudflare.com'],
+        imgSrc: ["'self'", 'data:', 'https:'],
+        connectSrc: ["'self'", '*'],
       },
     },
     crossOriginResourcePolicy: { policy: 'cross-origin' },
@@ -53,6 +54,7 @@ const allowedOrigins = getEnvWithDefault('CORS_ORIGIN', 'http://localhost:4001')
 app.use(
   cors({
     origin: (origin, callback) => {
+      // Allow any origin for public docs/spec or when '*' is allowed or matched
       if (!origin || allowedOrigins.includes(origin) || allowedOrigins.includes('*')) {
         callback(null, true);
       } else {
@@ -86,11 +88,21 @@ app.use(requestLogger);
 // Global rate limiting
 app.use(defaultRateLimit);
 
-// API Documentation
-app.use('/docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
-  customCss: '.swagger-ui .topbar { display: none }',
-  customSiteTitle: 'DevChrono JSONLab - API Docs',
-}));
+// Public API Documentation (Freely accessible in development and production)
+app.use(
+  '/docs',
+  swaggerUi.serve,
+  swaggerUi.setup(swaggerSpec, {
+    customCss: '.swagger-ui .topbar { display: none } .swagger-ui .info { margin: 20px 0 }',
+    customSiteTitle: 'DevKits Platform - Public API Docs',
+    swaggerOptions: {
+      persistAuthorization: true,
+      docExpansion: 'list',
+      filter: true,
+      showRequestDuration: true,
+    },
+  }),
+);
 
 // Routes
 app.use('/health', healthRouter);
@@ -112,12 +124,21 @@ app.use('/api/webhook', webhookRouter);
 app.use('/api/tempmail', tempmailRouter);
 app.use('/api/sandbox', sandboxRouter);
 
-// OpenAPI JSON spec
-app.get('/openapi.json', (_req, res) => res.json(swaggerSpec));
+// Public OpenAPI JSON spec
+app.get('/openapi.json', (_req, res) => {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.json(swaggerSpec);
+});
 
 // Root — Render's uptime pings and other health probes hit this by default
 app.get('/', (_req, res) => {
-  res.json({ name: 'DevChrono JSONLab API', docs: '/docs', health: '/health' });
+  res.json({
+    name: 'DevKits Platform API',
+    version: '2.0.0',
+    docs: '/docs',
+    openapi: '/openapi.json',
+    health: '/health',
+  });
 });
 
 // 404 handler

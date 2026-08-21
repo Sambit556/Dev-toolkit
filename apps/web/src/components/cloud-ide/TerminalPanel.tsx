@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useState } from 'react';
 import {
   Terminal as TermIcon,
   AlertCircle,
@@ -15,6 +15,8 @@ import {
   XCircle,
   ShieldCheck,
   ChevronDown,
+  Copy,
+  Check,
 } from 'lucide-react';
 import { useCloudIdeStore, BottomPanelTab } from '../../store/useCloudIdeStore';
 import { ErrorDiagnosticsBanner } from './ErrorDiagnosticsBanner';
@@ -34,7 +36,16 @@ export const TerminalPanel: React.FC = () => {
     toggleBottomPanel,
   } = useCloudIdeStore();
 
+  const [copied, setCopied] = useState(false);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+
+  const handleCopyLogs = () => {
+    const allLogs = [...terminalLogs, ...stderrLogs].join('\n');
+    if (!allLogs) return;
+    navigator.clipboard.writeText(allLogs);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
 
   useEffect(() => {
     if (scrollContainerRef.current) {
@@ -114,6 +125,13 @@ export const TerminalPanel: React.FC = () => {
           )}
 
           <button
+            onClick={handleCopyLogs}
+            title={copied ? 'Copied to Clipboard!' : 'Copy Terminal Logs'}
+            className="p-1 hover:text-slate-200 hover:bg-slate-800 rounded transition-colors text-slate-400 flex items-center gap-1 text-[11px]"
+          >
+            {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+          </button>
+          <button
             onClick={clearTerminal}
             title="Clear Console Output"
             className="p-1 hover:text-slate-200 hover:bg-slate-800 rounded transition-colors text-slate-400"
@@ -148,7 +166,7 @@ export const TerminalPanel: React.FC = () => {
               </div>
             ))}
             {stderrLogs.map((err, index) => (
-              <div key={index} className="text-rose-400 bg-rose-950/20 p-2 rounded border-l-2 border-rose-500 whitespace-pre-wrap">
+              <div key={index} className="text-rose-400 font-mono whitespace-pre-wrap">
                 {err}
               </div>
             ))}
@@ -217,23 +235,39 @@ export const TerminalPanel: React.FC = () => {
       </div>
 
       {/* Interactive Stdin Input Bar */}
-      <div className="p-2 bg-slate-950 border-t border-slate-800/80 flex items-center gap-2 shrink-0">
-        <span className="text-indigo-400 font-bold text-xs pl-1">stdin &gt;</span>
+      <div className={`p-2 border-t transition-all flex items-center gap-2 shrink-0 ${
+        metrics.status === 'running'
+          ? 'bg-indigo-950/40 border-indigo-500/50'
+          : 'bg-neutral-950 border-neutral-800'
+      }`}>
+        <span className="text-amber-400 font-bold text-xs pl-1 font-mono flex items-center gap-1">
+          <TermIcon className="w-3.5 h-3.5 text-amber-400" />
+          stdin &gt;
+        </span>
         <input
           type="text"
-          placeholder="Provide interactive stdin / custom test input (e.g. 42 or json payload)..."
+          placeholder="Provide terminal input / interactive payload (press Enter to feed & run)..."
           value={stdinInput}
           onChange={(e) => setStdinInput(e.target.value)}
           onKeyDown={(e) => {
-            if (e.key === 'Enter') runCode();
+            if (e.key === 'Enter') {
+              e.preventDefault();
+              runCode();
+            }
           }}
-          className="flex-1 bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1 text-xs text-slate-200 placeholder-slate-400 focus:outline-none focus:border-indigo-500"
+          disabled={metrics.status === 'running'}
+          className={`flex-1 rounded-lg px-3 py-1.5 text-xs text-slate-100 placeholder-neutral-500 font-mono transition-all focus:outline-none ${
+            stdinInput
+              ? 'bg-neutral-900 border-2 border-amber-500/90 ring-2 ring-amber-500/30'
+              : 'bg-neutral-900 border border-neutral-800 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/40'
+          }`}
         />
         <button
           onClick={runCode}
-          className="px-3 py-1 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg font-semibold flex items-center gap-1 transition-colors shrink-0"
+          disabled={metrics.status === 'running'}
+          className="px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 text-white rounded-lg font-semibold flex items-center gap-1.5 transition-colors shrink-0 shadow-sm text-xs"
         >
-          <Send className="w-3 h-3" />
+          <Send className="w-3.5 h-3.5" />
           <span>Feed & Run</span>
         </button>
       </div>

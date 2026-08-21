@@ -23,44 +23,30 @@ const MonacoEditor = dynamic(
   () =>
     import('@monaco-editor/react').then(async (mod) => {
       try {
-        const [monaco] = await Promise.all([
-          import('monaco-editor/esm/vs/editor/editor.api'),
-          import('monaco-editor/esm/vs/language/json/monaco.contribution').catch(() => null),
-          import('monaco-editor/esm/vs/basic-languages/typescript/typescript.contribution').catch(() => null),
-          import('monaco-editor/esm/vs/basic-languages/javascript/javascript.contribution').catch(() => null),
-          import('monaco-editor/esm/vs/basic-languages/python/python.contribution').catch(() => null),
-          import('monaco-editor/esm/vs/basic-languages/go/go.contribution').catch(() => null),
-          import('monaco-editor/esm/vs/basic-languages/rust/rust.contribution').catch(() => null),
-          import('monaco-editor/esm/vs/basic-languages/cpp/cpp.contribution').catch(() => null),
-          import('monaco-editor/esm/vs/basic-languages/java/java.contribution').catch(() => null),
-          import('monaco-editor/esm/vs/basic-languages/sql/sql.contribution').catch(() => null),
-          import('monaco-editor/esm/vs/basic-languages/shell/shell.contribution').catch(() => null),
-          import('monaco-editor/esm/vs/basic-languages/yaml/yaml.contribution').catch(() => null),
-          import('monaco-editor/esm/vs/basic-languages/xml/xml.contribution').catch(() => null),
-          import('monaco-editor/esm/vs/basic-languages/html/html.contribution').catch(() => null),
-          import('monaco-editor/esm/vs/basic-languages/css/css.contribution').catch(() => null),
-          import('monaco-editor/esm/vs/basic-languages/markdown/markdown.contribution').catch(() => null),
-          import('monaco-editor/esm/vs/basic-languages/php/php.contribution').catch(() => null),
-          import('monaco-editor/esm/vs/basic-languages/ruby/ruby.contribution').catch(() => null),
-          import('monaco-editor/esm/vs/basic-languages/csharp/csharp.contribution').catch(() => null),
-        ]);
-
-        if (monaco) {
-          mod.loader.config({ monaco });
-
-          if (typeof window !== 'undefined') {
-            (window as any).MonacoEnvironment = {
-              getWorker(_workerId: string, _label: string) {
-                return new Worker(
-                  new URL('monaco-editor/esm/vs/editor/editor.worker', import.meta.url),
-                  { type: 'module' },
-                );
-              },
-            };
-          }
+        if (typeof window !== 'undefined') {
+          (window as any).MonacoEnvironment = {
+            getWorkerUrl: function (_moduleId: string, label: string) {
+              if (label === 'json') {
+                return `data:text/javascript;charset=utf-8,${encodeURIComponent(`
+                  self.MonacoEnvironment = { baseUrl: 'https://cdn.jsdelivr.net/npm/monaco-editor@0.45.0/min/' };
+                  importScripts('https://cdn.jsdelivr.net/npm/monaco-editor@0.45.0/min/vs/language/json/json.worker.js');
+                `)}`;
+              }
+              if (label === 'typescript' || label === 'javascript') {
+                return `data:text/javascript;charset=utf-8,${encodeURIComponent(`
+                  self.MonacoEnvironment = { baseUrl: 'https://cdn.jsdelivr.net/npm/monaco-editor@0.45.0/min/' };
+                  importScripts('https://cdn.jsdelivr.net/npm/monaco-editor@0.45.0/min/vs/language/typescript/ts.worker.js');
+                `)}`;
+              }
+              return `data:text/javascript;charset=utf-8,${encodeURIComponent(`
+                self.MonacoEnvironment = { baseUrl: 'https://cdn.jsdelivr.net/npm/monaco-editor@0.45.0/min/' };
+                importScripts('https://cdn.jsdelivr.net/npm/monaco-editor@0.45.0/min/vs/editor/editor.worker.js');
+              `)}`;
+            },
+          };
         }
       } catch (err) {
-        console.warn('Monaco configuration notice:', err);
+        console.warn('Monaco worker notice:', err);
       }
       return mod;
     }),
@@ -69,7 +55,7 @@ const MonacoEditor = dynamic(
     loading: () => (
       <div className="flex-1 flex flex-col items-center justify-center bg-black min-h-[300px] text-slate-400 gap-2">
         <Loader2 className="w-6 h-6 animate-spin text-indigo-400" />
-        <span className="text-xs">Initializing Monaco Workspace...</span>
+        <span className="text-xs">Initializing Workspace...</span>
       </div>
     ),
   },
@@ -77,6 +63,7 @@ const MonacoEditor = dynamic(
 
 export const EditorPanel: React.FC = () => {
   const {
+    currentLanguage,
     files,
     activeFile,
     openTabs,
@@ -285,6 +272,19 @@ export const EditorPanel: React.FC = () => {
         </div>
       )}
 
+      {/* Execution Lock Banner */}
+      {metrics.status === 'running' && (
+        <div className="px-4 py-1.5 bg-indigo-950/80 border-b border-indigo-500/50 text-indigo-200 text-xs font-semibold flex items-center justify-between animate-pulse">
+          <span className="flex items-center gap-2">
+            <Loader2 className="w-3.5 h-3.5 animate-spin text-indigo-400" />
+            Executing in isolated sandbox... Editor locked to prevent race conditions.
+          </span>
+          <span className="text-[10px] bg-indigo-900/80 px-2 py-0.5 rounded text-indigo-300 uppercase font-mono font-bold">
+            Locked (Running)
+          </span>
+        </div>
+      )}
+
       {/* Breadcrumbs Path */}
       <div className="px-4 py-1 bg-black text-[11px] text-slate-400 border-b border-neutral-800 flex items-center justify-between">
         <div className="flex items-center gap-1.5 truncate">
@@ -310,6 +310,8 @@ export const EditorPanel: React.FC = () => {
         <div className="flex-1 h-full bg-black">
           {currentFile && (
             <MonacoEditor
+              key={`editor-${currentLanguage}-${currentFile.name}`}
+              path={`/${currentLanguage}/${currentFile.name}`}
               height="100%"
               theme={settings.theme}
               language={getMonacoLanguage(currentFile.name)}
@@ -331,6 +333,8 @@ export const EditorPanel: React.FC = () => {
                 automaticLayout: true,
                 glyphMargin: true,
                 padding: { top: 12, bottom: 12 },
+                readOnly: metrics.status === 'running',
+                domReadOnly: metrics.status === 'running',
               }}
             />
           )}
@@ -346,6 +350,8 @@ export const EditorPanel: React.FC = () => {
               </button>
             </div>
             <MonacoEditor
+              key={`split-${currentLanguage}-${splitCurrentFile.name}`}
+              path={`/split/${currentLanguage}/${splitCurrentFile.name}`}
               height="100%"
               theme={settings.theme}
               language={getMonacoLanguage(splitCurrentFile.name)}

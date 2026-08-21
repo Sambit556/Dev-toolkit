@@ -57,6 +57,7 @@ import {
 } from '@/components/ui/dialog';
 
 const TOOL_COLORS: Record<string, string> = {
+  '/code-studio': 'indigo',
   '/cloud-ide': 'indigo',
   '/epoch': 'blue',
   '/json': 'green',

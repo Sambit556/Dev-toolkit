@@ -88,18 +88,53 @@ export async function POST(req: NextRequest) {
           info: (...args: any[]) => logs.push('[INFO] ' + args.join(' ')),
         };
 
-        const cleanCode = entryFile.replace(/import\s+.*?from\s+['"].*?['"];?/g, '');
-        const fn = new Function('console', 'stdin', `
+        const cleanCode = entryFile
+          .replace(/import\s+type\s+.*?;/g, '')
+          .replace(/import\s+.*?from\s+['"].*?['"];?/g, '')
+          .replace(/export\s+/g, '');
+
+        const AsyncFunction = Object.getPrototypeOf(async function () {}).constructor;
+        const fn = new AsyncFunction(
+          'console',
+          'stdin',
+          'fetch',
+          'Headers',
+          'Request',
+          'Response',
+          'URL',
+          'URLSearchParams',
+          `
           try {
-            ${cleanCode}
+            const __res = (function() {
+              ${cleanCode}
+            })();
+            if (__res && typeof __res.then === 'function') {
+              await __res;
+            }
           } catch(err) {
-            console.error(err.stack || err.message);
+            console.error(err && (err.stack || err.message) ? (err.stack || err.message) : String(err));
             throw err;
           }
-        `);
-        fn(customConsole, stdin);
+        `,
+        );
+
+        await fn(
+          customConsole,
+          stdin,
+          globalThis.fetch || fetch,
+          globalThis.Headers,
+          globalThis.Request,
+          globalThis.Response,
+          globalThis.URL,
+          globalThis.URLSearchParams,
+        );
+
+        // Microtask tick
+        await new Promise((r) => setTimeout(r, 60));
       } catch (err: any) {
-        errors.push(err.message || String(err));
+        if (errors.length === 0) {
+          errors.push(err.message || String(err));
+        }
         exitCode = 1;
       }
     } else {

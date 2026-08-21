@@ -17,6 +17,7 @@
     "@dicebear/collection": "^9.4.2",
     "@dicebear/core": "^9.4.3",
     "@excalidraw/excalidraw": "^0.18.1",
+    "@google/genai": "^2.18.0",
     "@hookform/resolvers": "^3.3.4",
     "@monaco-editor/react": "^4.6.0",
     "@pdfsmaller/pdf-encrypt-lite": "^1.0.2",

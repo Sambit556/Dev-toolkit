@@ -62,8 +62,13 @@ export const CloudIdeApp: React.FC = () => {
     LANGUAGE_TEMPLATES.find((t) => t.id === currentLanguage) || LANGUAGE_TEMPLATES[0];
 
   useEffect(() => {
-    // Daemon background pre-warm container during page load
-    prewarmDaemon();
+    let isMounted = true;
+    if (isMounted) {
+      prewarmDaemon();
+    }
+    return () => {
+      isMounted = false;
+    };
   }, [prewarmDaemon]);
 
   // When switching to Code Converter Studio or wide panels, auto-expand to wide capacity
@@ -150,19 +155,23 @@ export const CloudIdeApp: React.FC = () => {
             <span className="font-medium">Back</span>
           </Link>
 
-          <div className="h-4 w-px bg-neutral-800" />
-
-          <div className="flex items-center gap-2">
-            <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-md shadow-indigo-500/20">
+          <Link
+            href="/"
+            title="Return to DevKits Home"
+            className="flex items-center gap-2 hover:opacity-90 transition-opacity group"
+          >
+            <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-md shadow-indigo-500/20 group-hover:scale-105 transition-transform">
               <Code2 className="w-4 h-4 text-white" />
             </div>
             <div className="flex items-center gap-1.5">
-              <span className="font-extrabold text-sm tracking-tight text-white hidden sm:inline">DevKits</span>
+              <span className="font-extrabold text-sm tracking-tight text-white group-hover:text-indigo-300 transition-colors hidden sm:inline">
+                DevKits
+              </span>
               <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-indigo-500/20 text-indigo-400 border border-indigo-500/30">
-                CLOUD IDE
+                CODE STUDIO
               </span>
             </div>
-          </div>
+          </Link>
 
           <div className="h-4 w-px bg-neutral-800 hidden sm:block" />
 

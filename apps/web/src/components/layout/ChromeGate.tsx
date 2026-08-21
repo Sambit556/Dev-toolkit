@@ -13,7 +13,7 @@ import { QuickAccess } from './QuickAccess';
 // below the sticky Header via `flex-1` (the <body> is already a flex column).
 export function ChromeGate({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const isCloudIde = pathname?.startsWith('/cloud-ide') ?? false;
+  const isCloudIde = (pathname?.startsWith('/code-studio') || pathname?.startsWith('/cloud-ide')) ?? false;
   const isStorageVault = pathname?.startsWith('/storage') ?? false;
 
   if (isCloudIde) {

@@ -25,8 +25,44 @@ const sharedWorkspaces = new Map<
  * @openapi
  * /api/sandbox/execute:
  *   post:
- *     summary: Execute code in an isolated sandbox
+ *     summary: Execute code in an isolated multi-language sandbox
  *     tags: [Sandbox]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - files
+ *             properties:
+ *               language:
+ *                 type: string
+ *                 example: javascript
+ *                 description: Language runtime (javascript, typescript, python, go, rust, cpp, java, php, ruby, bash, sql)
+ *               files:
+ *                 type: array
+ *                 items:
+ *                   type: object
+ *                   properties:
+ *                     name:
+ *                       type: string
+ *                       example: main.js
+ *                     content:
+ *                       type: string
+ *                       example: console.log("Hello, World!");
+ *               entryPoint:
+ *                 type: string
+ *                 example: main.js
+ *               stdin:
+ *                 type: string
+ *                 description: Interactive standard input stream to feed
+ *               timeoutMs:
+ *                 type: number
+ *                 example: 10000
+ *     responses:
+ *       200:
+ *         description: Execution result with stdout, stderr, exitCode, and performance metrics
  */
 router.post('/execute', async (req: Request, res: Response) => {
   try {
@@ -61,8 +97,37 @@ router.post('/execute', async (req: Request, res: Response) => {
  * @openapi
  * /api/sandbox/ai:
  *   post:
- *     summary: AI Code Assistant actions (explain, fix, refactor, generate, etc.)
+ *     summary: Gemini 3.7 Flash AI Code Assistant (Explain, Fix, Clean, Refactor, Optimize, Test, Docs)
  *     tags: [Sandbox]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - action
+ *               - code
+ *             properties:
+ *               action:
+ *                 type: string
+ *                 enum: [explain, fix, clean, eli5, refactor, optimize, test, docs, generate, custom]
+ *                 example: fix
+ *               language:
+ *                 type: string
+ *                 example: java
+ *               code:
+ *                 type: string
+ *                 example: 'System.out.println("Hello");'
+ *               errorContext:
+ *                 type: string
+ *                 description: Compiler diagnostic error message
+ *               prompt:
+ *                 type: string
+ *                 description: Custom user instruction
+ *     responses:
+ *       200:
+ *         description: AI structured response with 4-point diagnostic and diffCode
  */
 router.post('/ai', async (req: Request, res: Response) => {
   try {
@@ -92,8 +157,31 @@ router.post('/ai', async (req: Request, res: Response) => {
  * @openapi
  * /api/sandbox/convert:
  *   post:
- *     summary: Code Converter Studio (Source Lang -> Target Lang)
+ *     summary: Code Converter Studio (Universal Source -> Target Language Transpiler)
  *     tags: [Sandbox]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - sourceLanguage
+ *               - targetLanguage
+ *               - sourceCode
+ *             properties:
+ *               sourceLanguage:
+ *                 type: string
+ *                 example: python
+ *               targetLanguage:
+ *                 type: string
+ *                 example: javascript
+ *               sourceCode:
+ *                 type: string
+ *                 example: 'print("Hello from Python")'
+ *     responses:
+ *       200:
+ *         description: Converted source code
  */
 router.post('/convert', async (req: Request, res: Response) => {
   try {
@@ -122,8 +210,32 @@ router.post('/convert', async (req: Request, res: Response) => {
  * @openapi
  * /api/sandbox/share:
  *   post:
- *     summary: Create a shareable workspace link
+ *     summary: Create a shareable Code Studio workspace link
  *     tags: [Sandbox]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - files
+ *             properties:
+ *               name:
+ *                 type: string
+ *               files:
+ *                 type: array
+ *                 items:
+ *                   type: object
+ *               language:
+ *                 type: string
+ *               isReadOnly:
+ *                 type: boolean
+ *               expiresInHours:
+ *                 type: number
+ *     responses:
+ *       201:
+ *         description: Generated share ID and URL
  */
 router.post('/share', async (req: Request, res: Response) => {
   try {
@@ -149,7 +261,7 @@ router.post('/share', async (req: Request, res: Response) => {
 
     return res.status(201).json({
       shareId,
-      url: `/cloud-ide?shareId=${shareId}`,
+      url: `/code-studio?shareId=${shareId}`,
       expiresAt,
       isReadOnly: !!isReadOnly,
       hasPassword: !!password,

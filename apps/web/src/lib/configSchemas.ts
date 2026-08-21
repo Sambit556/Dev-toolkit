@@ -19,7 +19,7 @@ export const CONFIG_FORMATS: ConfigFormat[] = [
     sample: `{
   "$schema": "http://json-schema.org/draft-07/schema#",
   "app": {
-    "name": "DevKits Cloud IDE",
+    "name": "DevKits Online IDE",
     "version": "1.0.0",
     "environment": "production",
     "port": 4001

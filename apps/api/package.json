@@ -16,6 +16,7 @@
     "@aws-sdk/client-s3": "^3.1090.0",
     "@aws-sdk/s3-request-presigner": "^3.1090.0",
     "@devchrono/shared": "*",
+    "@google/genai": "^2.18.0",
     "@upstash/box": "^0.7.0",
     "@upstash/redis": "^1.38.2",
     "bcryptjs": "^3.0.3",

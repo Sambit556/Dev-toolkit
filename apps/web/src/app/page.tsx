@@ -42,16 +42,16 @@ import { useLocale } from '@/context/LocalizationContext';
 
 const TOOLS = [
   {
-    href: '/cloud-ide',
+    href: '/code-studio',
     icon: Code2,
-    title: 'Cloud IDE & Code Workspace',
+    title: 'Code Studio & Workspace',
     description:
-      'Production-grade Cloud IDE with Upstash Box isolated sandboxes, 15+ languages, Monaco editor, AI assistant, debugger, code converter, and config studio.',
-    features: ['Upstash Box isolated VM', '15+ Language runtimes', 'VS Code Monaco editor', 'AI Coding & Auto-Fix', 'Dedicated Code Converter', 'Config Studio & Debugger'],
+      'Production-grade Code Studio with isolated sandboxes, 15+ languages, Monaco editor, AI assistant, debugger, code converter, and config studio.',
+    features: ['Isolated sandbox runtime', '15+ Language runtimes', 'VS Code Monaco editor', 'AI Coding & Auto-Fix', 'Dedicated Code Converter', 'Config Studio & Debugger'],
     category: 'formatters',
-    badge: 'NEW IDE',
+    badge: 'NEW STUDIO',
     color: 'indigo',
-    keywords: ['cloud ide', 'online code editor', 'code sandbox', 'upstash box', 'isolated sandbox', 'typescript compiler', 'python ide', 'go compiler', 'rust ide', 'replit alternative', 'ai coding', 'code converter', 'debugger'],
+    keywords: ['code studio', 'cloud ide', 'online code editor', 'code sandbox', 'isolated sandbox', 'typescript compiler', 'python ide', 'go compiler', 'rust ide', 'replit alternative', 'ai coding', 'code converter', 'debugger'],
   },
   {
     href: '/epoch',

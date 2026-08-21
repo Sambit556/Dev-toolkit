@@ -4,25 +4,29 @@ export const swaggerSpec = swaggerJsdoc({
   definition: {
     openapi: '3.0.0',
     info: {
-      title: 'DevChrono JSONLab API',
-      version: '1.0.0',
-      description: 'Production-grade REST API for timestamp conversion and JSON utilities',
+      title: 'DevKits Platform API',
+      version: '2.0.0',
+      description:
+        'Production-grade developer utility platform: Code Studio & Sandbox, Gemini AI Code Assistant, Cloud Storage Vault, Temp Mail, Webhooks, Timestamp conversions, and JSON processing.',
       license: {
         name: 'MIT',
       },
     },
     servers: [
-      { url: 'http://localhost:3001', description: 'Development' },
-      { url: 'https://api.devchrono.app', description: 'Production' },
+      { url: 'http://localhost:3001', description: 'Development Server' },
+      { url: 'https://api.devkits.space', description: 'Production API' },
     ],
     tags: [
-      { name: 'System', description: 'System health and status' },
-      { name: 'Time', description: 'Unix timestamp conversion endpoints' },
-      { name: 'JSON', description: 'JSON validation and formatting endpoints' },
-      { name: 'Auth', description: 'Authentication, session, and password management' },
-      { name: 'Storage', description: 'Cloud Storage Vault — files, folders, notes, uploads, sharing' },
-      { name: 'Admin', description: 'Superadmin-only user management' },
-      { name: 'Profile', description: 'Authenticated user’s own profile and avatar' },
+      { name: 'System', description: 'System health, metrics, and runtime status' },
+      { name: 'Sandbox', description: 'Code Studio — Multi-language isolated execution, Gemini AI, and Code Converter' },
+      { name: 'Storage', description: 'Cloud Storage Vault — S3-compatible encrypted files, folders, notes & shares' },
+      { name: 'Auth', description: 'Authentication, session JWTs, and secure user management' },
+      { name: 'Time', description: 'Unix timestamp conversion & duration math endpoints' },
+      { name: 'JSON', description: 'JSON validation, formatting, and minification endpoints' },
+      { name: 'Email', description: 'Temporary disposable email inboxes & real-time webhook listeners' },
+      { name: 'Webhook', description: 'Custom HTTP payload tester and endpoint inspector' },
+      { name: 'Profile', description: 'User profile, settings, and avatars' },
+      { name: 'Admin', description: 'Superadmin management operations' },
     ],
     components: {
       securitySchemes: {

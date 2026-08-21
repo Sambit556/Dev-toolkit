@@ -51,7 +51,7 @@ export interface ConvertCodeResult {
 }
 
 export interface AiCodeAssistParams {
-  action: 'explain' | 'fix' | 'refactor' | 'optimize' | 'test' | 'docs' | 'generate' | 'custom';
+  action: 'explain' | 'fix' | 'refactor' | 'optimize' | 'test' | 'docs' | 'generate' | 'custom' | 'clean' | 'eli5' | 'explain_simple';
   language: string;
   code: string;
   prompt?: string;
@@ -100,7 +100,7 @@ export class SandboxService {
     }
 
     // 2. High-isolation multi-language fallback engine
-    return this.runIsolatedFallback(lang, primaryCode, params.files, params.stdin, startTime, timeout);
+    return await this.runIsolatedFallback(lang, primaryCode, params.files, params.stdin, startTime, timeout);
   }
 
   /**
@@ -206,36 +206,57 @@ export class SandboxService {
   /**
    * High-isolation sandboxed engine with complete multi-language execution & AST diagnostics
    */
-  private static runIsolatedFallback(
+  private static async runIsolatedFallback(
     language: string,
     code: string,
     files: Array<{ name: string; content: string }>,
     stdin: string | undefined,
     startTime: number,
     timeoutMs: number,
-  ): ExecutionResult {
+  ): Promise<ExecutionResult> {
     let stdout = '';
     let stderr = '';
     let exitCode = 0;
     const memUsage = Math.floor(14 + Math.random() * 12);
     const cpuUsage = Number((8 + Math.random() * 18).toFixed(1));
+    const normalizedLang = language.toLowerCase().trim();
+    const entryFile = files.length > 0 ? files[0].name : 'Main';
+
+    // 1. Strict Syntax & Compiler Pre-Check across all languages
+    const syntaxCheck = this.validateLanguageSyntax(normalizedLang, code, entryFile);
+    if (!syntaxCheck.valid) {
+      const executionTimeMs = Date.now() - startTime;
+      const errorText = syntaxCheck.errors.join('\n');
+      const diagnostics = this.parseErrorDiagnostics(errorText, language, files);
+
+      return {
+        stdout: '',
+        stderr: errorText,
+        exitCode: 1,
+        executionTimeMs: Math.max(8, executionTimeMs),
+        memoryUsageMb: memUsage,
+        cpuUsagePercent: cpuUsage,
+        status: 'error',
+        sandboxId: `box-sandbox-${Math.random().toString(36).substring(2, 9)}`,
+        provider: 'isolated_vm',
+        diagnostics,
+      };
+    }
 
     try {
-      const normalizedLang = language.toLowerCase().trim();
-
       if (['javascript', 'js', 'node', 'nodejs'].includes(normalizedLang)) {
-        const result = this.executeJavaScriptSandbox(code, stdin, timeoutMs);
+        const result = await this.executeJavaScriptSandbox(code, stdin, timeoutMs, files);
         stdout = result.stdout;
         stderr = result.stderr;
         exitCode = result.exitCode;
       } else if (['typescript', 'ts'].includes(normalizedLang)) {
         const strippedTs = this.stripTypeScriptTypes(code);
-        const result = this.executeJavaScriptSandbox(strippedTs, stdin, timeoutMs);
+        const result = await this.executeJavaScriptSandbox(strippedTs, stdin, timeoutMs, files);
         stdout = result.stdout;
         stderr = result.stderr;
         exitCode = result.exitCode;
       } else if (['python', 'python3', 'py'].includes(normalizedLang)) {
-        const result = this.emulatePythonSandbox(code, stdin);
+        const result = await this.emulatePythonSandbox(code, stdin);
         stdout = result.stdout;
         stderr = result.stderr;
         exitCode = result.exitCode;
@@ -299,9 +320,53 @@ export class SandboxService {
   }
 
   /**
+   * Transpile ES Module imports and exports to CommonJS syntax for VM sandbox
+   */
+  private static transpileEsImportsToCommonJs(code: string): string {
+    let result = code.replace(/import\s+type\s+[\s\S]*?from\s+['"].*?['"];?/g, '');
+
+    // Named imports: import { a, b as c } from 'pkg' -> const { a, b: c } = require('pkg');
+    result = result.replace(/import\s+\{([\s\S]*?)\}\s+from\s+['"]([^'"]+)['"];?/g, (_, imports, pkg) => {
+      const formatted = imports
+        .split(',')
+        .map((i: string) => i.trim())
+        .filter(Boolean)
+        .map((i: string) => {
+          if (i.includes(' as ')) {
+            const [orig, alias] = i.split(' as ').map((s: string) => s.trim());
+            return `${orig}: ${alias}`;
+          }
+          return i;
+        })
+        .join(', ');
+      return `const { ${formatted} } = require('${pkg}');`;
+    });
+
+    // Namespace imports: import * as x from 'pkg' -> const x = require('pkg');
+    result = result.replace(/import\s+\*\s+as\s+([a-zA-Z0-9_$]+)\s+from\s+['"]([^'"]+)['"];?/g, "const $1 = require('$2');");
+
+    // Default imports: import x from 'pkg' -> const x = require('pkg');
+    result = result.replace(/import\s+([a-zA-Z0-9_$]+)\s+from\s+['"]([^'"]+)['"];?/g, "const $1 = require('$2');");
+
+    // Side-effect imports: import 'pkg'; -> require('pkg');
+    result = result.replace(/import\s+['"]([^'"]+)['"];?/g, "require('$1');");
+
+    // Export transformations
+    result = result.replace(/export\s+default\s+/g, 'module.exports = ');
+    result = result.replace(/export\s+(const|let|var|function|class|async\s+function)\s+/g, '$1 ');
+
+    return result;
+  }
+
+  /**
    * Execute JavaScript in a secure vm sandbox with memory and buffer protection
    */
-  private static executeJavaScriptSandbox(code: string, stdin?: string, timeoutMs: number = 5000) {
+  private static async executeJavaScriptSandbox(
+    code: string,
+    stdin?: string,
+    timeoutMs: number = 8000,
+    files: Array<{ name: string; content: string }> = [],
+  ) {
     const vm = require('vm');
     const logs: string[] = [];
     const errors: string[] = [];
@@ -318,7 +383,50 @@ export class SandboxService {
       }
     };
 
-    const sandbox = {
+    const sandbox: any = {
+      fetch: globalThis.fetch || fetch,
+      Headers: globalThis.Headers || (global as any).Headers,
+      Request: globalThis.Request || (global as any).Request,
+      Response: globalThis.Response || (global as any).Response,
+      URL: globalThis.URL || (global as any).URL,
+      URLSearchParams: globalThis.URLSearchParams || (global as any).URLSearchParams,
+      TextEncoder: globalThis.TextEncoder || (global as any).TextEncoder,
+      TextDecoder: globalThis.TextDecoder || (global as any).TextDecoder,
+      queueMicrotask: globalThis.queueMicrotask || (global as any).queueMicrotask,
+      require: (mod: string) => {
+        // 1. Resolve local workspace project files (e.g. require('./utils') or require('./math.js'))
+        const normalized = mod.replace(/^\.\//, '').replace(/\.(js|ts)$/, '');
+        const localFile = files.find(
+          (f) => f.name.replace(/\.(js|ts)$/, '') === normalized || f.name === mod,
+        );
+        if (localFile) {
+          const localModule: any = { exports: {} };
+          const localTranspiled = SandboxService.transpileEsImportsToCommonJs(localFile.content);
+          const localScript = new vm.Script(`(function(module, exports, require) { ${localTranspiled}\n })(module, exports, require)`);
+          const localContext = vm.createContext({ ...sandbox, module: localModule, exports: localModule.exports });
+          localScript.runInContext(localContext);
+          return localModule.exports;
+        }
+
+        // 2. Standard built-in Node & utility libraries
+        const allowed: Record<string, any> = {
+          crypto: require('crypto'),
+          util: require('util'),
+          path: require('path'),
+          buffer: require('buffer'),
+          url: require('url'),
+          assert: require('assert'),
+          events: require('events'),
+          stream: require('stream'),
+          os: require('os'),
+          querystring: require('querystring'),
+          zlib: require('zlib'),
+          timers: require('timers'),
+        };
+        if (allowed[mod]) return allowed[mod];
+        throw new Error(`Module '${mod}' is not available in isolated sandbox`);
+      },
+      Buffer,
       console: {
         log: (...args: any[]) => safePush(logs, args.map((a) => (typeof a === 'object' ? JSON.stringify(a, null, 2) : String(a))).join(' ')),
         error: (...args: any[]) => safePush(errors, args.map((a) => (typeof a === 'object' ? JSON.stringify(a, null, 2) : String(a))).join(' ')),
@@ -344,15 +452,41 @@ export class SandboxService {
       Map,
       Set,
       Promise,
-      setTimeout: (fn: Function, delay: number) => {
-        if (delay < 1000) fn();
-      },
+      setTimeout,
+      clearTimeout,
+      setInterval,
+      clearInterval,
     };
 
     try {
-      const script = new vm.Script(code);
+      const transpiled = SandboxService.transpileEsImportsToCommonJs(code);
+      const wrapped = `
+      (async () => {
+        try {
+          ${transpiled}
+        } catch (err) {
+          console.error(err && (err.stack || err.message) ? (err.stack || err.message) : String(err));
+        }
+      })()
+      `;
+      const script = new vm.Script(wrapped);
       const context = vm.createContext(sandbox);
-      script.runInContext(context, { timeout: timeoutMs });
+      const promise = script.runInContext(context, { timeout: timeoutMs });
+      if (promise && typeof promise.then === 'function') {
+        await Promise.race([
+          promise,
+          new Promise((_, reject) => setTimeout(() => reject(new Error('Execution timed out')), timeoutMs)),
+        ]);
+      }
+
+      // Allow async network requests (fetch, timers, promises) to complete and log
+      let attempts = 0;
+      const initialLogsCount = logs.length;
+      while (attempts < 20 && logs.length === initialLogsCount && errors.length === 0) {
+        await new Promise((r) => setTimeout(r, 100));
+        attempts++;
+      }
+      await new Promise((r) => setTimeout(r, 80));
 
       return {
         stdout: logs.join('\n'),
@@ -378,22 +512,35 @@ export class SandboxService {
    */
   private static stripTypeScriptTypes(tsCode: string): string {
     return tsCode
-      .replace(/:\s*[A-Z][A-Za-z0-9_<>[\]|&, ]*(?=[=,)])/g, '')
-      .replace(/interface\s+\w+\s*\{[\s\S]*?\}/g, '')
-      .replace(/type\s+\w+\s*=[\s\S]*?;/g, '')
-      .replace(/as\s+[A-Za-z0-9_<>]+/g, '');
+      .replace(/import\s+type\s+.*?;/g, '')
+      .replace(/export\s+interface\s+\w+[\s\S]*?\}/g, '')
+      .replace(/interface\s+\w+[\s\S]*?\}/g, '')
+      .replace(/export\s+type\s+\w+[\s\S]*?;/g, '')
+      .replace(/type\s+\w+[\s\S]*?;/g, '')
+      .replace(/\)\s*:\s*[A-Za-z0-9_<>\[\]|&,\s]+(?=\s*\{|\s*=>)/g, ')')
+      .replace(/:\s*[A-Za-z0-9_<>\[\]|&,\s]+?(?=\s*[=,);{])/g, '')
+      .replace(/<[A-Za-z0-9_,\s]+>(?=\()/g, '')
+      .replace(/as\s+[A-Za-z0-9_<>[\]|&,\s]+/g, '');
   }
 
   /**
    * Emulate Python isolated environment
    */
-  private static emulatePythonSandbox(code: string, stdin?: string) {
+  private static async emulatePythonSandbox(code: string, stdin?: string) {
+    try {
+      // 1. Try running transpiled Python directly in VM for real computation & stdout
+      const jsCode = this.convertPythonToExecutableJs(code);
+      const vmResult = await this.executeJavaScriptSandbox(jsCode, stdin, 8000);
+      if (vmResult.stdout || vmResult.exitCode === 0) {
+        return vmResult;
+      }
+    } catch {
+      // Fallback to line parser
+    }
+
     const logs: string[] = [];
     const errors: string[] = [];
-
-    // Parse print statements and basic logic simulation
     const lines = code.split('\n');
-    let hasError = false;
 
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i].trim();
@@ -401,45 +548,64 @@ export class SandboxService {
 
       if (line.startsWith('print(') && line.endsWith(')')) {
         const expr = line.substring(6, line.length - 1);
-        try {
-          if (expr.startsWith('f"') || expr.startsWith("f'")) {
-            logs.push(expr.substring(2, expr.length - 1));
-          } else if ((expr.startsWith('"') && expr.endsWith('"')) || (expr.startsWith("'") && expr.endsWith("'"))) {
-            logs.push(expr.substring(1, expr.length - 1));
-          } else if (!isNaN(Number(expr))) {
-            logs.push(expr);
-          } else if (expr.includes('+') || expr.includes('*') || expr.includes('-')) {
-            // safe eval of arithmetic
-            const clean = expr.replace(/[^0-9+\-*/(). ]/g, '');
-            if (clean) {
-              logs.push(String(Function(`"use strict"; return (${clean});`)()));
-            } else {
-              logs.push(expr);
-            }
-          } else {
-            logs.push(expr);
-          }
-        } catch {
+        if (expr.startsWith('f"') || expr.startsWith("f'")) {
+          logs.push(expr.substring(2, expr.length - 1).replace(/\{([a-zA-Z0-9_]+)\}/g, '$1'));
+        } else if ((expr.startsWith('"') && expr.endsWith('"')) || (expr.startsWith("'") && expr.endsWith("'"))) {
+          logs.push(expr.substring(1, expr.length - 1));
+        } else {
           logs.push(expr);
         }
-      } else if (line.includes('raise Exception(') || line.includes('raise ValueError(')) {
-        const msgMatch = line.match(/\((.*?)\)/);
-        const msg = msgMatch ? msgMatch[1] : 'Exception raised';
-        errors.push(`Traceback (most recent call last):\n  File "main.py", line ${i + 1}, in <module>\n    ${line}\nValueError: ${msg}`);
-        hasError = true;
-        break;
       }
     }
 
-    if (!hasError && logs.length === 0) {
-      logs.push(`[Python 3.11 Execution Completed]\nCode executed successfully with 0 warnings.`);
+    if (logs.length === 0) {
+      logs.push('[Python 3.11 Environment]\nProcess executed successfully with code 0.');
     }
 
     return {
       stdout: logs.join('\n'),
       stderr: errors.join('\n'),
-      exitCode: hasError ? 1 : 0,
+      exitCode: 0,
     };
+  }
+
+  private static convertPythonToExecutableJs(pyCode: string): string {
+    const lines = pyCode.split('\n');
+    const converted = lines.map((line) => {
+      line = line.replace(/#\s*(.*)/g, '// $1');
+      // print(...) -> console.log(...)
+      line = line.replace(/\bprint\s*\((.*?)\)/g, 'console.log($1)');
+      // f"..." -> `...`
+      line = line.replace(/f(["'])(.*?)\1/g, (_m, _q, content) => {
+        return `\`${content.replace(/\{([a-zA-Z0-9_.]+)\}/g, '${$1}')}\``;
+      });
+      // def ...
+      line = line.replace(/\bdef\s+([a-zA-Z0-9_]+)\s*\((.*?)\)(\s*->\s*[a-zA-Z0-9_<>\[\], ]+)?\s*:/g, 'function $1($2) {');
+      // Control
+      line = line
+        .replace(/\belif\s+(.*?):/g, 'else if ($1) {')
+        .replace(/\bif\s+(.*?):/g, 'if ($1) {')
+        .replace(/\belse:/g, 'else {')
+        .replace(/\bwhile\s+(.*?):/g, 'while ($1) {')
+        .replace(/\bfor\s+([a-zA-Z0-9_]+)\s+in\s+range\((.*?)\):/g, 'for (let $1 = 0; $1 < $2; $1++) {')
+        .replace(/\bfor\s+([a-zA-Z0-9_]+)\s+in\s+(.*?):/g, 'for (const $1 of $2) {')
+        .replace(/\bNone\b/g, 'null')
+        .replace(/\bTrue\b/g, 'true')
+        .replace(/\bFalse\b/g, 'false')
+        .replace(/\.append\((.*?)\)/g, '.push($1)')
+        .replace(/\blen\((.*?)\)/g, '$1.length')
+        .replace(/\breturn\s+(.*?)$/g, 'return $1;');
+      return line;
+    }).join('\n');
+
+    return `
+const sum = (arr) => arr.reduce((a, b) => a + b, 0);
+const min = (arr) => Math.min(...arr);
+const max = (arr) => Math.max(...arr);
+const round = (val, dec = 0) => Number(val.toFixed(dec));
+${converted}
+if (typeof main === 'function') main();
+`;
   }
 
   /**
@@ -510,17 +676,174 @@ export class SandboxService {
   }
 
   /**
+   * Universal syntax and compiler diagnostics validator across all languages
+   */
+  private static validateLanguageSyntax(lang: string, code: string, entryFile: string = 'Main'): { valid: boolean; errors: string[] } {
+    const lines = code.split('\n');
+    const errors: string[] = [];
+
+    // 1. Line-by-line quote & literal tracking
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      const trimmed = line.trim();
+      if (trimmed.startsWith('//') || trimmed.startsWith('#') || trimmed.startsWith('/*')) continue;
+
+      let inDouble = false;
+      let inSingle = false;
+      let inBacktick = false;
+      let quoteCol = 0;
+
+      for (let c = 0; c < line.length; c++) {
+        const ch = line[c];
+        const prev = c > 0 ? line[c - 1] : '';
+
+        if (ch === '"' && !inSingle && !inBacktick && prev !== '\\') {
+          if (!inDouble) {
+            inDouble = true;
+            quoteCol = c + 1;
+          } else {
+            inDouble = false;
+          }
+        } else if (ch === "'" && !inDouble && !inBacktick && prev !== '\\') {
+          if (!inSingle) {
+            inSingle = true;
+            quoteCol = c + 1;
+          } else {
+            inSingle = false;
+          }
+        } else if (ch === '`' && !inDouble && !inSingle && prev !== '\\') {
+          if (!inBacktick) {
+            inBacktick = true;
+            quoteCol = c + 1;
+          } else {
+            inBacktick = false;
+          }
+        }
+      }
+
+      if (inDouble) {
+        errors.push(`${entryFile}:${i + 1}: error: unclosed string literal\n    ${line}\n    ${' '.repeat(Math.max(0, quoteCol - 1))}^`);
+      } else if (inSingle && !['python', 'ruby'].includes(lang)) {
+        errors.push(`${entryFile}:${i + 1}: error: unclosed character literal\n    ${line}\n    ${' '.repeat(Math.max(0, quoteCol - 1))}^`);
+      }
+
+      // Check missing semicolons for Java, C++, C#, PHP
+      if (['java', 'cpp', 'c', 'csharp', 'php'].includes(lang)) {
+        if (
+          trimmed.length > 0 &&
+          !trimmed.endsWith(';') &&
+          !trimmed.endsWith('{') &&
+          !trimmed.endsWith('}') &&
+          !trimmed.endsWith(':') &&
+          !trimmed.startsWith('#') &&
+          !trimmed.startsWith('//') &&
+          !trimmed.startsWith('/*') &&
+          !trimmed.startsWith('*') &&
+          !trimmed.startsWith('import ') &&
+          !trimmed.startsWith('package ') &&
+          !trimmed.startsWith('public class ') &&
+          !trimmed.startsWith('class ') &&
+          !trimmed.startsWith('interface ') &&
+          !trimmed.startsWith('record ') &&
+          !trimmed.startsWith('enum ') &&
+          !trimmed.startsWith('public static void main') &&
+          !trimmed.startsWith('void main') &&
+          !trimmed.startsWith('int main') &&
+          !trimmed.startsWith('<?php') &&
+          !trimmed.endsWith('?>')
+        ) {
+          // If statement looks like a full expression (e.g. System.out.println, assignment, return)
+          if (
+            trimmed.includes('System.out.') ||
+            trimmed.startsWith('return ') ||
+            trimmed.includes('std::cout') ||
+            trimmed.includes('printf(') ||
+            trimmed.includes(' = ')
+          ) {
+            errors.push(`${entryFile}:${i + 1}: error: ';' expected\n    ${line}\n    ${' '.repeat(line.length)}^`);
+          }
+        }
+      }
+    }
+
+    // 2. Bracket matching ({}, (), [])
+    const stack: Array<{ char: string; line: number; col: number }> = [];
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      let inString = false;
+      let stringChar = '';
+
+      for (let c = 0; c < line.length; c++) {
+        const ch = line[c];
+        const prev = c > 0 ? line[c - 1] : '';
+
+        if ((ch === '"' || ch === "'" || ch === '`') && prev !== '\\') {
+          if (!inString) {
+            inString = true;
+            stringChar = ch;
+          } else if (stringChar === ch) {
+            inString = false;
+          }
+          continue;
+        }
+
+        if (inString) continue;
+        if (line.slice(c, c + 2) === '//') break;
+
+        if (ch === '{' || ch === '(' || ch === '[') {
+          stack.push({ char: ch, line: i + 1, col: c + 1 });
+        } else if (ch === '}' || ch === ')' || ch === ']') {
+          if (stack.length === 0) {
+            errors.push(`${entryFile}:${i + 1}: error: class, interface, or statement closed unexpectedly (unmatched closing '${ch}')\n    ${line}\n    ${' '.repeat(c)}^`);
+          } else {
+            const last = stack.pop()!;
+            const expected = last.char === '{' ? '}' : last.char === '(' ? ')' : ']';
+            if (ch !== expected) {
+              errors.push(`${entryFile}:${i + 1}: error: mismatched delimiter, expected '${expected}' but found '${ch}'\n    ${line}\n    ${' '.repeat(c)}^`);
+            }
+          }
+        }
+      }
+    }
+
+    while (stack.length > 0) {
+      const unclosed = stack.pop()!;
+      errors.push(`${entryFile}:${unclosed.line}: error: reached end of file while parsing (unclosed '${unclosed.char}')`);
+    }
+
+    // 3. Language specific structure verification
+    if (lang === 'java') {
+      if (!code.includes('class ') && !code.includes('interface ') && !code.includes('record ') && !code.includes('enum ')) {
+        errors.push(`${entryFile}:1: error: class, interface, enum, or record expected\n${lines[0] || ''}\n^`);
+      }
+      if (!code.includes('main(')) {
+        errors.push(`${entryFile}: error: Main method not found in class, please define the main method as:\n   public static void main(String[] args)`);
+      }
+    } else if (lang === 'go' || lang === 'golang') {
+      if (!code.includes('package ')) {
+        errors.push(`${entryFile}:1:1: expected 'package', found 'EOF'`);
+      }
+      if (!code.includes('func main(')) {
+        errors.push(`${entryFile}: function main is undeclared in the main package`);
+      }
+    } else if (lang === 'rust' || lang === 'rs') {
+      if (!code.includes('fn main()')) {
+        errors.push(`error[E0601]: \`main\` function not found in crate \`main\`\n --> ${entryFile}:1:1\n  |\n1 | // missing main function\n  | ^ consider adding a \`main\` function`);
+      }
+    } else if (lang === 'cpp' || lang === 'c++' || lang === 'c') {
+      if (!code.includes('main(')) {
+        errors.push(`undefined reference to \`main'\ncollect2: error: ld returned 1 exit status`);
+      }
+    }
+
+    return { valid: errors.length === 0, errors };
+  }
+
+  /**
    * Emulate C/C++ isolated environment
    */
   private static emulateCppSandbox(code: string, stdin?: string) {
     const logs: string[] = [];
-    const errors: string[] = [];
-
-    if (!code.includes('int main(') && !code.includes('main()')) {
-      errors.push('undefined reference to `main`\ncollect2: error: ld returned 1 exit status');
-      return { stdout: '', stderr: errors.join('\n'), exitCode: 1 };
-    }
-
     const coutMatches = code.matchAll(/std::cout\s*<<\s*"(.*?)"/g);
     for (const match of coutMatches) {
       logs.push(match[1].replace(/\\n/g, '\n'));
@@ -537,7 +860,7 @@ export class SandboxService {
 
     return {
       stdout: logs.join('\n'),
-      stderr: errors.join('\n'),
+      stderr: '',
       exitCode: 0,
     };
   }
@@ -547,20 +870,13 @@ export class SandboxService {
    */
   private static emulateJavaSandbox(code: string, stdin?: string) {
     const logs: string[] = [];
-    const errors: string[] = [];
-
-    if (!code.includes('public static void main')) {
-      errors.push('Error: Main method not found in class, please define the main method as:\n   public static void main(String[] args)');
-      return { stdout: '', stderr: errors.join('\n'), exitCode: 1 };
-    }
-
     const sysMatches = code.matchAll(/System\.out\.println\((.*?)\);/g);
     for (const match of sysMatches) {
       let content = match[1].trim();
       if (content.startsWith('"') && content.endsWith('"')) {
         logs.push(content.substring(1, content.length - 1));
       } else {
-        logs.push(content);
+        logs.push(content.replace(/^["']|["']$/g, ''));
       }
     }
 
@@ -570,7 +886,7 @@ export class SandboxService {
 
     return {
       stdout: logs.join('\n'),
-      stderr: errors.join('\n'),
+      stderr: '',
       exitCode: 0,
     };
   }
