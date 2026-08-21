@@ -18,9 +18,12 @@ import {
   Loader2,
   Terminal,
   Lock,
+  Globe,
+  Radio,
 } from 'lucide-react';
 import { useCloudIdeStore } from '../../store/useCloudIdeStore';
 import { TerminalPanel } from './TerminalPanel';
+import { LiveBrowserPreview } from './LiveBrowserPreview';
 
 const MonacoEditor = dynamic(
   () =>
@@ -94,7 +97,13 @@ export const EditorPanel: React.FC = () => {
     revertAiApplied,
     isReadOnlyWorkspace,
     forkWorkspace,
+    isLivePreviewOpen,
+    toggleLivePreview,
   } = useCloudIdeStore();
+
+  const isFrontendRuntime = ['html', 'react', 'vue', 'angular', 'svelte'].includes(
+    currentLanguage.toLowerCase(),
+  );
 
   const [isFullscreen, setIsFullscreen] = React.useState(false);
   const [showFullscreenTerminal, setShowFullscreenTerminal] = useState(false);
@@ -240,6 +249,34 @@ export const EditorPanel: React.FC = () => {
 
         {/* Action Controls on Top Right */}
         <div className="flex items-center gap-1.5 py-1 shrink-0">
+          {/* Go Live Web Preview Button */}
+          <button
+            onClick={() => toggleLivePreview()}
+            title={isLivePreviewOpen ? 'Close Live Web Preview' : 'Launch Go Live Browser Sandbox (Port 3000)'}
+            className={`px-2.5 py-1 rounded-lg border text-xs font-bold flex items-center gap-1.5 transition-all shadow-sm ${
+              isLivePreviewOpen
+                ? 'bg-emerald-950/90 text-emerald-300 border-emerald-500/60 shadow-emerald-500/10'
+                : isFrontendRuntime
+                ? 'bg-indigo-600 hover:bg-indigo-500 text-white border-indigo-400/50 shadow-indigo-500/20'
+                : 'bg-neutral-900 hover:bg-neutral-800 text-slate-300 border-neutral-700'
+            }`}
+          >
+            {isLivePreviewOpen ? (
+              <>
+                <Radio className="w-3.5 h-3.5 text-emerald-400 animate-pulse" />
+                <span className="flex items-center gap-1">
+                  <span>● LIVE</span>
+                  <span className="text-[10px] text-emerald-400/80 font-mono hidden sm:inline">:3000</span>
+                </span>
+              </>
+            ) : (
+              <>
+                <Globe className={`w-3.5 h-3.5 ${isFrontendRuntime ? 'text-indigo-200' : 'text-emerald-400'}`} />
+                <span>Go Live</span>
+              </>
+            )}
+          </button>
+
           {/* AI Quick Explain */}
           <button
             onClick={() => runAiAssist('explain')}
@@ -468,6 +505,13 @@ export const EditorPanel: React.FC = () => {
                 domReadOnly: isReadOnlyWorkspace || metrics.status === 'running',
               }}
             />
+          </div>
+        )}
+
+        {/* Live Browser Preview Split Studio (if open) */}
+        {isLivePreviewOpen && (
+          <div className="flex-1 h-full min-w-[340px] border-l border-neutral-800 flex flex-col bg-slate-950">
+            <LiveBrowserPreview onClose={() => toggleLivePreview(false)} />
           </div>
         )}
       </div>

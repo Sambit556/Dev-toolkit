@@ -101,10 +101,22 @@ export const ProjectExplorer: React.FC = () => {
         setIsLangDropdownOpen(false);
       }
     };
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setIsLangDropdownOpen(false);
+        setIsCreatingFile(false);
+        setIsCreatingFolder(false);
+        setEditingFile(null);
+      }
+    };
     if (isLangDropdownOpen) {
       document.addEventListener('mousedown', handleClickOutside);
     }
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      window.removeEventListener('keydown', handleKeyDown);
+    };
   }, [isLangDropdownOpen]);
 
   const [isCreatingFile, setIsCreatingFile] = useState(false);

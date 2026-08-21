@@ -14,6 +14,7 @@ import {
   FileCode,
   Layers,
   Terminal,
+  Globe,
 } from 'lucide-react';
 import { useCloudIdeStore } from '../../store/useCloudIdeStore';
 import { LANGUAGE_TEMPLATES } from '../../lib/templates';
@@ -40,9 +41,11 @@ export const CommandPalette: React.FC = () => {
     setSettingsModalOpen,
     setVersionModalOpen,
     toggleBottomPanel,
+    toggleLivePreview,
   } = useCloudIdeStore();
 
   const [query, setQuery] = useState('');
+  const modalRef = React.useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -54,8 +57,20 @@ export const CommandPalette: React.FC = () => {
         setCommandPaletteOpen(false);
       }
     };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
+    const handleClickOutside = (e: MouseEvent) => {
+      if (modalRef.current && !modalRef.current.contains(e.target as Node)) {
+        setCommandPaletteOpen(false);
+      }
+    };
+
+    if (isCommandPaletteOpen) {
+      window.addEventListener('keydown', handleKeyDown);
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
   }, [isCommandPaletteOpen, setCommandPaletteOpen]);
 
   if (!isCommandPaletteOpen) return null;
@@ -146,6 +161,13 @@ export const CommandPalette: React.FC = () => {
       icon: Terminal,
       action: () => toggleBottomPanel(),
     },
+    {
+      id: 'toggle-golive',
+      title: 'Toggle Go Live Browser Sandbox (Port 3000)',
+      category: 'Frontend & Preview',
+      icon: Globe,
+      action: () => toggleLivePreview(),
+    },
     // Add language template switchers
     ...LANGUAGE_TEMPLATES.map((tpl) => ({
       id: `lang-${tpl.id}`,
@@ -163,8 +185,17 @@ export const CommandPalette: React.FC = () => {
   );
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center pt-20 bg-black/70 backdrop-blur-sm p-4 animate-in fade-in duration-100 select-none">
-      <div className="bg-slate-900 border border-slate-700/80 rounded-2xl w-full max-w-xl shadow-2xl overflow-hidden flex flex-col max-h-[70vh]">
+    <div
+      onClick={(e) => {
+        if (e.target === e.currentTarget) setCommandPaletteOpen(false);
+      }}
+      className="fixed inset-0 z-50 flex items-start justify-center pt-20 bg-black/70 backdrop-blur-sm p-4 animate-in fade-in duration-100 select-none cursor-pointer"
+    >
+      <div
+        ref={modalRef}
+        onClick={(e) => e.stopPropagation()}
+        className="bg-slate-900 border border-slate-700/80 rounded-2xl w-full max-w-xl shadow-2xl overflow-hidden flex flex-col max-h-[70vh] cursor-default"
+      >
         {/* Search Bar */}
         <div className="p-3 border-b border-slate-800 flex items-center gap-2">
           <Search className="w-4 h-4 text-slate-400 shrink-0" />

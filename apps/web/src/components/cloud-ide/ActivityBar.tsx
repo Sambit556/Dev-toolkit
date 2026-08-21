@@ -13,6 +13,7 @@ import {
   History,
   Share2,
   Terminal,
+  Globe,
 } from 'lucide-react';
 import { useCloudIdeStore, ActivityPanel } from '../../store/useCloudIdeStore';
 
@@ -37,6 +38,8 @@ export const ActivityBar: React.FC = () => {
     setVersionModalOpen,
     toggleBottomPanel,
     isBottomPanelOpen,
+    isLivePreviewOpen,
+    toggleLivePreview,
   } = useCloudIdeStore();
 
   const navItems: NavItem[] = [
@@ -107,6 +110,18 @@ export const ActivityBar: React.FC = () => {
 
       {/* Bottom Utility Icons */}
       <div className="flex flex-col items-center gap-1.5 w-full pt-3 border-t border-slate-800/60">
+        <button
+          onClick={() => toggleLivePreview()}
+          title={isLivePreviewOpen ? 'Hide Go Live Browser Preview' : 'Open Go Live Browser Preview (Port 3000)'}
+          className={`p-2.5 rounded-xl transition-colors ${
+            isLivePreviewOpen
+              ? 'text-emerald-400 bg-emerald-500/20 border border-emerald-500/40 shadow-sm shadow-emerald-500/10'
+              : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
+          }`}
+        >
+          <Globe className="w-5 h-5" />
+        </button>
+
         <button
           onClick={() => toggleBottomPanel()}
           title={isBottomPanelOpen ? 'Hide Terminal / Output' : 'Show Terminal / Output'}

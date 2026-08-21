@@ -32,6 +32,29 @@ export const ShareModal: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [copied, setCopied] = useState(false);
   const [copiedEmbed, setCopiedEmbed] = useState(false);
+  const modalRef = React.useRef<HTMLDivElement>(null);
+
+  React.useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && isShareModalOpen) {
+        setShareModalOpen(false);
+      }
+    };
+    const handleClickOutside = (e: MouseEvent) => {
+      if (modalRef.current && !modalRef.current.contains(e.target as Node)) {
+        setShareModalOpen(false);
+      }
+    };
+
+    if (isShareModalOpen) {
+      window.addEventListener('keydown', handleKeyDown);
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isShareModalOpen, setShareModalOpen]);
 
   if (!isShareModalOpen) return null;
 
@@ -58,30 +81,34 @@ export const ShareModal: React.FC = () => {
         setGeneratedLink(fullUrl);
       } else {
         // Deterministic zero-server snapshot fallback
-        const snapshotPayload = {
-          f: files.map((file) => ({ n: file.name, c: file.content })),
-          l: currentLanguage,
-          a: activeFile,
-          r: isReadOnly ? 1 : 0,
-        };
-        const snapshotBase64 = encodeURIComponent(btoa(unescape(encodeURIComponent(JSON.stringify(snapshotPayload)))));
-        setGeneratedLink(`${window.location.origin}/code-studio?snapshot=${snapshotBase64}`);
+        const payload = JSON.stringify({
+          files,
+          language: currentLanguage,
+          activeFile,
+          isReadOnly,
+        });
+        const encoded = btoa(encodeURIComponent(payload));
+        const directUrl = `${window.location.origin}/code-studio?snapshot=${encoded}`;
+        setGeneratedLink(directUrl);
       }
     } catch {
-      const snapshotPayload = {
-        f: files.map((file) => ({ n: file.name, c: file.content })),
-        l: currentLanguage,
-        a: activeFile,
-        r: isReadOnly ? 1 : 0,
-      };
-      const snapshotBase64 = encodeURIComponent(btoa(unescape(encodeURIComponent(JSON.stringify(snapshotPayload)))));
-      setGeneratedLink(`${window.location.origin}/code-studio?snapshot=${snapshotBase64}`);
+      // Offline / zero-server base64 snapshot
+      const payload = JSON.stringify({
+        files,
+        language: currentLanguage,
+        activeFile,
+        isReadOnly,
+      });
+      const encoded = btoa(encodeURIComponent(payload));
+      const directUrl = `${window.location.origin}/code-studio?snapshot=${encoded}`;
+      setGeneratedLink(directUrl);
     } finally {
       setLoading(false);
     }
   };
 
   const handleCopyLink = () => {
+    if (!generatedLink) return;
     navigator.clipboard.writeText(generatedLink);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
@@ -111,8 +138,17 @@ export const ShareModal: React.FC = () => {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 animate-in fade-in duration-150 select-none">
-      <div className="bg-slate-900 border border-slate-700/80 rounded-2xl w-full max-w-xl shadow-2xl overflow-hidden flex flex-col">
+    <div
+      onClick={(e) => {
+        if (e.target === e.currentTarget) setShareModalOpen(false);
+      }}
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 animate-in fade-in duration-150 select-none cursor-pointer"
+    >
+      <div
+        ref={modalRef}
+        onClick={(e) => e.stopPropagation()}
+        className="bg-slate-900 border border-slate-700/80 rounded-2xl w-full max-w-xl shadow-2xl overflow-hidden flex flex-col cursor-default"
+      >
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b border-slate-800">
           <div className="flex items-center gap-2.5">

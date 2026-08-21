@@ -230,7 +230,9 @@ interface CloudIdeState {
   settings: EditorSettings;
   updateSettings: (newSettings: Partial<EditorSettings>) => void;
 
-  // UI Modals
+  // UI Modals & Live Preview
+  isLivePreviewOpen: boolean;
+  toggleLivePreview: (open?: boolean) => void;
   isShareModalOpen: boolean;
   setShareModalOpen: (open: boolean) => void;
   isSettingsModalOpen: boolean;
@@ -297,6 +299,7 @@ export const useCloudIdeStore = create<CloudIdeState>()(
 
       setLanguage: (langId) => {
         const template = LANGUAGE_TEMPLATES.find((t) => t.id === langId) || defaultTypeScriptTemplate;
+        const isFrontend = ['html', 'react', 'vue', 'angular', 'svelte'].includes(langId.toLowerCase());
         set({
           currentLanguage: langId,
           files: template.files,
@@ -308,6 +311,7 @@ export const useCloudIdeStore = create<CloudIdeState>()(
           diagnostics: { hasError: false },
           terminalLogs: [],
           stderrLogs: [],
+          isLivePreviewOpen: isFrontend,
         });
         get().prewarmDaemon(langId);
         get().createSnapshot(`Switched to ${template.name} Starter`);
@@ -438,14 +442,16 @@ export const useCloudIdeStore = create<CloudIdeState>()(
         const nextIndex = executionCount + 1;
         const now = new Date();
         const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+        const isFrontend = ['html', 'react', 'vue', 'angular', 'svelte'].includes(currentLanguage.toLowerCase());
 
-        // Update state to running
+        // Update state to running and trigger Go Live if frontend
         set({
           executionCount: nextIndex,
           metrics: { ...get().metrics, status: 'running' },
           diagnostics: { hasError: false },
           isBottomPanelOpen: true,
           activeBottomTab: 'terminal',
+          ...(isFrontend ? { isLivePreviewOpen: true } : {}),
         });
 
         try {
@@ -867,7 +873,10 @@ export const useCloudIdeStore = create<CloudIdeState>()(
       updateSettings: (newSettings) =>
         set((s) => ({ settings: { ...s.settings, ...newSettings } })),
 
-      // Modals
+      // Modals & Live Preview
+      isLivePreviewOpen: false,
+      toggleLivePreview: (isLivePreviewOpen) =>
+        set((s) => ({ isLivePreviewOpen: isLivePreviewOpen !== undefined ? isLivePreviewOpen : !s.isLivePreviewOpen })),
       isShareModalOpen: false,
       setShareModalOpen: (isShareModalOpen) => set({ isShareModalOpen }),
       isSettingsModalOpen: false,
