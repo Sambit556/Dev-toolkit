@@ -5,15 +5,11 @@ import {
   Sparkles,
   Wrench,
   HelpCircle,
-  FileCode,
   Zap,
   TestTube,
   BookOpen,
   Send,
-  Check,
-  RotateCcw,
   RefreshCw,
-  Baby,
   Sparkle,
   Copy,
   CheckCheck,
@@ -21,7 +17,6 @@ import {
   Lightbulb,
   CheckCircle2,
   Code,
-  Terminal,
 } from 'lucide-react';
 import { useCloudIdeStore } from '../../store/useCloudIdeStore';
 
@@ -29,11 +24,7 @@ export const AiAssistantPanel: React.FC = () => {
   const {
     aiLoading,
     aiResponse,
-    aiDiffCode,
-    aiDiffFile,
     runAiAssist,
-    acceptAiDiff,
-    rejectAiDiff,
     currentLanguage,
     activeFile,
   } = useCloudIdeStore();
@@ -61,7 +52,6 @@ export const AiAssistantPanel: React.FC = () => {
     { id: 'explain', label: 'Explain Code', icon: HelpCircle, desc: 'Architecture & logic' },
     { id: 'optimize', label: 'Optimize Speed', icon: Zap, desc: 'Reduce runtime lag' },
     { id: 'docs', label: 'Generate Docs', icon: BookOpen, desc: 'Add docstrings & types' },
-    { id: 'eli5', label: 'Explain (ELI5)', icon: Baby, desc: 'Beginner friendly' },
     { id: 'test', label: 'Generate Tests', icon: TestTube, desc: 'Unit test suite' },
   ];
 
@@ -89,7 +79,6 @@ export const AiAssistantPanel: React.FC = () => {
       <div className="space-y-3">
         {parts.map((part, idx) => {
           if (part.type === 'code') {
-            const isLatestDiff = aiDiffCode && aiDiffCode === part.content;
             return (
               <div
                 key={`code-${idx}`}
@@ -103,28 +92,18 @@ export const AiAssistantPanel: React.FC = () => {
                       ({part.content.split('\n').length} lines)
                     </span>
                   </div>
-                  <div className="flex items-center gap-1.5">
-                    <button
-                      onClick={() => handleCopyText(part.content, `code-${idx}`)}
-                      className="px-2 py-0.5 rounded bg-neutral-850 hover:bg-neutral-800 text-[10px] text-neutral-300 flex items-center gap-1 transition-colors"
-                      title="Copy code snippet"
-                    >
-                      {copiedSection === `code-${idx}` ? (
-                        <CheckCheck className="w-3 h-3 text-emerald-400" />
-                      ) : (
-                        <Copy className="w-3 h-3 text-neutral-400" />
-                      )}
-                      <span>{copiedSection === `code-${idx}` ? 'Copied' : 'Copy'}</span>
-                    </button>
-                    <button
-                      onClick={() => acceptAiDiff(part.content)}
-                      className="px-2.5 py-0.5 rounded bg-emerald-600 hover:bg-emerald-500 text-[10px] text-white font-bold flex items-center gap-1 transition-colors shadow-sm"
-                      title={`Apply this code directly into ${activeFile}`}
-                    >
-                      <Check className="w-3 h-3" />
-                      <span>Apply to IDE</span>
-                    </button>
-                  </div>
+                  <button
+                    onClick={() => handleCopyText(part.content, `code-${idx}`)}
+                    className="px-2 py-0.5 rounded bg-neutral-850 hover:bg-neutral-800 text-[10px] text-neutral-300 flex items-center gap-1 transition-colors"
+                    title="Copy code snippet"
+                  >
+                    {copiedSection === `code-${idx}` ? (
+                      <CheckCheck className="w-3 h-3 text-emerald-400" />
+                    ) : (
+                      <Copy className="w-3 h-3 text-neutral-400" />
+                    )}
+                    <span>{copiedSection === `code-${idx}` ? 'Copied' : 'Copy'}</span>
+                  </button>
                 </div>
                 <pre className="p-3 text-[11px] font-mono text-slate-100 overflow-x-auto leading-relaxed selection:bg-indigo-500/30">
                   <code>{part.content}</code>
@@ -207,17 +186,8 @@ export const AiAssistantPanel: React.FC = () => {
                     >
                       <div className="flex items-center gap-1.5 text-xs font-bold text-emerald-300">
                         <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
-                        <span>4. 🛠️ Apply the Solution</span>
+                        <span>4. 🛠️ Solution Code</span>
                       </div>
-                      {aiDiffCode && (
-                        <button
-                          onClick={() => acceptAiDiff()}
-                          className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-500 text-white rounded-md text-[10px] font-bold flex items-center gap-1 transition-colors shadow-sm"
-                        >
-                          <Check className="w-3 h-3" />
-                          <span>Apply to IDE</span>
-                        </button>
-                      )}
                     </div>
                   );
                 }
@@ -315,34 +285,6 @@ export const AiAssistantPanel: React.FC = () => {
           </button>
         </div>
       </form>
-
-      {/* Solution Ready Banner Card */}
-      {aiDiffCode && (
-        <div className="p-2.5 bg-indigo-950/60 border border-indigo-500/50 rounded-xl mb-2.5 space-y-1.5 shrink-0 animate-in slide-in-from-top-1">
-          <div className="flex items-center justify-between text-xs text-indigo-200 font-semibold">
-            <span className="flex items-center gap-1.5">
-              <FileCode className="w-3.5 h-3.5 text-indigo-400" />
-              Solution Ready for <span className="font-mono text-white">{aiDiffFile || activeFile}</span>
-            </span>
-          </div>
-          <div className="flex items-center gap-2 pt-1">
-            <button
-              onClick={() => acceptAiDiff()}
-              className="flex-1 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-lg flex items-center justify-center gap-1.5 transition-colors shadow-sm"
-            >
-              <Check className="w-3.5 h-3.5" />
-              Apply Solution to IDE
-            </button>
-            <button
-              onClick={rejectAiDiff}
-              className="px-3 py-1.5 bg-neutral-800 hover:bg-neutral-700 text-slate-300 text-xs font-semibold rounded-lg flex items-center gap-1 transition-colors"
-            >
-              <RotateCcw className="w-3.5 h-3.5" />
-              Discard
-            </button>
-          </div>
-        </div>
-      )}
 
       {/* AI Response Output Area */}
       <div className="flex-1 overflow-y-auto bg-neutral-950 border border-neutral-800 rounded-xl p-3 text-xs flex flex-col relative">

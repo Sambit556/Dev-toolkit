@@ -16,8 +16,11 @@ import {
   RotateCcw,
   Bug,
   Loader2,
+  Terminal,
+  Lock,
 } from 'lucide-react';
 import { useCloudIdeStore } from '../../store/useCloudIdeStore';
+import { TerminalPanel } from './TerminalPanel';
 
 const MonacoEditor = dynamic(
   () =>
@@ -89,14 +92,29 @@ export const EditorPanel: React.FC = () => {
     aiAppliedNotification,
     dismissAiNotification,
     revertAiApplied,
+    isReadOnlyWorkspace,
+    forkWorkspace,
   } = useCloudIdeStore();
 
   const [isFullscreen, setIsFullscreen] = React.useState(false);
+  const [showFullscreenTerminal, setShowFullscreenTerminal] = useState(false);
   const editorRef = useRef<any>(null);
   const monacoRef = useRef<Monaco | null>(null);
 
   const currentFile = files.find((f) => f.name === activeFile) || files[0];
   const splitCurrentFile = splitFile ? files.find((f) => f.name === splitFile) : null;
+
+  // Listen for Escape key to exit fullscreen
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && isFullscreen) {
+        setIsFullscreen(false);
+        setShowFullscreenTerminal(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isFullscreen]);
 
   // Synchronize Monaco editor content with external state (e.g. AI diff accept, template change, snapshot restore)
   useEffect(() => {
@@ -201,6 +219,9 @@ export const EditorPanel: React.FC = () => {
               >
                 <FileCode className="w-3.5 h-3.5" />
                 <span className="font-medium">{tab}</span>
+                {isReadOnlyWorkspace && (
+                  <Lock className="w-2.5 h-2.5 text-amber-400 shrink-0" />
+                )}
                 {openTabs.length > 1 && (
                   <button
                     onClick={(e) => {
@@ -248,13 +269,39 @@ export const EditorPanel: React.FC = () => {
             <Columns className="w-3.5 h-3.5" />
           </button>
 
+          {/* Fullscreen Terminal Button */}
+          {isFullscreen && (
+            <button
+              onClick={() => setShowFullscreenTerminal(!showFullscreenTerminal)}
+              title={showFullscreenTerminal ? 'Hide Terminal (Fullscreen)' : 'Open Terminal (Fullscreen)'}
+              className={`px-2.5 py-1 rounded-lg border text-xs flex items-center gap-1.5 transition-colors ${
+                showFullscreenTerminal
+                  ? 'bg-indigo-600/30 text-indigo-300 border-indigo-500/50 font-semibold'
+                  : 'text-slate-300 hover:text-white border-neutral-800 hover:bg-neutral-900 bg-neutral-950'
+              }`}
+            >
+              <Terminal className="w-3.5 h-3.5 text-indigo-400" />
+              <span>Terminal</span>
+            </button>
+          )}
+
           {/* Fullscreen Toggle */}
           <button
-            onClick={() => setIsFullscreen(!isFullscreen)}
-            title={isFullscreen ? 'Exit Fullscreen' : 'Fullscreen'}
-            className="p-1.5 rounded-lg border border-slate-800 text-slate-400 hover:text-slate-200 hover:bg-slate-900 text-xs transition-colors"
+            onClick={() => {
+              setIsFullscreen(!isFullscreen);
+              if (isFullscreen) setShowFullscreenTerminal(false);
+            }}
+            title={isFullscreen ? 'Exit Fullscreen (Esc)' : 'Enter Fullscreen'}
+            className="p-1.5 rounded-lg border border-slate-800 text-slate-400 hover:text-slate-200 hover:bg-slate-900 text-xs transition-colors flex items-center gap-1.5"
           >
-            {isFullscreen ? <Minimize2 className="w-3.5 h-3.5" /> : <Maximize2 className="w-3.5 h-3.5" />}
+            {isFullscreen ? (
+              <>
+                <Minimize2 className="w-3.5 h-3.5" />
+                <kbd className="text-[9px] bg-neutral-800 px-1 py-0.2 rounded text-slate-400 font-mono">Esc</kbd>
+              </>
+            ) : (
+              <Maximize2 className="w-3.5 h-3.5" />
+            )}
           </button>
         </div>
       </div>
@@ -336,6 +383,12 @@ export const EditorPanel: React.FC = () => {
           <span className="text-slate-400">workspace</span>
           <span>/</span>
           <span className="text-slate-200 font-semibold">{currentFile?.name}</span>
+          {isReadOnlyWorkspace && (
+            <span className="ml-2 px-2 py-0.2 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30 text-[10px] font-bold flex items-center gap-1">
+              <Lock className="w-2.5 h-2.5" />
+              Read-Only
+            </span>
+          )}
         </div>
         <div className="flex items-center gap-3 text-slate-400">
           {breakpoints.filter((b) => b.file === activeFile).length > 0 && (
@@ -378,8 +431,8 @@ export const EditorPanel: React.FC = () => {
                 automaticLayout: true,
                 glyphMargin: true,
                 padding: { top: 12, bottom: 12 },
-                readOnly: metrics.status === 'running',
-                domReadOnly: metrics.status === 'running',
+                readOnly: isReadOnlyWorkspace || metrics.status === 'running',
+                domReadOnly: isReadOnlyWorkspace || metrics.status === 'running',
               }}
             />
           )}
@@ -411,11 +464,20 @@ export const EditorPanel: React.FC = () => {
                 wordWrap: settings.wordWrap,
                 automaticLayout: true,
                 padding: { top: 12, bottom: 12 },
+                readOnly: isReadOnlyWorkspace || metrics.status === 'running',
+                domReadOnly: isReadOnlyWorkspace || metrics.status === 'running',
               }}
             />
           </div>
         )}
       </div>
+
+      {/* Fullscreen Embedded Terminal Drawer */}
+      {isFullscreen && showFullscreenTerminal && (
+        <div className="h-64 border-t border-neutral-800 flex flex-col bg-black z-30 shrink-0 animate-in slide-in-from-bottom-2">
+          <TerminalPanel />
+        </div>
+      )}
     </div>
   );
 };

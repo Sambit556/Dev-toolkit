@@ -17,6 +17,8 @@ import {
   ShieldCheck,
   Zap,
   ArrowLeft,
+  Lock,
+  GitFork,
 } from 'lucide-react';
 import { useCloudIdeStore } from '../../store/useCloudIdeStore';
 import { ActivityBar } from './ActivityBar';
@@ -49,17 +51,67 @@ export const CloudIdeApp: React.FC = () => {
     setShareModalOpen,
     setSettingsModalOpen,
     setVersionModalOpen,
+    terminalPosition,
+    setTerminalPosition,
     toggleBottomPanel,
     prewarmDaemon,
+    isReadOnlyWorkspace,
+    sharedWorkspaceInfo,
+    loadSharedWorkspace,
+    forkWorkspace,
   } = useCloudIdeStore();
 
   const [sidebarWidth, setSidebarWidth] = useState(280);
   const [bottomHeight, setBottomHeight] = useState(240);
+  const [rightTerminalWidth, setRightTerminalWidth] = useState(440);
   const [isDraggingSidebar, setIsDraggingSidebar] = useState(false);
   const [isDraggingBottom, setIsDraggingBottom] = useState(false);
+  const [isDraggingRightTerminal, setIsDraggingRightTerminal] = useState(false);
 
   const currentTemplate =
     LANGUAGE_TEMPLATES.find((t) => t.id === currentLanguage) || LANGUAGE_TEMPLATES[0];
+
+  // Load Shared Workspace if URL parameters are present
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const urlParams = new URLSearchParams(window.location.search);
+    const shareId = urlParams.get('shareId') || urlParams.get('share');
+    const snapshotParam = urlParams.get('snapshot');
+
+    if (snapshotParam) {
+      try {
+        const decoded = JSON.parse(decodeURIComponent(escape(atob(decodeURIComponent(snapshotParam)))));
+        if (decoded && Array.isArray(decoded.f) && decoded.f.length > 0) {
+          const projectFiles = decoded.f.map((item: any) => ({ name: item.n, content: item.c }));
+          loadSharedWorkspace({
+            files: projectFiles,
+            language: decoded.l || 'javascript',
+            activeFile: decoded.a || projectFiles[0]?.name,
+            isReadOnly: decoded.r === 1,
+            name: 'Shared Snapshot Workspace',
+          });
+        }
+      } catch (e) {
+        console.warn('Snapshot decode error:', e);
+      }
+    } else if (shareId) {
+      fetch(`/api/sandbox/share/${shareId}`)
+        .then((res) => res.json())
+        .then((data) => {
+          if (data && data.files && Array.isArray(data.files)) {
+            loadSharedWorkspace({
+              files: data.files,
+              language: data.language || 'javascript',
+              activeFile: data.activeFile || data.files[0]?.name,
+              isReadOnly: data.isReadOnly,
+              name: data.name,
+              id: data.id,
+            });
+          }
+        })
+        .catch((err) => console.warn('Share fetch error:', err));
+    }
+  }, [loadSharedWorkspace]);
 
   useEffect(() => {
     let isMounted = true;
@@ -83,8 +135,6 @@ export const CloudIdeApp: React.FC = () => {
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
       if (isDraggingSidebar) {
-        // Activity bar width is 56px (w-14)
-        // Enforce strict minimum width so icons & text are NEVER clipped or hidden
         const minAllowed = activeActivityPanel === 'converter' ? 380 : 280;
         const maxAllowed = Math.min(900, window.innerWidth - 320);
         const newWidth = Math.max(minAllowed, Math.min(maxAllowed, e.clientX - 56));
@@ -94,18 +144,23 @@ export const CloudIdeApp: React.FC = () => {
         const newHeight = Math.max(100, Math.min(600, window.innerHeight - e.clientY - 24));
         setBottomHeight(newHeight);
       }
+      if (isDraggingRightTerminal) {
+        const newWidth = Math.max(280, Math.min(900, window.innerWidth - e.clientX));
+        setRightTerminalWidth(newWidth);
+      }
     };
 
     const handleMouseUp = () => {
       setIsDraggingSidebar(false);
       setIsDraggingBottom(false);
+      setIsDraggingRightTerminal(false);
     };
 
-    if (isDraggingSidebar || isDraggingBottom) {
+    if (isDraggingSidebar || isDraggingBottom || isDraggingRightTerminal) {
       document.addEventListener('mousemove', handleMouseMove);
       document.addEventListener('mouseup', handleMouseUp);
       document.body.style.userSelect = 'none';
-      document.body.style.cursor = isDraggingSidebar ? 'col-resize' : 'row-resize';
+      document.body.style.cursor = isDraggingBottom ? 'row-resize' : 'col-resize';
     } else {
       document.body.style.userSelect = '';
       document.body.style.cursor = '';
@@ -117,7 +172,7 @@ export const CloudIdeApp: React.FC = () => {
       document.body.style.userSelect = '';
       document.body.style.cursor = '';
     };
-  }, [isDraggingSidebar, isDraggingBottom, activeActivityPanel]);
+  }, [isDraggingSidebar, isDraggingBottom, isDraggingRightTerminal, activeActivityPanel]);
 
   const renderActiveSidebar = () => {
     switch (activeActivityPanel) {
@@ -249,6 +304,34 @@ export const CloudIdeApp: React.FC = () => {
         </div>
       </header>
 
+      {/* VSCode-Grade Read-Only Shared Workspace Banner */}
+      {isReadOnlyWorkspace && (
+        <div className="h-9 bg-gradient-to-r from-amber-950/90 via-slate-900 to-indigo-950/90 border-b border-amber-500/40 px-3 flex items-center justify-between text-xs text-amber-200 z-20 shrink-0 select-none animate-in slide-in-from-top-1">
+          <div className="flex items-center gap-2">
+            <span className="p-1 rounded-md bg-amber-500/20 text-amber-400 border border-amber-500/30">
+              <Lock className="w-3.5 h-3.5" />
+            </span>
+            <span className="font-semibold text-amber-100">
+              Read-Only Workspace: <span className="text-white font-mono">{sharedWorkspaceInfo?.name || `${currentLanguage.toUpperCase()} Project`}</span>
+            </span>
+            <span className="text-[11px] text-amber-300/80 hidden md:inline">
+              — You are viewing a shared live session. You can run code or fork to edit.
+            </span>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              onClick={forkWorkspace}
+              className="px-3 py-1 bg-amber-500 hover:bg-amber-400 text-slate-950 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all shadow-sm shadow-amber-500/20 hover:scale-105"
+              title="Create your own editable copy"
+            >
+              <GitFork className="w-3.5 h-3.5" />
+              <span>Fork to Edit</span>
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Main Workspace Area (Activity Bar + Sidebar + Resizer + Editor + Terminal) */}
       <div className="flex-1 flex overflow-hidden relative bg-black">
         {/* Left Activity Bar */}
@@ -275,31 +358,61 @@ export const CloudIdeApp: React.FC = () => {
           </>
         )}
 
-        {/* Editor & Bottom Terminal Stack */}
-        <main className="flex-1 flex flex-col h-full overflow-hidden relative bg-black">
-          {/* Editor Canvas */}
-          <div className="flex-1 flex overflow-hidden bg-black">
-            <EditorPanel />
-          </div>
+        {/* Editor & Dynamic Terminal Layout (Bottom vs Right Dock) */}
+        {terminalPosition === 'right' ? (
+          <main className="flex-1 flex flex-row h-full overflow-hidden relative bg-black">
+            {/* Editor Canvas */}
+            <div className="flex-1 flex overflow-hidden bg-black">
+              <EditorPanel />
+            </div>
 
-          {/* Collapsible Bottom Terminal Panel & Resizer */}
-          {isBottomPanelOpen && (
-            <>
-              {/* Draggable Bottom Resizer Handle */}
-              <div
-                onMouseDown={() => setIsDraggingBottom(true)}
-                className="h-1.5 hover:h-2 hover:bg-indigo-500 cursor-row-resize transition-all bg-neutral-900 border-t border-neutral-800 z-20 shrink-0 select-none group flex items-center justify-center"
-                title="Drag to resize terminal panel"
-              >
-                <div className="h-0.5 w-12 rounded-full bg-neutral-600 group-hover:bg-indigo-400 transition-colors" />
-              </div>
+            {/* Collapsible Right Terminal Panel & Resizer */}
+            {isBottomPanelOpen && (
+              <>
+                {/* Draggable Right Resizer Handle */}
+                <div
+                  onMouseDown={() => setIsDraggingRightTerminal(true)}
+                  className="w-1.5 hover:w-2 hover:bg-indigo-500 cursor-col-resize transition-all bg-neutral-900 border-l border-neutral-800 z-20 shrink-0 select-none group flex items-center justify-center -mr-0.5"
+                  title="Drag to resize terminal panel"
+                >
+                  <div className="w-0.5 h-12 rounded-full bg-neutral-600 group-hover:bg-indigo-400 transition-colors" />
+                </div>
 
-              <div style={{ height: `${bottomHeight}px` }} className="shrink-0 flex flex-col overflow-hidden bg-black">
-                <TerminalPanel />
-              </div>
-            </>
-          )}
-        </main>
+                <div
+                  style={{ width: `${rightTerminalWidth}px` }}
+                  className="shrink-0 flex flex-col overflow-hidden bg-black border-l border-neutral-800"
+                >
+                  <TerminalPanel />
+                </div>
+              </>
+            )}
+          </main>
+        ) : (
+          <main className="flex-1 flex flex-col h-full overflow-hidden relative bg-black">
+            {/* Editor Canvas */}
+            <div className="flex-1 flex overflow-hidden bg-black">
+              <EditorPanel />
+            </div>
+
+            {/* Collapsible Bottom Terminal Panel & Resizer */}
+            {isBottomPanelOpen && (
+              <>
+                {/* Draggable Bottom Resizer Handle */}
+                <div
+                  onMouseDown={() => setIsDraggingBottom(true)}
+                  className="h-1.5 hover:h-2 hover:bg-indigo-500 cursor-row-resize transition-all bg-neutral-900 border-t border-neutral-800 z-20 shrink-0 select-none group flex items-center justify-center"
+                  title="Drag to resize terminal panel"
+                >
+                  <div className="h-0.5 w-12 rounded-full bg-neutral-600 group-hover:bg-indigo-400 transition-colors" />
+                </div>
+
+                <div style={{ height: `${bottomHeight}px` }} className="shrink-0 flex flex-col overflow-hidden bg-black">
+                  <TerminalPanel />
+                </div>
+              </>
+            )}
+          </main>
+        )}
       </div>
 
       {/* Status Bar */}

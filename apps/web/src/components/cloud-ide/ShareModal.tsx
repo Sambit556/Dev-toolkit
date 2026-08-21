@@ -22,6 +22,7 @@ export const ShareModal: React.FC = () => {
     setShareModalOpen,
     files,
     currentLanguage,
+    activeFile,
   } = useCloudIdeStore();
 
   const [isReadOnly, setIsReadOnly] = useState(true);
@@ -44,6 +45,7 @@ export const ShareModal: React.FC = () => {
           name: `${currentLanguage.toUpperCase()} Workspace`,
           files,
           language: currentLanguage,
+          activeFile,
           isReadOnly,
           expiresInHours,
           password: password || undefined,
@@ -55,13 +57,25 @@ export const ShareModal: React.FC = () => {
         const fullUrl = `${window.location.origin}${data.url}`;
         setGeneratedLink(fullUrl);
       } else {
-        // Fallback local share URL
-        const shareId = Math.random().toString(36).substring(2, 9);
-        setGeneratedLink(`${window.location.origin}/code-studio?share=${shareId}`);
+        // Deterministic zero-server snapshot fallback
+        const snapshotPayload = {
+          f: files.map((file) => ({ n: file.name, c: file.content })),
+          l: currentLanguage,
+          a: activeFile,
+          r: isReadOnly ? 1 : 0,
+        };
+        const snapshotBase64 = encodeURIComponent(btoa(unescape(encodeURIComponent(JSON.stringify(snapshotPayload)))));
+        setGeneratedLink(`${window.location.origin}/code-studio?snapshot=${snapshotBase64}`);
       }
     } catch {
-      const shareId = Math.random().toString(36).substring(2, 9);
-      setGeneratedLink(`${window.location.origin}/code-studio?share=${shareId}`);
+      const snapshotPayload = {
+        f: files.map((file) => ({ n: file.name, c: file.content })),
+        l: currentLanguage,
+        a: activeFile,
+        r: isReadOnly ? 1 : 0,
+      };
+      const snapshotBase64 = encodeURIComponent(btoa(unescape(encodeURIComponent(JSON.stringify(snapshotPayload)))));
+      setGeneratedLink(`${window.location.origin}/code-studio?snapshot=${snapshotBase64}`);
     } finally {
       setLoading(false);
     }

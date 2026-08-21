@@ -3,7 +3,6 @@
 import React, { useRef, useEffect, useState } from 'react';
 import {
   Terminal as TermIcon,
-  AlertCircle,
   Activity,
   Cpu,
   HardDrive,
@@ -17,6 +16,9 @@ import {
   ChevronDown,
   Copy,
   Check,
+  PanelBottom,
+  PanelRight,
+  X,
 } from 'lucide-react';
 import { useCloudIdeStore, BottomPanelTab } from '../../store/useCloudIdeStore';
 import { ErrorDiagnosticsBanner } from './ErrorDiagnosticsBanner';
@@ -34,6 +36,9 @@ export const TerminalPanel: React.FC = () => {
     runCode,
     diagnostics,
     toggleBottomPanel,
+    terminalPosition,
+    setTerminalPosition,
+    toggleTerminalPosition,
   } = useCloudIdeStore();
 
   const [copied, setCopied] = useState(false);
@@ -56,7 +61,6 @@ export const TerminalPanel: React.FC = () => {
   const tabs: Array<{ id: BottomPanelTab; label: string; icon: React.ElementType; badge?: string | number }> = [
     { id: 'terminal', label: 'Terminal / Logs', icon: TermIcon },
     { id: 'output', label: 'Raw Output', icon: Activity },
-    { id: 'problems', label: 'Problems & Lint', icon: AlertCircle, badge: diagnostics.hasError ? '1' : undefined },
     { id: 'metrics', label: 'Sandbox Telemetry', icon: Cpu },
   ];
 
@@ -124,6 +128,20 @@ export const TerminalPanel: React.FC = () => {
             </span>
           )}
 
+          {/* Dock Position Toggle */}
+          <button
+            onClick={() => setTerminalPosition(terminalPosition === 'bottom' ? 'right' : 'bottom')}
+            title={terminalPosition === 'bottom' ? 'Move Terminal to Right Side' : 'Move Terminal to Bottom'}
+            className="p-1 hover:text-slate-200 hover:bg-slate-800 rounded transition-colors text-slate-400 flex items-center gap-1 text-[11px]"
+          >
+            {terminalPosition === 'bottom' ? (
+              <PanelRight className="w-3.5 h-3.5 text-indigo-400" />
+            ) : (
+              <PanelBottom className="w-3.5 h-3.5 text-indigo-400" />
+            )}
+            <span className="hidden sm:inline text-[10px]">{terminalPosition === 'bottom' ? 'Dock Right' : 'Dock Bottom'}</span>
+          </button>
+
           <button
             onClick={handleCopyLogs}
             title={copied ? 'Copied to Clipboard!' : 'Copy Terminal Logs'}
@@ -140,10 +158,10 @@ export const TerminalPanel: React.FC = () => {
           </button>
           <button
             onClick={() => toggleBottomPanel(false)}
-            title="Minimize Panel"
+            title="Close Panel"
             className="p-1 hover:text-slate-200 hover:bg-slate-800 rounded transition-colors text-slate-400"
           >
-            <ChevronDown className="w-3.5 h-3.5" />
+            <X className="w-3.5 h-3.5" />
           </button>
         </div>
       </div>
@@ -176,27 +194,6 @@ export const TerminalPanel: React.FC = () => {
         {activeBottomTab === 'output' && (
           <div className="text-[12px] text-emerald-400 whitespace-pre-wrap">
             {terminalLogs.join('\n') || 'No output recorded yet. Click Run to execute.'}
-          </div>
-        )}
-
-        {activeBottomTab === 'problems' && (
-          <div className="space-y-2">
-            {diagnostics.hasError ? (
-              <div className="p-3 bg-rose-950/30 border border-rose-800/40 rounded-xl space-y-1">
-                <div className="flex items-center gap-2 text-rose-400 font-bold">
-                  <AlertCircle className="w-4 h-4" />
-                  <span>{diagnostics.errorType || 'Runtime Error'} in {diagnostics.failingFile} (Line {diagnostics.failingLine})</span>
-                </div>
-                <p className="text-slate-300">{diagnostics.errorMessage}</p>
-                <div className="pt-2 text-indigo-300 text-xs font-sans">
-                  <strong>Recommended Fix:</strong> {diagnostics.suggestedFix}
-                </div>
-              </div>
-            ) : (
-              <div className="text-slate-400 text-center py-6">
-                No lint problems or runtime errors detected in workspace.
-              </div>
-            )}
           </div>
         )}
 

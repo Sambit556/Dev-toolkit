@@ -64,7 +64,7 @@ You MUST structure your response with these exact 4 sections:
 
         if (outputText) {
           let diffCode: string | undefined = undefined;
-          if (!['explain', 'eli5', 'explain_simple'].includes(action)) {
+          if (!['explain', 'docs', 'eli5', 'explain_simple'].includes(action)) {
             const matches = [...outputText.matchAll(/```(?:[a-zA-Z0-9_-]*\n)?([\s\S]*?)```/g)];
             const validBlocks = matches
               .map((m) => m[1].trim())

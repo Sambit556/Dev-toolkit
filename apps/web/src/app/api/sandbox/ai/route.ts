@@ -2,8 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { GoogleGenAI } from '@google/genai';
 
 function extractCodeBlock(markdown: string, action: string): string | null {
-  // Explanations should not generate code diffs
-  if (action === 'explain' || action === 'eli5' || action === 'explain_simple') {
+  // Explanations and documentation reviews should not generate code diffs
+  if (['explain', 'docs', 'eli5', 'explain_simple'].includes(action)) {
     return null;
   }
 

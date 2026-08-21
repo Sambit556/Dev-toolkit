@@ -14,7 +14,7 @@ export type ActivityPanel =
   | 'packages'
   | 'settings';
 
-export type BottomPanelTab = 'terminal' | 'output' | 'problems' | 'debugger' | 'metrics';
+export type BottomPanelTab = 'terminal' | 'output' | 'debugger' | 'metrics';
 
 export interface Breakpoint {
   file: string;
@@ -89,6 +89,9 @@ interface CloudIdeState {
   setActiveBottomTab: (tab: BottomPanelTab) => void;
   isBottomPanelOpen: boolean;
   toggleBottomPanel: (open?: boolean) => void;
+  terminalPosition: 'bottom' | 'right';
+  setTerminalPosition: (pos: 'bottom' | 'right') => void;
+  toggleTerminalPosition: () => void;
   isSidebarOpen: boolean;
   toggleSidebar: (open?: boolean) => void;
 
@@ -98,6 +101,18 @@ interface CloudIdeState {
   activeFile: string;
   openTabs: string[];
   splitFile: string | null;
+  isReadOnlyWorkspace: boolean;
+  sharedWorkspaceInfo: { id?: string; name?: string; author?: string } | null;
+  setIsReadOnlyWorkspace: (isReadOnly: boolean) => void;
+  loadSharedWorkspace: (data: {
+    files: ProjectFile[];
+    language: string;
+    activeFile?: string;
+    isReadOnly?: boolean;
+    name?: string;
+    id?: string;
+  }) => void;
+  forkWorkspace: () => void;
   setLanguage: (langId: string) => void;
   selectFile: (fileName: string) => void;
   updateFileContent: (fileName: string, content: string) => void;
@@ -225,6 +240,9 @@ export const useCloudIdeStore = create<CloudIdeState>()(
       setActiveBottomTab: (tab) => set({ activeBottomTab: tab, isBottomPanelOpen: true }),
       isBottomPanelOpen: true,
       toggleBottomPanel: (open) => set((s) => ({ isBottomPanelOpen: open !== undefined ? open : !s.isBottomPanelOpen })),
+      terminalPosition: 'bottom',
+      setTerminalPosition: (terminalPosition) => set({ terminalPosition }),
+      toggleTerminalPosition: () => set((s) => ({ terminalPosition: s.terminalPosition === 'bottom' ? 'right' : 'bottom' })),
       isSidebarOpen: true,
       toggleSidebar: (open) => set((s) => ({ isSidebarOpen: open !== undefined ? open : !s.isSidebarOpen })),
 
@@ -234,6 +252,34 @@ export const useCloudIdeStore = create<CloudIdeState>()(
       activeFile: defaultTypeScriptTemplate.entryPoint,
       openTabs: [defaultTypeScriptTemplate.entryPoint],
       splitFile: null,
+      isReadOnlyWorkspace: false,
+      sharedWorkspaceInfo: null,
+      setIsReadOnlyWorkspace: (isReadOnlyWorkspace) => set({ isReadOnlyWorkspace }),
+
+      loadSharedWorkspace: (data) => {
+        const { files, language, activeFile, isReadOnly, name, id } = data;
+        const entry = activeFile || files[0]?.name || 'main.js';
+        set({
+          files,
+          currentLanguage: language,
+          activeFile: entry,
+          openTabs: [entry],
+          isReadOnlyWorkspace: !!isReadOnly,
+          sharedWorkspaceInfo: { id, name, author: 'Shared Developer' },
+          aiDiffCode: null,
+          aiAppliedNotification: null,
+          diagnostics: { hasError: false },
+        });
+        get().createSnapshot(`Loaded shared workspace: ${name || id || language}`);
+      },
+
+      forkWorkspace: () => {
+        set({
+          isReadOnlyWorkspace: false,
+          sharedWorkspaceInfo: null,
+        });
+        get().createSnapshot('Forked workspace into personal editable session');
+      },
 
       setLanguage: (langId) => {
         const template = LANGUAGE_TEMPLATES.find((t) => t.id === langId) || defaultTypeScriptTemplate;
@@ -243,6 +289,8 @@ export const useCloudIdeStore = create<CloudIdeState>()(
           activeFile: template.entryPoint,
           openTabs: [template.entryPoint],
           splitFile: null,
+          isReadOnlyWorkspace: false,
+          sharedWorkspaceInfo: null,
           diagnostics: { hasError: false },
           terminalLogs: [],
           stderrLogs: [],
