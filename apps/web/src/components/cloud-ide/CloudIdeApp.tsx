@@ -273,6 +273,22 @@ export const CloudIdeApp: React.FC = () => {
             </button>
           )}
 
+          {/* Dedicated Hide / Show Terminal / Output Button (Right of Run) */}
+          <button
+            onClick={() => toggleBottomPanel()}
+            title={isBottomPanelOpen ? 'Hide Terminal / Output' : 'Show Terminal / Output'}
+            className={`px-2.5 py-1 rounded-lg border text-xs font-medium flex items-center gap-1.5 transition-all ${
+              isBottomPanelOpen
+                ? 'bg-slate-900 text-indigo-300 border-indigo-500/40 hover:bg-slate-800'
+                : 'bg-neutral-900 hover:bg-neutral-800 text-slate-300 border-neutral-800'
+            }`}
+          >
+            <Terminal className="w-3.5 h-3.5 text-indigo-400" />
+            <span className="hidden md:inline">
+              {isBottomPanelOpen ? 'Hide Terminal / Output' : 'Show Terminal / Output'}
+            </span>
+          </button>
+
           <div className="h-4 w-px bg-neutral-800 hidden sm:block" />
 
           {/* Share */}
