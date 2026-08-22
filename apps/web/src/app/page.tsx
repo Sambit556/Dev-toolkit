@@ -78,6 +78,30 @@ const TOOLS = [
     keywords: ['json formatter', 'json beautifier', 'json prettifier', 'json validator', 'format json', 'beautify json', 'minify json', 'parse json', 'json parser', 'json editor', 'json tree view', 'json lint', 'jsonlint'],
   },
   {
+    href: '/file-converter',
+    icon: RefreshCw,
+    title: 'File Converter',
+    description:
+      'Convert Word documents, PDFs, Excel sheets, images, Markdown, CSV, JSON, and text locally in your browser.',
+    features: ['CSV ↔ JSON structure', 'Markdown ↔ HTML previews', 'WebP/PNG/JPG canvas exports', 'Local file upload zone'],
+    category: 'converters',
+    badge: 'Converter',
+    color: 'teal',
+    keywords: ['file converter', 'convert files', 'file format converter', 'document converter', 'image to base64', 'file to text converter', 'client-side file conversion', 'batch file convert'],
+  },
+  {
+    href: '/image-tool',
+    icon: Sparkles,
+    title: 'Image Compressor & Enhancer',
+    description:
+      'Compress JPEG/PNG/WebP images, scale dimensions by custom ratios, adjust enhancement filters, and generate a full favicon package locally.',
+    features: ['Quality adjustments', 'Percentage scale', 'Canvas filters', 'Favicon & app icon generator'],
+    category: 'utilities',
+    badge: 'Media',
+    color: 'amber',
+    keywords: ['image compressor', 'image optimizer', 'resize image', 'compress image', 'image converter', 'image quality reducer', 'photo compressor', 'exif viewer', 'favicon generator', 'favicon maker', 'ico generator', 'apple touch icon generator', 'generate favicon', 'site icon creator'],
+  },
+  {
     href: '/jwt',
     icon: Shield,
     title: 'JWT Decoder & Encoder',
@@ -89,7 +113,6 @@ const TOOLS = [
     color: 'red',
     keywords: ['jwt decoder', 'jwt encoder', 'json web token', 'decode jwt', 'jwt parser', 'bearer token decoder', 'jwt debugger', 'token decoder', 'jwt payload', 'auth token viewer', 'jwt verify'],
   },
-
   {
     href: '/cron',
     icon: CalendarRange,
@@ -101,6 +124,18 @@ const TOOLS = [
     badge: 'Scheduler',
     color: 'indigo',
     keywords: ['cron generator', 'cron expression builder', 'crontab generator', 'cron job creator', 'cron syntax helper', 'visual cron builder', 'schedule generator', 'cron parser', 'cron humanizer', 'crontab syntax'],
+  },
+  {
+    href: '/diff-checker',
+    icon: ArrowRightLeft,
+    title: 'Code Diff Checker',
+    description:
+      'Compare files, code blocks, or standard text strings side-by-side or in inline unified views using Monaco DiffEditor.',
+    features: ['Monaco Diff editor', 'Side-by-side & unified layout', 'Local files upload dropzone', 'Format checking'],
+    category: 'formatters',
+    badge: 'Format',
+    color: 'emerald',
+    keywords: ['diff checker', 'text diff', 'compare text', 'code diff', 'file diff', 'diff tool', 'text comparison', 'side by side diff', 'unified diff', 'compare code', 'what changed between two files'],
   },
   {
     href: '/calendar',
@@ -164,18 +199,6 @@ const TOOLS = [
   },
 
   {
-    href: '/image-tool',
-    icon: Sparkles,
-    title: 'Image Compressor & Enhancer',
-    description:
-      'Compress JPEG/PNG/WebP images, scale dimensions by custom ratios, adjust enhancement filters, and generate a full favicon package locally.',
-    features: ['Quality adjustments', 'Percentage scale', 'Canvas filters', 'Favicon & app icon generator'],
-    category: 'utilities',
-    badge: 'Media',
-    color: 'amber',
-    keywords: ['image compressor', 'image optimizer', 'resize image', 'compress image', 'image converter', 'image quality reducer', 'photo compressor', 'exif viewer', 'favicon generator', 'favicon maker', 'ico generator', 'apple touch icon generator', 'generate favicon', 'site icon creator'],
-  },
-  {
     href: '/converters',
     icon: RefreshCw,
     title: 'Structured Data Format Converter',
@@ -224,18 +247,6 @@ const TOOLS = [
     keywords: ['internet speed test', 'download speed test', 'upload speed test', 'ping test', 'jitter test', 'bandwidth test', 'network speed checker'],
   },
   {
-    href: '/file-converter',
-    icon: RefreshCw,
-    title: 'File Converter',
-    description:
-      'Convert Word documents, PDFs, Excel sheets, images, Markdown, CSV, JSON, and text locally in your browser.',
-    features: ['CSV ↔ JSON structure', 'Markdown ↔ HTML previews', 'WebP/PNG/JPG canvas exports', 'Local file upload zone'],
-    category: 'converters',
-    badge: 'Converter',
-    color: 'teal',
-    keywords: ['file converter', 'convert files', 'file format converter', 'document converter', 'image to base64', 'file to text converter', 'client-side file conversion', 'batch file convert'],
-  },
-  {
     href: '/text-utils',
     icon: FileText,
     title: 'Text Case Converter & Counters',
@@ -246,18 +257,6 @@ const TOOLS = [
     badge: 'Text',
     color: 'pink',
     keywords: ['case converter', 'uppercase lowercase converter', 'camel case', 'snake case', 'kebab case', 'title case', 'text analytics', 'word counter', 'character counter', 'text case converter', 'capitalize text', 'text statistics'],
-  },
-  {
-    href: '/diff-checker',
-    icon: ArrowRightLeft,
-    title: 'Code Diff Checker',
-    description:
-      'Compare files, code blocks, or standard text strings side-by-side or in inline unified views using Monaco DiffEditor.',
-    features: ['Monaco Diff editor', 'Side-by-side & unified layout', 'Local files upload dropzone', 'Format checking'],
-    category: 'formatters',
-    badge: 'Format',
-    color: 'emerald',
-    keywords: ['diff checker', 'text diff', 'compare text', 'code diff', 'file diff', 'diff tool', 'text comparison', 'side by side diff', 'unified diff', 'compare code', 'what changed between two files'],
   },
   {
     href: '/countdown',
@@ -556,9 +555,8 @@ export default function HomePage() {
                       <div className="space-y-3">
                         <div className="flex items-start justify-between">
                           <div
-                            className={`flex h-10 w-10 items-center justify-center rounded-xl border ${
-                              COLOR_MAPS[color] || 'bg-muted text-muted-foreground'
-                            }`}
+                            className={`flex h-10 w-10 items-center justify-center rounded-xl border ${COLOR_MAPS[color] || 'bg-muted text-muted-foreground'
+                              }`}
                           >
                             <Icon className="h-5 w-5" />
                           </div>
