@@ -1,6 +1,12 @@
 import path from 'path';
 import swaggerJsdoc from 'swagger-jsdoc';
 
+const isProduction = process.env.NODE_ENV === 'production';
+const currentServerUrl = isProduction
+  ? (process.env.API_URL || 'https://devchrono-api.onrender.com')
+  : `http://localhost:${process.env.PORT || 3001}`;
+const currentServerDesc = isProduction ? 'Production API Server' : 'Local Development Server';
+
 export const swaggerSpec = swaggerJsdoc({
   definition: {
     openapi: '3.0.0',
@@ -14,9 +20,7 @@ export const swaggerSpec = swaggerJsdoc({
       },
     },
     servers: [
-      { url: 'https://devchrono-api.onrender.com', description: 'Production API (Render)' },
-      { url: 'https://api.devkits.space', description: 'Production API (Custom Domain)' },
-      { url: 'http://localhost:3001', description: 'Development Localhost Server' },
+      { url: currentServerUrl, description: currentServerDesc },
     ],
     tags: [
       { name: 'System', description: 'System health, metrics, and runtime status' },

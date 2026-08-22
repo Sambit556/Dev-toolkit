@@ -137,9 +137,24 @@ app.use('/api/tempmail', tempmailRouter);
 app.use('/api/sandbox', sandboxRouter);
 
 // Public OpenAPI JSON spec
-app.get('/openapi.json', (_req, res) => {
+app.get('/openapi.json', (req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
-  res.json(swaggerSpec);
+  const protocol = req.headers['x-forwarded-proto'] || req.protocol || 'http';
+  const host = req.get('host') || 'localhost:3001';
+  const dynamicServerUrl = `${protocol}://${host}`;
+  const isProd = process.env.NODE_ENV === 'production' || !host.includes('localhost');
+
+  const dynamicSpec = {
+    ...swaggerSpec,
+    servers: [
+      {
+        url: dynamicServerUrl,
+        description: isProd ? 'Production API Server' : 'Local Development Server',
+      },
+    ],
+  };
+
+  res.json(dynamicSpec);
 });
 
 // Root — Render's uptime pings and other health probes hit this by default
