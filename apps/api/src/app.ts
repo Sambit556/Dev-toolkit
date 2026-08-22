@@ -88,18 +88,30 @@ app.use(requestLogger);
 // Global rate limiting
 app.use(defaultRateLimit);
 
-// Public API Documentation (Freely accessible in development and production)
+// Public API Documentation (Freely accessible in development and production with zero restrictions)
 app.use(
   '/docs',
+  (_req: express.Request, res: express.Response, next: express.NextFunction) => {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+    next();
+  },
   swaggerUi.serve,
   swaggerUi.setup(swaggerSpec, {
-    customCss: '.swagger-ui .topbar { display: none } .swagger-ui .info { margin: 20px 0 }',
+    customCss:
+      '.swagger-ui .topbar { display: none } .swagger-ui .info { margin: 20px 0 } .swagger-ui .scheme-container { margin: 15px 0 }',
     customSiteTitle: 'DevKits Platform - Public API Docs',
+    customCssUrl: 'https://cdnjs.cloudflare.com/ajax/libs/swagger-ui/5.11.0/swagger-ui.min.css',
+    customJs: [
+      'https://cdnjs.cloudflare.com/ajax/libs/swagger-ui/5.11.0/swagger-ui-bundle.min.js',
+      'https://cdnjs.cloudflare.com/ajax/libs/swagger-ui/5.11.0/swagger-ui-standalone-preset.min.js',
+    ],
     swaggerOptions: {
       persistAuthorization: true,
       docExpansion: 'list',
       filter: true,
       showRequestDuration: true,
+      url: '/openapi.json',
     },
   }),
 );

@@ -1,3 +1,4 @@
+import path from 'path';
 import swaggerJsdoc from 'swagger-jsdoc';
 
 export const swaggerSpec = swaggerJsdoc({
@@ -13,8 +14,9 @@ export const swaggerSpec = swaggerJsdoc({
       },
     },
     servers: [
-      { url: 'http://localhost:3001', description: 'Development Server' },
-      { url: 'https://api.devkits.space', description: 'Production API' },
+      { url: 'https://devchrono-api.onrender.com', description: 'Production API (Render)' },
+      { url: 'https://api.devkits.space', description: 'Production API (Custom Domain)' },
+      { url: 'http://localhost:3001', description: 'Development Localhost Server' },
     ],
     tags: [
       { name: 'System', description: 'System health, metrics, and runtime status' },
@@ -39,5 +41,12 @@ export const swaggerSpec = swaggerJsdoc({
       },
     },
   },
-  apis: ['./src/routes/*.ts'],
+  apis: [
+    path.join(__dirname, 'routes/*.ts'),
+    path.join(__dirname, 'routes/*.js'),
+    './src/routes/*.ts',
+    './dist/routes/*.js',
+    './routes/*.js',
+  ],
 });
+

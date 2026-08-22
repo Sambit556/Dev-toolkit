@@ -33,9 +33,11 @@ import { toast } from 'sonner';
 import {
   extractDocxContent,
   createDocxFromText,
+  createDocxFromStructuredDoc,
   extractPdfContent,
   renderPdfToImages,
   generatePdfFromText,
+  generatePdfFromStructuredDoc,
   generatePdfFromTable,
   rtfToPlainText,
   extractTextFromEpub,
@@ -501,14 +503,15 @@ export function FileConverterTool() {
       if (['docx', 'doc'].includes(ext)) {
         const docxData = await extractDocxContent(item.file);
         if (targetFormat === 'pdf') {
-          resultBlob = generatePdfFromText(baseName, docxData.text);
+          resultBlob = generatePdfFromStructuredDoc(baseName, docxData.blocks);
           outputFilename = `${baseName}.pdf`;
+          textPreview = docxData.text.slice(0, 1000);
         } else if (targetFormat === 'txt') {
           resultBlob = new Blob([docxData.text], { type: 'text/plain;charset=utf-8;' });
           outputFilename = `${baseName}.txt`;
           textPreview = docxData.text.slice(0, 1000);
         } else if (targetFormat === 'html') {
-          const wrapperHtml = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${baseName}</title><style>body{font-family:system-ui,-apple-system,sans-serif;line-height:1.6;max-width:800px;margin:40px auto;padding:20px;}</style></head><body>${docxData.html}</body></html>`;
+          const wrapperHtml = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${baseName}</title><style>body{font-family:system-ui,-apple-system,sans-serif;line-height:1.6;max-width:800px;margin:40px auto;padding:20px;}table{border-collapse:collapse;width:100%;margin:16px 0;}th,td{border:1px solid #ddd;padding:8px;text-align:left;}th{background:#f4f4f4;}</style></head><body>${docxData.html}</body></html>`;
           resultBlob = new Blob([wrapperHtml], { type: 'text/html;charset=utf-8;' });
           outputFilename = `${baseName}.html`;
           textPreview = docxData.html.slice(0, 1000);
@@ -523,9 +526,9 @@ export function FileConverterTool() {
       else if (ext === 'pdf') {
         if (targetFormat === 'docx') {
           const pdfData = await extractPdfContent(item.file);
-          resultBlob = await createDocxFromText(baseName, pdfData.text);
+          resultBlob = await createDocxFromText(baseName, pdfData.markdown || pdfData.text);
           outputFilename = `${baseName}.docx`;
-          textPreview = `Converted ${pdfData.pageCount} pages to Word .docx document.`;
+          textPreview = `Converted ${pdfData.pageCount} page(s) with preserved headings & layout to Word .docx.`;
         } else if (targetFormat === 'txt') {
           const pdfData = await extractPdfContent(item.file);
           resultBlob = new Blob([pdfData.text], { type: 'text/plain;charset=utf-8;' });
@@ -533,7 +536,8 @@ export function FileConverterTool() {
           textPreview = pdfData.text.slice(0, 1000);
         } else if (targetFormat === 'html') {
           const pdfData = await extractPdfContent(item.file);
-          const htmlContent = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${baseName}</title></head><body><h1>${baseName}</h1>${pdfData.pagesText.map((p, idx) => `<section><h2>Page ${idx + 1}</h2><p>${p.replace(/\n/g, '<br/>')}</p></section>`).join('<hr/>')}</body></html>`;
+          const bodyHtml = await marked.parse(pdfData.markdown);
+          const htmlContent = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${baseName}</title><style>body{font-family:system-ui,-apple-system,sans-serif;line-height:1.6;max-width:800px;margin:40px auto;padding:20px;}</style></head><body>${bodyHtml}</body></html>`;
           resultBlob = new Blob([htmlContent], { type: 'text/html;charset=utf-8;' });
           outputFilename = `${baseName}.html`;
           textPreview = htmlContent.slice(0, 1000);
