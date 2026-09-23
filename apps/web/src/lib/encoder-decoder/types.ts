@@ -44,7 +44,8 @@ export type ConversionMethodId =
   | 'braille'
   | 'tapcode'
   | 'reverse'
-  // Symmetric Encryption (Passphrase based)
+  // Asymmetric & Symmetric Encryption
+  | 'rsa'
   | 'aes-256'
   | 'aes-192'
   | 'aes-128'
@@ -105,6 +106,12 @@ export interface ConversionOptions {
   morseWordSeparator?: string;
   // URL encoding strictness
   urlFullEncoding?: boolean;
+  // RSA options
+  rsaPublicKey?: string;
+  rsaPrivateKey?: string;
+  rsaPadding?: 'OAEP-SHA256' | 'OAEP-SHA1' | 'PKCS1-v1_5' | 'RAW';
+  rsaKeySize?: 1024 | 2048 | 4096;
+  rsaOutputFormat?: 'base64' | 'hex';
 }
 
 export interface DetectionResult {

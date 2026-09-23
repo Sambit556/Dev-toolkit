@@ -22,6 +22,10 @@ import {
   Volume2,
   Trash2,
   Clipboard,
+  ShieldCheck,
+  KeyRound,
+  FileKey,
+  Loader2,
 } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -48,18 +52,63 @@ import {
   executeConversion,
   detectFormat,
   calculateShannonEntropy,
+  generateRsaKeyPair,
+  getPublicKeyFromPrivateKey,
+  parseRsaPublicKey,
+  parseRsaPrivateKey,
 } from '@/lib/encoder-decoder';
 import { CaesarMatrixModal } from './CaesarMatrixModal';
 import { MultiAlgorithmGrid } from './MultiAlgorithmGrid';
+
+// Default RSA 2048-bit Demo Keypair
+const DEFAULT_RSA_PUBLIC_KEY = `-----BEGIN PUBLIC KEY-----
+MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAsH3qeMDUIwSi1RUAdYvj
+gxHdeanScv+xcxK/f4t06kgZO1q9ACcp/z8REv3Q1ZoqW2CN+gqVgjZaq3kLpM/C
+MJLADN8UZj5wZSWmuqC9ISb7MLoqATCzq91ZHnDi+tEmAEPoE4u0RyW0z6mx63M7
+njWF5mSqjevkPapePQtrRQl3qsE9g9BZkVFD+FHtMrgxsh0iwGxCMlUkxef9qjyk
+dWXiVTIrqHVm8iBnb2TV6k+rPLsHRDIqOTOY63U3CEjUT2kNtbwOR3C154mISdG2
+B1z7gnVOUNW7PIGtYnMIM2XTzgf2iIP61YLkmLpC/eSzDrAODLD+JkoRI4waEPRf
+XwIDAQAB
+-----END PUBLIC KEY-----`;
+
+const DEFAULT_RSA_PRIVATE_KEY = `-----BEGIN PRIVATE KEY-----
+MIIEvwIBADANBgkqhkiG9w0BAQEFAASCBKkwggSlAgEAAoIBAQCwfep4wNQjBKLV
+FQB1i+ODEd15qdJy/7FzEr9/i3TqSBk7Wr0AJyn/PxES/dDVmipbYI36CpWCNlqr
+eQukz8IwksAM3xRmPnBlJaa6oL0hJvswuioBMLOr3VkecOL60SYAQ+gTi7RHJbTP
+qbHrczueNYXmZKqN6+Q9ql49C2tFCXeqwT2D0FmRUUP4Ue0yuDGyHSLAbEIyVSTF
+5/2qPKR1ZeJVMiuodWbyIGdvZNXqT6s8uwdEMio5M5jrdTcISNRPaQ21vA5HcLXn
+iYhJ0bYHXPuCdU5Q1bs8ga1icwgzZdPOB/aIg/rVguSYukL95LMOsA4MsP4mShEj
+jBoQ9F9fAgMBAAECggEBAKa3WsyUQg+OKo6j1xoyeUhvkMmDXJNa63GrDQ/bWSaR
+0pvZu90wIaDGH0fUUPflOAu3KoY+hzpIQ9/kaNZXlrUxeo7uDyQB6UPyjAuRGPb/
+DprZ0CHtslsvrSZvNkn9VSs8+jW0aygl+yWKw9GIuZFaN9EJ2H5VjPWfQIPjjIHZ
+u8XDVTrNgWKn7HZIq2K8bpCiionKw+8DO82N7M8zVSsCrpEM/cCkeWbwhrSC65Q8
+QKKWHQa0QFg3rAgR7S7FZu49/IqtVYz6zrhnxKh1u8NQlHL4imamskQPGYN8DwP0
+ZI81Cu6QevisfEtLYYGuXB7a6JP1bGl+UYDry57exRkCgYEA5guvkOQa+YGpxyTv
+tfNYZ3fUqq+f4noWJl2XFuVlhvzBoHTLaItlUCKs5n3Q0NI+bzYJyzeYgvJUY83h
+GelLUAS+o4sCTqSAAqx8pZKlnAy+ixv+ZmjQ1m2e8m6bDt7XS45RWwM6JGmZgkqd
+bpBsYCOnmSs7/hnZM9GN0yHo5vMCgYEAxGd1PQej9PQpdBMfpe35C26JFNKeo6u6
+X5g7a+kaAVJAL7c5fYxIf2axjepuD+xty0JKVcEtL54kT3Q0Ikdo6PlEn2azDG4+
+UuhijQY0CTw299saW5fGRBfe/VqMUVg2+pkaKaeJ88KoonbWdyg53smTIUAQHH/V
+8jw9nk3tGOUCgYEA3lZbCDG+9Hliiwvi9rtMLSx/Cb0WTYDr2YbJGaL6/n1Z8ugP
+FGrtr4bkDx147erV1wymaJfCOoVWFOQN9MorNRpw2oXm4/VPl8X37tsOXwVeP/r9
+ZSNW/HgUkIFgMf4knWzeqpUy47CAYpIVGKBTbpPnTz2fDRcUe2XEqlPy0wsCgYEA
+jjNB5RAVG5N0OABol6C3Ahnj0lm0VlhNtkzoKPc6xt4gbuvACjB5hRR7VX74dTr/
+O30hiPk2mBVtwMEnxfHh+VwQ3UBkPonLQgfS4rwtDMq2GbpfWRWIjWCjKNhYY8T0
++XfEQ4h0DzNPGWHlYZyUWcOkbRyPDbNY2evXyTguhCkCgYBLYpmaEbyRgr+hDhm7
+H2bIsWHWys0X/xQk/4Md7FEg6o2noyhxfXDjfdElfHfKd1/vtVW7OyxF1nPEzTlo
+NP6LzyDSWiQBXk1+rNyluUWCPsy6S3pRVb8nXnf5no9HkaMdqer4TVKfZ1zIjnte
+PHUn2et0liFEW54Y6HNSY/TalA==
+-----END PRIVATE KEY-----`;
 
 // Quick Access Pill Formats (Most Popular)
 const QUICK_FORMATS: { id: ConversionMethodId; label: string }[] = [
   { id: 'auto', label: '⚡ Auto-Detect' },
   { id: 'base64', label: 'Base64' },
+  { id: 'rsa', label: 'RSA (Public-Key)' },
+  { id: 'aes-256', label: 'AES-256' },
   { id: 'url', label: 'URL' },
   { id: 'hex', label: 'Hex' },
   { id: 'binary', label: 'Binary' },
-  { id: 'aes-256', label: 'AES-256' },
   { id: 'caesar', label: 'Caesar' },
   { id: 'morse', label: 'Morse' },
   { id: 'sha256', label: 'SHA-256' },
@@ -73,6 +122,14 @@ const SAMPLE_PRESETS = [
     value: 'Hello, World! Welcome to DevKits.',
     method: 'base64' as ConversionMethodId,
     isDecode: false,
+  },
+  {
+    name: 'RSA 2048-bit Public Key Encryption',
+    value: 'Hello! This message is secured with 2048-bit RSA-OAEP asymmetric encryption.',
+    method: 'rsa' as ConversionMethodId,
+    isDecode: false,
+    rsaPublicKey: DEFAULT_RSA_PUBLIC_KEY,
+    rsaPrivateKey: DEFAULT_RSA_PRIVATE_KEY,
   },
   {
     name: 'OpenSSL AES-256 Ciphertext',
@@ -136,6 +193,15 @@ export function EncoderDecoderTool() {
   const [cipherKey, setCipherKey] = useState<string>('SECRET');
   const [aesMode, setAesMode] = useState<'CBC' | 'CTR' | 'ECB' | 'CFB' | 'OFB'>('CBC');
 
+  // RSA Specific State
+  const [rsaPublicKey, setRsaPublicKey] = useState<string>(DEFAULT_RSA_PUBLIC_KEY);
+  const [rsaPrivateKey, setRsaPrivateKey] = useState<string>(DEFAULT_RSA_PRIVATE_KEY);
+  const [rsaPadding, setRsaPadding] = useState<'OAEP-SHA256' | 'OAEP-SHA1' | 'PKCS1-v1_5' | 'RAW'>('OAEP-SHA256');
+  const [rsaKeySize, setRsaKeySize] = useState<1024 | 2048 | 4096>(2048);
+  const [rsaOutputFormat, setRsaOutputFormat] = useState<'base64' | 'hex'>('base64');
+  const [isGeneratingRsa, setIsGeneratingRsa] = useState<boolean>(false);
+  const [showAllRsaKeys, setShowAllRsaKeys] = useState<boolean>(false);
+
   // Caesar Matrix Modal State
   const [isCaesarModalOpen, setIsCaesarModalOpen] = useState<boolean>(false);
 
@@ -154,8 +220,26 @@ export function EncoderDecoderTool() {
       railCount,
       cipherKey,
       aesMode,
+      rsaPublicKey,
+      rsaPrivateKey,
+      rsaPadding,
+      rsaKeySize,
+      rsaOutputFormat,
     }),
-    [passphrase, caesarShift, affineA, affineB, railCount, cipherKey, aesMode]
+    [
+      passphrase,
+      caesarShift,
+      affineA,
+      affineB,
+      railCount,
+      cipherKey,
+      aesMode,
+      rsaPublicKey,
+      rsaPrivateKey,
+      rsaPadding,
+      rsaKeySize,
+      rsaOutputFormat,
+    ]
   );
 
   // Current method definition
@@ -255,6 +339,12 @@ export function EncoderDecoderTool() {
     if (det.detectedParams?.caesarShift) {
       setCaesarShift(det.detectedParams.caesarShift);
     }
+    if (det.detectedParams?.rsaPublicKey) {
+      setRsaPublicKey(det.detectedParams.rsaPublicKey);
+    }
+    if (det.detectedParams?.rsaPrivateKey) {
+      setRsaPrivateKey(det.detectedParams.rsaPrivateKey);
+    }
     toast.success(`Switched to ${det.name}`);
   };
 
@@ -265,6 +355,8 @@ export function EncoderDecoderTool() {
     setIsDecodeMode(preset.isDecode);
     if (preset.passphrase) setPassphrase(preset.passphrase);
     if (preset.shift) setCaesarShift(preset.shift);
+    if ((preset as any).rsaPublicKey) setRsaPublicKey((preset as any).rsaPublicKey);
+    if ((preset as any).rsaPrivateKey) setRsaPrivateKey((preset as any).rsaPrivateKey);
     toast.info(`Loaded: ${preset.name}`);
   };
 
@@ -321,9 +413,53 @@ export function EncoderDecoderTool() {
     toast.success('Downloaded output file');
   };
 
+  // Generate RSA Keypair
+  const handleGenerateRsa = () => {
+    setIsGeneratingRsa(true);
+    setTimeout(() => {
+      try {
+        const pair = generateRsaKeyPair(rsaKeySize);
+        setRsaPublicKey(pair.publicKey);
+        setRsaPrivateKey(pair.privateKey);
+        toast.success(`Generated new ${rsaKeySize}-bit RSA Keypair!`);
+      } catch (err: any) {
+        toast.error(`Keypair generation failed: ${err.message}`);
+      } finally {
+        setIsGeneratingRsa(false);
+      }
+    }, 40);
+  };
+
+  // Derive Public Key from Private Key
+  const handleDerivePublicFromPrivate = () => {
+    try {
+      const pub = getPublicKeyFromPrivateKey(rsaPrivateKey);
+      setRsaPublicKey(pub);
+      toast.success('Derived RSA Public Key from Private Key!');
+    } catch (err: any) {
+      toast.error(`Could not derive public key: ${err.message}`);
+    }
+  };
+
+  // Key validation status
+  const rsaKeyValidation = useMemo(() => {
+    if (conversionType !== 'rsa') return null;
+    try {
+      if (isDecodeMode) {
+        const priv = parseRsaPrivateKey(rsaPrivateKey);
+        return { valid: true, bits: priv.bitLength, type: 'Private Key' };
+      } else {
+        const pub = parseRsaPublicKey(rsaPublicKey);
+        return { valid: true, bits: pub.bitLength, type: 'Public Key' };
+      }
+    } catch (err: any) {
+      return { valid: false, error: err.message };
+    }
+  }, [conversionType, isDecodeMode, rsaPublicKey, rsaPrivateKey]);
+
   // Requires passphrase / key check
   const requiresKey =
-    currentMethodDef.requiresPassphrase ||
+    (currentMethodDef.requiresPassphrase && conversionType !== 'rsa') ||
     conversionType.startsWith('aes-') ||
     conversionType === 'vigenere' ||
     conversionType === 'xor';
@@ -373,6 +509,15 @@ export function EncoderDecoderTool() {
                     <SelectItem value="url">URL / Percent-Encoding</SelectItem>
                     <SelectItem value="html">HTML Entities</SelectItem>
                     <SelectItem value="punycode">Punycode (IDNA Domains)</SelectItem>
+                  </SelectGroup>
+
+                  <SelectGroup>
+                    <SelectLabel className="text-[10px] uppercase tracking-wider font-bold text-muted-foreground">
+                      Asymmetric Public-Key Cryptography
+                    </SelectLabel>
+                    <SelectItem value="rsa" className="font-bold text-primary">
+                      RSA (Public-Key / PEM)
+                    </SelectItem>
                   </SelectGroup>
 
                   <SelectGroup>
@@ -483,6 +628,269 @@ export function EncoderDecoderTool() {
               </Button>
             </div>
           </div>
+
+          {/* RSA Key & Options Dedicated Control Section */}
+          {conversionType === 'rsa' && (
+            <div className="pt-2.5 border-t space-y-3 text-xs">
+              {/* RSA Configuration Bar */}
+              <div className="flex flex-wrap items-center justify-between gap-2.5 bg-muted/30 p-2.5 rounded-lg border">
+                <div className="flex flex-wrap items-center gap-3">
+                  {/* Padding Scheme */}
+                  <div className="flex items-center gap-1.5">
+                    <Label className="text-[11px] font-bold text-muted-foreground shrink-0">Padding:</Label>
+                    <Select
+                      value={rsaPadding}
+                      onValueChange={(v) => setRsaPadding(v as any)}
+                    >
+                      <SelectTrigger className="h-7 text-xs font-semibold w-44 bg-background">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="OAEP-SHA256">RSA-OAEP (SHA-256) ★</SelectItem>
+                        <SelectItem value="OAEP-SHA1">RSA-OAEP (SHA-1)</SelectItem>
+                        <SelectItem value="PKCS1-v1_5">PKCS#1 v1.5 (Classic)</SelectItem>
+                        <SelectItem value="RAW">Raw / No Padding</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {/* Output Encoding for Encryption */}
+                  {!isDecodeMode && (
+                    <div className="flex items-center gap-1.5">
+                      <Label className="text-[11px] font-bold text-muted-foreground shrink-0">Format:</Label>
+                      <Select
+                        value={rsaOutputFormat}
+                        onValueChange={(v) => setRsaOutputFormat(v as any)}
+                      >
+                        <SelectTrigger className="h-7 text-xs font-semibold w-24 bg-background">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="base64">Base64</SelectItem>
+                          <SelectItem value="hex">Hex</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
+
+                  {/* Key Validation Status Badge */}
+                  {rsaKeyValidation && (
+                    <Badge
+                      variant={rsaKeyValidation.valid ? 'default' : 'destructive'}
+                      className="h-6 text-[10px] font-bold px-2 gap-1"
+                    >
+                      {rsaKeyValidation.valid ? (
+                        <>
+                          <ShieldCheck className="h-3 w-3 text-emerald-400" />
+                          {rsaKeyValidation.bits}-bit {rsaKeyValidation.type} Valid
+                        </>
+                      ) : (
+                        <>⚠ Key Invalid</>
+                      )}
+                    </Badge>
+                  )}
+                </div>
+
+                {/* Keypair Generator & Utilities */}
+                <div className="flex items-center gap-2">
+                  <Select
+                    value={rsaKeySize.toString()}
+                    onValueChange={(v) => setRsaKeySize(Number(v) as any)}
+                  >
+                    <SelectTrigger className="h-7 text-xs w-24 bg-background font-mono">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="1024">1024-bit</SelectItem>
+                      <SelectItem value="2048">2048-bit</SelectItem>
+                      <SelectItem value="4096">4096-bit</SelectItem>
+                    </SelectContent>
+                  </Select>
+
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={handleGenerateRsa}
+                    disabled={isGeneratingRsa}
+                    className="h-7 text-[11px] font-bold px-2.5 gap-1.5 text-primary border-primary/30 hover:bg-primary/10"
+                  >
+                    {isGeneratingRsa ? (
+                      <>
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        Generating...
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles className="h-3.5 w-3.5" />
+                        Generate Keypair
+                      </>
+                    )}
+                  </Button>
+
+                  <Button
+                    size="sm"
+                    variant={showAllRsaKeys ? 'secondary' : 'ghost'}
+                    onClick={() => setShowAllRsaKeys(!showAllRsaKeys)}
+                    className="h-7 text-[11px] font-bold px-2 text-muted-foreground hover:text-foreground"
+                  >
+                    <KeyRound className="h-3.5 w-3.5 mr-1" />
+                    {showAllRsaKeys ? 'Hide Keys' : 'View Keypair'}
+                  </Button>
+                </div>
+              </div>
+
+              {/* Active Key Editor or Dual Keypair View */}
+              {showAllRsaKeys ? (
+                <div className="grid gap-3 md:grid-cols-2 p-3 bg-muted/20 rounded-lg border">
+                  {/* Public Key Card */}
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <Label className="text-[11px] font-bold text-primary flex items-center gap-1">
+                        <FileKey className="h-3.5 w-3.5" />
+                        RSA Public Key (PEM) - For Encryption
+                      </Label>
+                      <div className="flex items-center gap-1">
+                        <label className="cursor-pointer inline-flex items-center gap-1 text-[10px] text-muted-foreground hover:text-foreground h-5 px-1.5 rounded hover:bg-muted transition-colors">
+                          <Upload className="h-2.5 w-2.5" />
+                          Import
+                          <input
+                            type="file"
+                            className="hidden"
+                            accept=".pem,.pub,.key,.txt"
+                            onChange={(e) => {
+                              const f = e.target.files?.[0];
+                              if (f) {
+                                const r = new FileReader();
+                                r.onload = () => {
+                                  if (typeof r.result === 'string') setRsaPublicKey(r.result);
+                                };
+                                r.readAsText(f);
+                              }
+                            }}
+                          />
+                        </label>
+                        <CopyButton value={rsaPublicKey} toastMessage="Public key copied!" />
+                      </div>
+                    </div>
+                    <Textarea
+                      value={rsaPublicKey}
+                      onChange={(e) => setRsaPublicKey(e.target.value)}
+                      placeholder="-----BEGIN PUBLIC KEY-----"
+                      className="h-28 text-[10px] font-mono leading-tight resize-y bg-background"
+                    />
+                  </div>
+
+                  {/* Private Key Card */}
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <Label className="text-[11px] font-bold text-primary flex items-center gap-1">
+                        <Key className="h-3.5 w-3.5" />
+                        RSA Private Key (PEM) - For Decryption
+                      </Label>
+                      <div className="flex items-center gap-1">
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={handleDerivePublicFromPrivate}
+                          className="h-5 text-[10px] px-1.5 text-muted-foreground hover:text-foreground"
+                          title="Derive Public Key from this Private Key"
+                        >
+                          Derive Public Key
+                        </Button>
+                        <label className="cursor-pointer inline-flex items-center gap-1 text-[10px] text-muted-foreground hover:text-foreground h-5 px-1.5 rounded hover:bg-muted transition-colors">
+                          <Upload className="h-2.5 w-2.5" />
+                          Import
+                          <input
+                            type="file"
+                            className="hidden"
+                            accept=".pem,.key,.txt"
+                            onChange={(e) => {
+                              const f = e.target.files?.[0];
+                              if (f) {
+                                const r = new FileReader();
+                                r.onload = () => {
+                                  if (typeof r.result === 'string') setRsaPrivateKey(r.result);
+                                };
+                                r.readAsText(f);
+                              }
+                            }}
+                          />
+                        </label>
+                        <CopyButton value={rsaPrivateKey} toastMessage="Private key copied!" />
+                      </div>
+                    </div>
+                    <Textarea
+                      value={rsaPrivateKey}
+                      onChange={(e) => setRsaPrivateKey(e.target.value)}
+                      placeholder="-----BEGIN PRIVATE KEY-----"
+                      className="h-28 text-[10px] font-mono leading-tight resize-y bg-background"
+                    />
+                  </div>
+                </div>
+              ) : (
+                /* Compact Active Mode Key Input */
+                <div className="p-2.5 bg-muted/20 rounded-lg border space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-[11px] font-bold text-primary flex items-center gap-1.5">
+                      {isDecodeMode ? <Key className="h-3.5 w-3.5" /> : <FileKey className="h-3.5 w-3.5" />}
+                      {isDecodeMode ? 'RSA Private Key (PEM) Required for Decryption:' : 'RSA Public Key (PEM) Required for Encryption:'}
+                    </Label>
+                    <div className="flex items-center gap-1">
+                      {isDecodeMode && (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={handleDerivePublicFromPrivate}
+                          className="h-5 text-[10px] px-1.5 text-muted-foreground hover:text-foreground"
+                        >
+                          Derive Public Key
+                        </Button>
+                      )}
+                      <label className="cursor-pointer inline-flex items-center gap-1 text-[10px] text-muted-foreground hover:text-foreground h-5 px-1.5 rounded hover:bg-muted transition-colors">
+                        <Upload className="h-2.5 w-2.5" />
+                        Import PEM
+                        <input
+                          type="file"
+                          className="hidden"
+                          accept=".pem,.pub,.key,.txt"
+                          onChange={(e) => {
+                            const f = e.target.files?.[0];
+                            if (f) {
+                              const r = new FileReader();
+                              r.onload = () => {
+                                if (typeof r.result === 'string') {
+                                  if (isDecodeMode) setRsaPrivateKey(r.result);
+                                  else setRsaPublicKey(r.result);
+                                }
+                              };
+                              r.readAsText(f);
+                            }
+                          }}
+                        />
+                      </label>
+                      <CopyButton
+                        value={isDecodeMode ? rsaPrivateKey : rsaPublicKey}
+                        toastMessage="Key copied!"
+                      />
+                    </div>
+                  </div>
+                  <Textarea
+                    value={isDecodeMode ? rsaPrivateKey : rsaPublicKey}
+                    onChange={(e) => {
+                      if (isDecodeMode) setRsaPrivateKey(e.target.value);
+                      else setRsaPublicKey(e.target.value);
+                    }}
+                    placeholder={
+                      isDecodeMode
+                        ? 'Paste RSA Private Key (-----BEGIN PRIVATE KEY----- ...)'
+                        : 'Paste RSA Public Key (-----BEGIN PUBLIC KEY----- ...)'
+                    }
+                    className="h-20 text-[10px] font-mono leading-tight resize-y bg-background"
+                  />
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Inline Algorithm Parameters (Clean, only appears when needed) */}
           {(requiresKey || conversionType === 'caesar' || conversionType === 'affine' || conversionType === 'railfence') && (

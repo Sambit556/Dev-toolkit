@@ -33,7 +33,27 @@ export function detectFormat(input: string): DetectionResult[] {
 
   const results: DetectionResult[] = [];
 
-  // 1. OpenSSL AES / DES Salted Ciphertext (Base64 starts with U2FsdGVkX1...)
+  // 1. RSA PEM Key
+  if (
+    trimmed.startsWith('-----BEGIN RSA PUBLIC KEY-----') ||
+    trimmed.startsWith('-----BEGIN PUBLIC KEY-----') ||
+    trimmed.startsWith('-----BEGIN RSA PRIVATE KEY-----') ||
+    trimmed.startsWith('-----BEGIN PRIVATE KEY-----')
+  ) {
+    const isPrivate = trimmed.includes('PRIVATE KEY');
+    results.push({
+      methodId: 'rsa',
+      name: isPrivate ? 'RSA Private Key (PEM)' : 'RSA Public Key (PEM)',
+      category: 'encryption',
+      confidence: 100,
+      reason: isPrivate ? 'Standard PEM PKCS#1 / PKCS#8 RSA Private Key header' : 'Standard PEM SPKI / PKCS#1 RSA Public Key header',
+      requiresPassphrase: true,
+      suggestedAction: isPrivate ? 'decode' : 'encode',
+      detectedParams: isPrivate ? { rsaPrivateKey: trimmed } : { rsaPublicKey: trimmed },
+    });
+  }
+
+  // 2. OpenSSL AES / DES Salted Ciphertext (Base64 starts with U2FsdGVkX1...)
   if (trimmed.startsWith('U2FsdGVkX1')) {
     results.push({
       methodId: 'aes-256',

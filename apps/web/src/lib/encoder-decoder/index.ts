@@ -46,6 +46,9 @@ import {
   xorCipher,
 } from './methods/encryption';
 import {
+  encryptRsa, decryptRsa,
+} from './methods/rsa';
+import {
   calculateMd5,
   calculateSha1,
   calculateSha256,
@@ -64,6 +67,7 @@ export * from './detector';
 export * from './methods/ciphers';
 export * from './methods/encodings';
 export * from './methods/encryption';
+export * from './methods/rsa';
 export * from './methods/hashes';
 
 export const METHOD_DEFINITIONS: MethodDefinition[] = [
@@ -268,7 +272,14 @@ export const METHOD_DEFINITIONS: MethodDefinition[] = [
     description: 'Reverses the sequence of characters.',
   },
 
-  // Symmetric Encryption (Passphrase based)
+  // Asymmetric & Symmetric Encryption
+  {
+    id: 'rsa',
+    name: 'RSA Encryption / Decryption',
+    category: 'encryption',
+    requiresPassphrase: true,
+    description: 'Asymmetric public-key cryptography (PKCS#1 v1.5 / RSA-OAEP) with PEM keypair support.',
+  },
   {
     id: 'aes-256',
     name: 'AES-256 Encryption',
@@ -557,7 +568,10 @@ export function executeConversion(
           output = reverseText(input);
           break;
 
-        // Symmetric Encryption
+        // Asymmetric & Symmetric Encryption
+        case 'rsa':
+          output = isDecode ? decryptRsa(input, options) : encryptRsa(input, options);
+          break;
         case 'aes-256':
         case 'aes-192':
         case 'aes-128':
@@ -664,6 +678,7 @@ export const MULTI_COMPARE_METHODS: ConversionMethodId[] = [
   'caesar',
   'atbash',
   'aes-256',
+  'rsa',
   'des',
   'rc4',
   'sha256',

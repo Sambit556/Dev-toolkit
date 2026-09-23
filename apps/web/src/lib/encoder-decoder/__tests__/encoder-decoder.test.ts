@@ -1,3 +1,12 @@
+import { TextEncoder, TextDecoder } from 'util';
+
+if (typeof global.TextEncoder === 'undefined') {
+  global.TextEncoder = TextEncoder;
+}
+if (typeof global.TextDecoder === 'undefined') {
+  global.TextDecoder = TextDecoder as any;
+}
+
 import {
   encodeBase64, decodeBase64,
   encodeBase32, decodeBase32,
@@ -28,6 +37,9 @@ import {
   encryptRabbit, decryptRabbit,
   encryptBlowfish, decryptBlowfish,
   xorCipher,
+  encryptRsa, decryptRsa,
+  generateRsaKeyPair, getPublicKeyFromPrivateKey,
+  parseRsaPublicKey, parseRsaPrivateKey,
   calculateMd5,
   calculateSha256,
   calculateCrc32,
@@ -172,6 +184,110 @@ describe('Universal Encoder / Decoder & Encryption Suite', () => {
 
     const xorEnc = xorCipher(sample, { passphrase: pass }, false);
     expect(xorCipher(xorEnc, { passphrase: pass }, true)).toBe(sample);
+  });
+
+  describe('RSA Public-Key Encryption and Decryption', () => {
+    // Generate test 1024-bit keypair for fast test execution
+    const keyPair = generateRsaKeyPair(1024);
+
+    test('Key generation produces valid PEM keys and can derive public key', () => {
+      expect(keyPair.publicKey).toContain('-----BEGIN PUBLIC KEY-----');
+      expect(keyPair.privateKey).toContain('-----BEGIN PRIVATE KEY-----');
+
+      const parsedPub = parseRsaPublicKey(keyPair.publicKey);
+      const parsedPriv = parseRsaPrivateKey(keyPair.privateKey);
+      expect(parsedPub.bitLength).toBe(1024);
+      expect(parsedPriv.bitLength).toBe(1024);
+
+      const derivedPub = getPublicKeyFromPrivateKey(keyPair.privateKey);
+      expect(derivedPub).toContain('-----BEGIN PUBLIC KEY-----');
+    });
+
+    test('RSA-OAEP SHA-256 Encryption & Decryption roundtrip', () => {
+      const msg = 'Top secret RSA message! 🔒';
+      const ciphertext = encryptRsa(msg, {
+        rsaPublicKey: keyPair.publicKey,
+        rsaPadding: 'OAEP-SHA256',
+      });
+      expect(ciphertext.length).toBeGreaterThan(0);
+
+      const decrypted = decryptRsa(ciphertext, {
+        rsaPrivateKey: keyPair.privateKey,
+        rsaPadding: 'OAEP-SHA256',
+      });
+      expect(decrypted).toBe(msg);
+    });
+
+    test('RSA-OAEP SHA-1 Encryption & Decryption roundtrip', () => {
+      const msg = 'Testing SHA-1 OAEP padding';
+      const ciphertext = encryptRsa(msg, {
+        rsaPublicKey: keyPair.publicKey,
+        rsaPadding: 'OAEP-SHA1',
+      });
+      const decrypted = decryptRsa(ciphertext, {
+        rsaPrivateKey: keyPair.privateKey,
+        rsaPadding: 'OAEP-SHA1',
+      });
+      expect(decrypted).toBe(msg);
+    });
+
+    test('PKCS#1 v1.5 Encryption & Decryption roundtrip', () => {
+      const msg = 'Classic PKCS#1 v1.5 padding';
+      const ciphertext = encryptRsa(msg, {
+        rsaPublicKey: keyPair.publicKey,
+        rsaPadding: 'PKCS1-v1_5',
+      });
+      const decrypted = decryptRsa(ciphertext, {
+        rsaPrivateKey: keyPair.privateKey,
+        rsaPadding: 'PKCS1-v1_5',
+      });
+      expect(decrypted).toBe(msg);
+    });
+
+    test('Hex output format roundtrip', () => {
+      const msg = 'Hex formatted ciphertext';
+      const hexCipher = encryptRsa(msg, {
+        rsaPublicKey: keyPair.publicKey,
+        rsaPadding: 'OAEP-SHA256',
+        rsaOutputFormat: 'hex',
+      });
+      expect(hexCipher).toMatch(/^[0-9a-f]{2}( [0-9a-f]{2})+$/);
+
+      const decrypted = decryptRsa(hexCipher, {
+        rsaPrivateKey: keyPair.privateKey,
+        rsaPadding: 'OAEP-SHA256',
+      });
+      expect(decrypted).toBe(msg);
+    });
+
+    test('executeConversion dispatching for RSA', () => {
+      const msg = 'Unified execution test';
+      const encResult = executeConversion(msg, 'rsa', false, {
+        rsaPublicKey: keyPair.publicKey,
+        rsaPadding: 'OAEP-SHA256',
+      });
+      expect(encResult.error).toBeUndefined();
+      expect(encResult.output.length).toBeGreaterThan(0);
+
+      const decResult = executeConversion(encResult.output, 'rsa', true, {
+        rsaPrivateKey: keyPair.privateKey,
+        rsaPadding: 'OAEP-SHA256',
+      });
+      expect(decResult.error).toBeUndefined();
+      expect(decResult.output).toBe(msg);
+    });
+
+    test('Auto-detection recognizes RSA PEM keys', () => {
+      const detectionsPub = detectFormat(keyPair.publicKey);
+      expect(detectionsPub.length).toBeGreaterThan(0);
+      expect(detectionsPub[0].methodId).toBe('rsa');
+      expect(detectionsPub[0].suggestedAction).toBe('encode');
+
+      const detectionsPriv = detectFormat(keyPair.privateKey);
+      expect(detectionsPriv.length).toBeGreaterThan(0);
+      expect(detectionsPriv[0].methodId).toBe('rsa');
+      expect(detectionsPriv[0].suggestedAction).toBe('decode');
+    });
   });
 
   test('Hashes: MD5, SHA-256, CRC32', () => {
