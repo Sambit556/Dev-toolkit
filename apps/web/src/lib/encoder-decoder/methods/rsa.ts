@@ -249,12 +249,25 @@ function uint8ToBase64(bytes: Uint8Array): string {
 }
 
 function base64ToUint8(base64: string): Uint8Array {
-  const binary = atob(base64.replace(/\s+/g, ''));
-  const bytes = new Uint8Array(binary.length);
-  for (let i = 0; i < binary.length; i++) {
-    bytes[i] = binary.charCodeAt(i);
+  let cleaned = (base64 || '').replace(/[\r\n\s]+/g, '').replace(/-/g, '+').replace(/_/g, '/');
+  if (!cleaned) return new Uint8Array(0);
+  while (cleaned.length % 4 !== 0) {
+    cleaned += '=';
   }
-  return bytes;
+  // Sanitize characters
+  cleaned = cleaned.replace(/[^A-Za-z0-9+/=]/g, '');
+  if (!cleaned) return new Uint8Array(0);
+
+  try {
+    const binary = atob(cleaned);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) {
+      bytes[i] = binary.charCodeAt(i);
+    }
+    return bytes;
+  } catch {
+    throw new Error('Invalid Base64 / PEM encoding format.');
+  }
 }
 
 function formatPem(header: string, base64: string): string {

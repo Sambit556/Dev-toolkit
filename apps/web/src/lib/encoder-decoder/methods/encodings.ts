@@ -30,13 +30,21 @@ export function encodeBase64(input: string): string {
 }
 
 export function decodeBase64(input: string): string {
-  const cleaned = input.trim().replace(/\s+/g, '');
-  const binary = atob(cleaned);
-  const bytes = new Uint8Array(binary.length);
-  for (let i = 0; i < binary.length; i++) {
-    bytes[i] = binary.charCodeAt(i);
+  let cleaned = input.trim().replace(/[\r\n\s]+/g, '');
+  if (!cleaned) return '';
+  while (cleaned.length % 4 !== 0) {
+    cleaned += '=';
   }
-  return utf8BytesToString(bytes);
+  try {
+    const binary = atob(cleaned);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) {
+      bytes[i] = binary.charCodeAt(i);
+    }
+    return utf8BytesToString(bytes);
+  } catch {
+    throw new Error('Invalid Base64 input. Ensure input is a valid Base64 string.');
+  }
 }
 
 export function encodeBase64Url(input: string): string {
@@ -459,7 +467,6 @@ export function encodePunycode(input: string): string {
   const parts = input.split('.');
   const encodedParts = parts.map((part) => {
     // If pure ASCII, no transformation needed
-    // eslint-disable-next-line no-control-regex
     if (/^[\x00-\x7F]*$/.test(part)) return part;
 
     const codePoints = Array.from(part).map((c) => c.codePointAt(0)!);

@@ -22,7 +22,6 @@ export function calculateShannonEntropy(str: string): number {
 // Check if string is predominantly printable text
 function isPrintableText(str: string): boolean {
   if (!str || str.length === 0) return false;
-  // eslint-disable-next-line no-control-regex
   const printable = str.replace(/[\x20-\x7E\t\r\n\u00A0-\uFFFF]/g, '');
   return printable.length / str.length < 0.05;
 }
